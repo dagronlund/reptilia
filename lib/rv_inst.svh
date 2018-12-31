@@ -28,7 +28,7 @@ package rv_inst;
         RV_INST_SIZE_48 = 3'b010,
         RV_INST_SIZE_64 = 3'b011,
         RV_INST_SIZE_VAR = 3'b100,
-        RV_INST_SIZE_RES = 3'b101
+        RV_INST_SIZE_RESERVED = 3'b101
     } rv_inst_size;
 
     function automatic rv_inst_size rv_inst_get_size(bit [15:0] inst_header);
@@ -43,7 +43,7 @@ package rv_inst;
         end else if (inst_header[14:12] != 3'b111) begin
             return RV_INST_SIZE_VAR;
         end else begin
-            return RV_INST_SIZE_RES;
+            return RV_INST_SIZE_RESERVED;
         end
     endfunction
 
@@ -110,8 +110,9 @@ package rv_inst;
         endcase
     endfunction
 
-    function automatic bit[31:0] rv_inst_get_immediate_32(bit [31:0] inst);
-        case (rv_inst_get_type_32(inst))
+    function automatic signed bit[31:0] rv_inst_get_immediate_32(bit [31:0] inst, 
+            rv_inst_type_32 inst_type);
+        case (inst_type)
         RV_INST_TYPE_S: return {{20{inst[31]}}, inst[31:25], inst[11:7]};
         RV_INST_TYPE_B: return {{20{inst[31]}}, inst[7], inst[30:25], inst[11:8], 1'b0};
         RV_INST_TYPE_U: return {inst[31:12], 12'b0};
@@ -349,9 +350,6 @@ endpackage
 
 /*
 
-
-
-
 Atomic Instructions:
     00010 aq rl 00000 rs1 010 rd 0101111 LR.W
     00011 aq rl rs2 rs1 010   rd 0101111 SC.W
@@ -455,6 +453,25 @@ Notes:
     RV_FENCE_I
         Forces executing processor to flush any existing memory operations before reading another instruction
     RV_FENCE
+        Forces executing processor to flush any existing memory operations before allowing other processors to execute their own memory operations
+
+
+FETCH -> DECODE -> EXECUTE -> MEM -> REG
+
+FETCH
+    - Owns the instruction pointer
+
+DECODE
+    - Owns the register file
+
+EXECUTE
+    
+
+MEM
+
+REG
+
+
 
 
 */
