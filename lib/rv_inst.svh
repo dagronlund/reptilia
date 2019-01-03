@@ -48,7 +48,7 @@ package rv_inst;
     endfunction
 
     function automatic bit [3:0] rv_inst_get_size_variable_parcels(bit [15:0] inst_header);
-        return inst_header[14:12]) + 4'd5;
+        return inst_header[14:12] + 4'd5;
     endfunction
 
     typedef struct packed {
@@ -179,7 +179,7 @@ package rv_inst;
                 FUNCT7_NORMAL: return RV_SLLI;
                 default: return RV_32I_UNDEF;
                 endcase
-            3'b010: return RV_SLTI
+            3'b010: return RV_SLTI;
             3'b011: return RV_SLTIU;
             3'b100: return RV_XORI;
             3'b101:
@@ -286,14 +286,14 @@ package rv_inst;
             case(data.funct7)
             FUNCT7_MUL_DIV:
                 case (data.funct3)
-                3'b000 return MUL;
-                3'b001 return MULH;
-                3'b010 return MULHSU;
-                3'b011: return MULHU;
-                3'b100: return DIV;
-                3'b101: return DIVU;
-                3'b110: return REM;
-                3'b111: return REMU;
+                3'b000: return RV_MUL;
+                3'b001: return RV_MULH;
+                3'b010: return RV_MULHSU;
+                3'b011: return RV_MULHU;
+                3'b100: return RV_DIV;
+                3'b101: return RV_DIVU;
+                3'b110: return RV_REM;
+                3'b111: return RV_REMU;
                 default: return RV_32M_UNDEF;
                 endcase
             default: return RV_32M_UNDEF;
@@ -335,10 +335,10 @@ package rv_inst;
         end else begin
             return RV_32A_UNDEF;
         end
-    endcase
+    endfunction
     
     typedef struct packed {
-        bit DEVICE_INPUT; 
+        bit DEVICE_INPUT;
         bit DEVICE_OUTPUT; 
         bit MEM_READ;
         bit MEM_WRITE;
