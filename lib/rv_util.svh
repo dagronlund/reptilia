@@ -11,7 +11,7 @@ Utilities for RISC-V development
 generate \
 if (!condition) begin \
     initial begin \
-        $error("%s:%d Condition Failed: %s", `__FILE__, `__LINE__, `STRINGIFY(condition)); \
+        $error("FAILED ASSERTION: %s:%d, %s", `__FILE__, `__LINE__, `STRINGIFY(condition)); \
     end \
 end \
 endgenerate
@@ -25,6 +25,15 @@ interface ``DATA_TYPE``_stream_intf(); \
     modport view(input valid, data, ready); \
 endinterface \
 `define __``DATA_TYPE``_STREAM_INTF__ \
+`endif
+
+`define BUILD_MAYBE_STRUCT(DATA_TYPE) \
+`ifndef __``DATA_TYPE``_MAYBE_STRUCT__ \
+typedef struct { \
+    DATA_TYPE data; \
+    logic valid; \
+} ``DATA_TYPE``_maybe; \
+`define __``DATA_TYPE``_MAYBE_STRUCT__ \
 `endif
 
 `endif
