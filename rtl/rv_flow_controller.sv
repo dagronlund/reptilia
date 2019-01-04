@@ -6,13 +6,13 @@ module rv_seq_flow_controller #(
 )(
     input logic clk, rst,
 
-    input logic inputs_valid [NUM_INPUTS],
-    output logic inputs_ready [NUM_INPUTS],
-    input logic inputs_recieved [NUM_INPUTS], // Inputs being accepted
+    input logic [NUM_INPUTS-1:0] inputs_valid,
+    output logic [NUM_INPUTS-1:0] inputs_ready,
+    input logic [NUM_INPUTS-1:0] inputs_block, // Inputs being accepted
     
-    output logic outputs_valid [NUM_OUTPUTS],
-    input logic outputs_ready [NUM_OUTPUTS],
-    input logic outputs_sent [NUM_OUTPUTS], // Outputs being generated
+    output logic [NUM_OUTPUTS-1:0] outputs_valid,
+    input logic [NUM_OUTPUTS-1:0] outputs_ready,
+    input logic [NUM_OUTPUTS-1:0] outputs_block, // Outputs being generated
 
     output logic enable // Enable state transition
 );
@@ -20,7 +20,7 @@ module rv_seq_flow_controller #(
     // logic global_output_ready, global_input_valid;
 
     // Prevents an output from being read more than once
-    logic outputs_consumed [NUM_OUTPUTS];
+    logic [NUM_OUTPUTS-1:0] outputs_consumed;
     always_ff @(posedge clk) begin
         for (int i = 0; i < NUM_OUTPUTS; i++) begin
             if (rst || enable) begin
@@ -55,11 +55,11 @@ module rv_seq_flow_controller #(
         for (int i = 0; i < NUM_OUTPUTS; i++) begin
             
             // Outputs are valid if they were sent and haven't been consumed yet
-            outputs_valid[i] = outputs_sent[i] & ~outputs_consumed[i];
+            outputs_valid[i] = outputs_block[i] & ~outputs_consumed[i];
 
             for (int j = 0; j < NUM_OUTPUTS; j++) begin
                 if (i != j) begin
-                    outputs_valid[i] &= outputs_ready[j] | ~outputs_sent[j];
+                    outputs_valid[i] &= outputs_ready[j] | ~outputs_block[j];
                 end
             end
 
@@ -67,7 +67,7 @@ module rv_seq_flow_controller #(
             //  a. Being accepted currently 
             //  b. Was already accepted
             //  c. Was never sent originally
-            outputs_flowing &= outputs_ready[i] | outputs_consumed[i] | ~outputs_sent[i];   
+            outputs_flowing &= outputs_ready[i] | outputs_consumed[i] | ~outputs_block[i];   
         end
 
         enable = outputs_flowing;
@@ -76,18 +76,18 @@ module rv_seq_flow_controller #(
         for (int i = 0; i < NUM_INPUTS; i++) begin
 
             // Inputs are ready if they are being awaited and all outputs are flowing
-            inputs_ready[i] = inputs_recieved[i] & outputs_flowing;
+            inputs_ready[i] = inputs_block[i] & outputs_flowing;
 
             for (int j = 0; j < NUM_INPUTS; j++) begin
                 if (i != j) begin
-                    inputs_ready[i] &= inputs_valid[j] | ~inputs_recieved[j];
+                    inputs_ready[i] &= inputs_valid[j] | ~inputs_block[j];
                 end
             end
 
             // Inputs are clear if they are either
             //  a. Currently being provided
             //  b. Currently not being accepted
-            enable &= inputs_valid[i] | ~inputs_recieved[i];
+            enable &= inputs_valid[i] | ~inputs_block[i];
         end
 
     end
@@ -98,11 +98,11 @@ module rv_comb_flow_controller #(
     parameter int NUM_INPUTS = 1,
     parameter int NUM_OUTPUTS = 1
 )(
-    input logic inputs_valid [NUM_INPUTS],
-    output logic inputs_ready [NUM_INPUTS],
+    input logic [NUM_INPUTS-1:0] inputs_valid,
+    output logic [NUM_INPUTS-1:0] inputs_ready,
     
-    output logic outputs_valid [NUM_OUTPUTS],
-    input logic outputs_ready [NUM_OUTPUTS]
+    output logic [NUM_OUTPUTS-1:0] outputs_valid,
+    input logic [NUM_OUTPUTS-1:0] outputs_ready
 );
 
     logic all_inputs_valid, all_outputs_ready;
@@ -118,8 +118,8 @@ module rv_comb_flow_controller #(
             all_outputs_ready &= outputs_ready[i];
         end
 
-        outputs_valid = '{NUM_OUTPUTS{all_inputs_valid}};
-        inputs_ready = '{NUM_INPUTS{all_outputs_ready}};
+        outputs_valid = {NUM_OUTPUTS{all_inputs_valid}};
+        inputs_ready = {NUM_INPUTS{all_outputs_ready}};
     end
 
 endmodule
