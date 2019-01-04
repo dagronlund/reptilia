@@ -19,10 +19,10 @@ Utilities for RISC-V development
 `define BUILD_STREAM_INTF(DATA_TYPE) \
     `ifndef __``DATA_TYPE``_STREAM_INTF__ \
     interface ``DATA_TYPE``_stream_intf(); \
-        DATA_TYPE data; logic valid, ready; \
-        modport out(output valid, data, input ready); \
-        modport in(input valid, data, output ready); \
-        modport view(input valid, data, ready); \
+        DATA_TYPE data; logic valid, ready, block; \
+        modport out(output valid, data, block, input ready); \
+        modport in(input valid, data, output ready, block); \
+        modport view(input valid, data, ready, block); \
     endinterface \
     `define __``DATA_TYPE``_STREAM_INTF__ \
     `endif
@@ -37,7 +37,7 @@ Utilities for RISC-V development
     `endif
 
 `define BUILD_WRAPPER_TYPES(DATA_TYPE) \
-    `define BUILD_STREAM_INTF(DATA_TYPE) \
-    `define BUILD_MAYBE_STRUCT(DATA_TYPE)
+    `BUILD_STREAM_INTF(DATA_TYPE) \
+    `BUILD_MAYBE_STRUCT(DATA_TYPE)
 
 `endif
