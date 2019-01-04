@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-module rv_sequential_flow_controller #(
+module rv_seq_flow_controller #(
     parameter int NUM_INPUTS = 1,
     parameter int NUM_OUTPUTS = 1
 )(
@@ -94,7 +94,7 @@ module rv_sequential_flow_controller #(
 
 endmodule
 
-module rv_combinational_flow_controller #(
+module rv_comb_flow_controller #(
     parameter int NUM_INPUTS = 1,
     parameter int NUM_OUTPUTS = 1
 )(
