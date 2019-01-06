@@ -10,20 +10,28 @@
  * immediately after this will allow for the block memory output register to
  * be used.
  */
+ 
 module rv_memory_single #(
     parameter WRITE_PROPAGATE = 0 // Writes generate a result as well
 )(
     input logic clk, rst,
-    rv_mem.in command, // Inbound Commands
-    rv_mem.out result // Outbound Results
+    rv_mem_intf.in command, // Inbound Commands
+    rv_mem_intf.out result // Outbound Results
 );
 
-    `STATIC_ASSERT(command.DATA_WIDTH == result.DATA_WIDTH)
-    `STATIC_ASSERT(command.ADDR_WIDTH == result.ADDR_WIDTH)
+    import rv_mem::*;
 
-    parameter DATA_WIDTH = command.DATA_WIDTH;
-    parameter ADDR_WIDTH = command.ADDR_WIDTH;
-    parameter DATA_LENGTH = 2**ADDR_WIDTH;
+    `STATIC_ASSERT($bits(command.data) == $bits(result.data))
+    `STATIC_ASSERT($bits(command.addr) == $bits(result.addr))
+
+    // Currently blows up Vivado 2017.2
+    localparam DATA_WIDTH = $bits(command.data);
+    localparam ADDR_WIDTH = $bits(command.addr);
+    localparam DATA_LENGTH = 2**ADDR_WIDTH;
+
+//    localparam DATA_WIDTH = 32;
+//    localparam ADDR_WIDTH = 10;
+//    localparam DATA_LENGTH = 2**ADDR_WIDTH;
 
     logic enable, data_valid;
     logic [DATA_WIDTH-1:0] data [DATA_LENGTH];
@@ -58,5 +66,96 @@ module rv_memory_single #(
             result.addr <= command.addr;
         end
     end
+
+endmodule
+
+module rv_memory_single_tb ();
+
+    import rv_mem::*;
+
+    logic clk, rst;
+    clk_rst_gen clk_rst_gen_inst(.clk, .rst);
+
+    rv_mem_intf mem_command(.*);
+    rv_mem_intf mem_result(.*);
+
+    rv_memory_single #(
+        .WRITE_PROPAGATE(0)
+    ) mem_inst0 (
+        .clk, .rst,
+        .command(mem_command),
+        .result(mem_result)
+    );
+
+    initial begin
+        mem_command.valid = 0;
+        while (rst) @ (posedge clk);
+
+        @ (posedge clk);
+        mem_command.send(RV_MEM_READ, 'b0, 'b0);
+
+        @ (posedge clk);
+        mem_command.send(RV_MEM_WRITE, 'b0, 'b1);
+
+        @ (posedge clk);
+        mem_command.send(RV_MEM_READ, 'b0, 'b0);
+
+        $display("Sends Complete");
+    end
+
+    rv_memory_op result_op;
+    logic [9:0] result_addr;
+    logic [31:0] result_data;
+
+    initial begin
+        mem_result.ready = 0;
+        while (rst) @ (posedge clk);
+
+        @ (posedge clk);
+        mem_result.recv(result_op, result_addr, result_data);
+
+        @ (posedge clk);
+        mem_result.recv(result_op, result_addr, result_data);
+
+        $display("Recvs Complete");
+        $finish;
+    end
+
+endmodule
+
+module rv_memory_single_synth_tb(
+    logic clk, rst
+);
+
+    // Interfaces
+    rv_mem_intf mem_command0();
+    rv_mem_intf mem_command1();
+
+    rv_mem_intf mem_result0();
+    rv_mem_intf mem_result1();
+
+    // Null Endpoints
+    rv_mem_intf_out_null null_out0(.mem(mem_command0));
+    rv_mem_intf_out_null null_out1(.mem(mem_command1));
+
+    rv_mem_intf_in_null null_in0(.mem(mem_result0));
+    rv_mem_intf_in_null null_in1(.mem(mem_result1));
+
+    rv_memory_single #(
+        .WRITE_PROPAGATE(0)
+    ) mem_inst0 (
+        .clk, .rst,
+        .command(mem_command0),
+        .result(mem_result0)
+    );
+
+    rv_memory_single #(
+        .WRITE_PROPAGATE(1)
+    ) mem_inst1 (
+        .clk, .rst,
+        .command(mem_command1),
+        .result(mem_result1)
+    );
+
 
 endmodule
