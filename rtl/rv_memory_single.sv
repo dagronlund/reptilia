@@ -10,9 +10,8 @@
  * immediately after this will allow for the block memory output register to
  * be used.
  */
-
-module rv_memory_simple #(
-    parameter WRITE_GENERATE_RESULT = 0 // Writes generate a result as well
+module rv_memory_single #(
+    parameter WRITE_PROPAGATE = 0 // Writes generate a result as well
 )(
     input logic clk, rst,
     rv_mem.in command, // Inbound Commands
@@ -51,7 +50,7 @@ module rv_memory_simple #(
                 data_valid <= 1'b1;
             end else begin // write
                 data[command.addr] <= command.data;
-                data_valid <= (WRITE_GENERATE_RESULT != 0);
+                data_valid <= (WRITE_PROPAGATE != 0);
             end
 
             result.data <= data[command.addr];
