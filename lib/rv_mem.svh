@@ -10,35 +10,4 @@ package rv_mem;
 
 endpackage
 
-interface rv_mem_intf #(
-    parameter DATA_WIDTH = 32,
-    parameter ADDR_WIDTH = 10
-)();
-
-    import rv_mem::*;
-
-    logic valid, ready, block;
-    rv_memory_op op;
-    logic [ADDR_WIDTH-1:0] addr;
-    logic [DATA_WIDTH-1:0] data;
-
-    modport out(
-        output valid, block,
-        input ready,
-        output op, addr, data
-    );
-
-    modport in(
-        input valid, block,
-        output ready,
-        input op, addr, data
-    );
-    
-    modport view(
-        input valid, block, ready,
-        input op, addr, data
-    );
-
-endinterface
-
 `endif

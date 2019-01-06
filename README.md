@@ -17,3 +17,7 @@ The following standard state machine controller are provided for working with st
 	...
 2. rv_comb_flow_controler
 	...
+
+## Random Notes
+1. ABSOLUTELY NEVER put an interface or module definition in a header file, Vivado loses it
+2. Use $bit(interface.bus) instead of interface.BUS_WIDTH to parameterize bit widths when possible

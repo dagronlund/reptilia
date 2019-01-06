@@ -46,8 +46,8 @@ module clk_rst_gen #(
     parameter ACTIVE_HIGH = 1,
     parameter CYCLES = 1
 )(
-    output logic clk, rst,
-    input logic trigger_rst = 'b0
+    output logic clk, rst
+    // input logic trigger_rst = 1'b0
 );
 
     initial begin
