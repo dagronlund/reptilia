@@ -14,23 +14,30 @@ module rv_memory_double #(
     parameter WRITE_PROPAGATE = 0 // Writes generate a result as well
 )(
     input logic clk, rst,
-    rv_mem.in command0, // Inbound Commands
-    rv_mem.out result0, // Outbound Results
-    rv_mem.in command1, // Inbound Commands
-    rv_mem.out result1, // Outbound Results
+    rv_mem_intf.in command0, // Inbound Commands
+    rv_mem_intf.out result0, // Outbound Results
+    rv_mem_intf.in command1, // Inbound Commands
+    rv_mem_intf.out result1 // Outbound Results
 );
 
-    `STATIC_ASSERT(command0.DATA_WIDTH == result0.DATA_WIDTH)
-    `STATIC_ASSERT(command0.DATA_WIDTH == command1.DATA_WIDTH)
-    `STATIC_ASSERT(command0.DATA_WIDTH == result1.DATA_WIDTH)
+    import rv_mem::*;
 
-    `STATIC_ASSERT(command0.ADDR_WIDTH == result0.ADDR_WIDTH)
-    `STATIC_ASSERT(command0.ADDR_WIDTH == command1.ADDR_WIDTH)
-    `STATIC_ASSERT(command0.ADDR_WIDTH == result1.ADDR_WIDTH)
+    `STATIC_ASSERT($bits(command0.data) == $bits(result0.data))
+    `STATIC_ASSERT($bits(command0.data) == $bits(command1.data))
+    `STATIC_ASSERT($bits(command0.data) == $bits(result1.data))
 
-    parameter DATA_WIDTH = command0.DATA_WIDTH;
-    parameter ADDR_WIDTH = command0.ADDR_WIDTH;
-    parameter DATA_LENGTH = 2**ADDR_WIDTH;
+    `STATIC_ASSERT($bits(command0.addr) == $bits(result0.addr))
+    `STATIC_ASSERT($bits(command0.addr) == $bits(command1.addr))
+    `STATIC_ASSERT($bits(command0.addr) == $bits(result1.addr))
+
+    // // Currently causes Vivado 2017.2 to blow up
+    // parameter DATA_WIDTH = $bits(command0.data);
+    // parameter ADDR_WIDTH = $bits(command0.addr);
+    // parameter DATA_LENGTH = 2**ADDR_WIDTH;
+
+    localparam DATA_WIDTH = 32;
+    localparam ADDR_WIDTH = 10;
+    localparam DATA_LENGTH = 2**ADDR_WIDTH;
 
     logic enable0, data_valid0;
     logic enable1, data_valid1;
@@ -65,36 +72,93 @@ module rv_memory_double #(
         .outputs_block({data_valid1})
     );
 
-    always_ff @(posedge clk) begin
-        if(rst) begin
+    /*
+    Note:
+    Using four seperate always_ff blocks is super important for Vivado to 
+    recognize that this is a true-dual-port block-ram, without a weird output
+    register stage.
+
+    A single always_ff block will imply some priority when writing to the
+    block-ram at the same time and place, which won't synthesize.
+    */
+
+    always_ff @ (posedge clk) begin
+        if (rst) begin
             data_valid0 <= 1'b0;
         end else if (enable0) begin
             if (command0.op == RV_MEM_READ) begin
                 data_valid0 <= 1'b1;
             end else begin // write
-                data[command0.addr] <= command0.data;
                 data_valid0 <= (WRITE_PROPAGATE != 0);
             end
 
-            result0.data <= data[command0.addr];
             result0.op <= command0.op;
             result0.addr <= command0.addr;
         end
+    end
 
-        if(rst) begin
+    always_ff @ (posedge clk) begin
+        if (!rst && enable0) begin
+            if (command0.op == RV_MEM_WRITE) begin
+                data[command0.addr] <= command0.data;
+            end
+            result0.data <= data[command0.addr];
+        end
+    end
+
+    always_ff @ (posedge clk) begin
+        if (rst) begin
             data_valid1 <= 1'b0;
         end else if (enable1) begin
             if (command1.op == RV_MEM_READ) begin
                 data_valid1 <= 1'b1;
             end else begin // write
-                data[command1.addr] <= command1.data;
                 data_valid1 <= (WRITE_PROPAGATE != 0);
             end
 
-            result1.data <= data[command1.addr];
             result1.op <= command1.op;
             result1.addr <= command1.addr;
         end
     end
 
+    always_ff @ (posedge clk) begin
+        if (!rst && enable1) begin
+            if (command1.op == RV_MEM_WRITE) begin
+                data[command1.addr] <= command1.data;
+            end
+            result1.data <= data[command1.addr];
+        end
+    end
+
 endmodule
+
+module rv_memory_double_synth_tb(
+    logic clk, rst
+);
+
+    // Interfaces
+    rv_mem_intf mem_command0();
+    rv_mem_intf mem_command1();
+
+    rv_mem_intf mem_result0();
+    rv_mem_intf mem_result1();
+
+    // Null Endpoints
+    rv_mem_intf_out_null null_out0(.mem(mem_command0));
+    rv_mem_intf_out_null null_out1(.mem(mem_command1));
+
+    rv_mem_intf_in_null null_in0(.mem(mem_result0));
+    rv_mem_intf_in_null null_in1(.mem(mem_result1));
+
+    rv_memory_double #(
+        .WRITE_PROPAGATE(0)
+    ) mem_inst0 (
+        .clk, .rst,
+        .command0(mem_command0),
+        .result0(mem_result0),
+        .command1(mem_command1),
+        .result1(mem_result1)
+    );
+
+endmodule
+

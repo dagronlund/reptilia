@@ -157,5 +157,4 @@ module rv_memory_single_synth_tb(
         .result(mem_result1)
     );
 
-
 endmodule
