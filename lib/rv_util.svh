@@ -3,6 +3,8 @@
 
 /*
 Utilities for RISC-V development
+
+Original STATIC_ASSERT from Reid Long
 */
 
 `define STRINGIFY(str) `"str`"
@@ -39,5 +41,28 @@ Utilities for RISC-V development
 `define BUILD_WRAPPER_TYPES(DATA_TYPE) \
     `BUILD_STREAM_INTF(DATA_TYPE) \
     `BUILD_MAYBE_STRUCT(DATA_TYPE)
+
+module clk_rst_gen #(
+    parameter ACTIVE_HIGH = 1,
+    parameter CYCLES = 1
+)(
+    output logic clk, rst,
+    input logic trigger_rst = 'b0
+);
+
+    initial begin
+        clk = 0;
+        rst = 1;
+        for (int i = 0; i < CYCLES; i++) begin
+            #5 clk = 1;
+            #5 clk = 0;
+        end
+        rst = 0;
+        forever begin 
+            #5 clk = ~clk;
+        end
+    end
+
+endmodule
 
 `endif
