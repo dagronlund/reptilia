@@ -24,14 +24,9 @@ module rv_memory_single #(
     `STATIC_ASSERT($bits(command.data) == $bits(result.data))
     `STATIC_ASSERT($bits(command.addr) == $bits(result.addr))
 
-    // Currently blows up Vivado 2017.2
     localparam DATA_WIDTH = $bits(command.data);
     localparam ADDR_WIDTH = $bits(command.addr);
     localparam DATA_LENGTH = 2**ADDR_WIDTH;
-
-//    localparam DATA_WIDTH = 32;
-//    localparam ADDR_WIDTH = 10;
-//    localparam DATA_LENGTH = 2**ADDR_WIDTH;
 
     logic enable, data_valid;
     logic [DATA_WIDTH-1:0] data [DATA_LENGTH];

@@ -30,13 +30,8 @@ module rv_memory_double #(
     `STATIC_ASSERT($bits(command0.addr) == $bits(command1.addr))
     `STATIC_ASSERT($bits(command0.addr) == $bits(result1.addr))
 
-    // // Currently causes Vivado 2017.2 to blow up
-    // parameter DATA_WIDTH = $bits(command0.data);
-    // parameter ADDR_WIDTH = $bits(command0.addr);
-    // parameter DATA_LENGTH = 2**ADDR_WIDTH;
-
-    localparam DATA_WIDTH = 32;
-    localparam ADDR_WIDTH = 10;
+    localparam DATA_WIDTH = $bits(command0.data);
+    localparam ADDR_WIDTH = $bits(command0.addr);
     localparam DATA_LENGTH = 2**ADDR_WIDTH;
 
     logic enable0, data_valid0;
