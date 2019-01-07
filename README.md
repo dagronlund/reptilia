@@ -19,5 +19,6 @@ The following standard state machine controller are provided for working with st
 	...
 
 ## Random Notes
-1. ABSOLUTELY NEVER put an interface or module definition in a header file, Vivado loses it
+1. ABSOLUTELY NEVER put an interface or module definition in a header file, Vivado loses it brainz
 2. Use $bit(interface.bus) instead of interface.BUS_WIDTH to parameterize bit widths when possible
+3. When referencing a parameter or type passed through an interface port (i.e my_intf.BUS_WIDTH or $bits(my_intf.bus)), make sure that it is assigned to a localparam, not a parameter

@@ -126,34 +126,3 @@ module rv_memory_double #(
     end
 
 endmodule
-
-module rv_memory_double_synth_tb(
-    logic clk, rst
-);
-
-    // Interfaces
-    rv_mem_intf mem_command0();
-    rv_mem_intf mem_command1();
-
-    rv_mem_intf mem_result0();
-    rv_mem_intf mem_result1();
-
-    // Null Endpoints
-    rv_mem_intf_out_null null_out0(.mem(mem_command0));
-    rv_mem_intf_out_null null_out1(.mem(mem_command1));
-
-    rv_mem_intf_in_null null_in0(.mem(mem_result0));
-    rv_mem_intf_in_null null_in1(.mem(mem_result1));
-
-    rv_memory_double #(
-        .WRITE_PROPAGATE(0)
-    ) mem_inst0 (
-        .clk, .rst,
-        .command0(mem_command0),
-        .result0(mem_result0),
-        .command1(mem_command1),
-        .result1(mem_result1)
-    );
-
-endmodule
-
