@@ -12,33 +12,26 @@ interface rv_mem_intf #(
 
     import rv_mem::*;
 
-    // logic clk, rst;
-
     logic valid, ready;
     rv_memory_op op;
     logic [ADDR_WIDTH-1:0] addr;
     logic [DATA_WIDTH-1:0] data;
 
-    // logic block_in, block_out; // Placeholder signals for stream control
-
     modport out(
         output valid,
         input ready,
         output op, addr, data
-        // output block_out
     );
 
     modport in(
         input valid,
         output ready,
         input op, addr, data
-        // output block_in
     );
     
     modport view(
         input valid, ready,
         input op, addr, data
-        // input block_in, block_out
     );
 
     task send(input rv_memory_op op_in, 
@@ -68,47 +61,3 @@ interface rv_mem_intf #(
     endtask
 
 endinterface
-
-module rv_mem_intf_in_null(
-    rv_mem_intf.in mem
-);
-
-    import rv_mem::*;
-
-    (*dont_touch = "true"*) logic valid;
-    (*dont_touch = "true"*) logic ready;
-    (*dont_touch = "true"*) rv_memory_op op;
-    (*dont_touch = "true"*) logic [mem.ADDR_WIDTH-1:0] addr;
-    (*dont_touch = "true"*) logic [mem.DATA_WIDTH-1:0] data;
-
-    always_comb begin
-        valid = mem.valid;
-        mem.ready = ready;
-        op = mem.op;
-        addr = mem.addr;
-        data = mem.data;
-    end
-
-endmodule
-
-module rv_mem_intf_out_null(
-    rv_mem_intf.out mem
-);
-
-    import rv_mem::*;
-
-    (*dont_touch = "true"*) logic valid;
-    (*dont_touch = "true"*) logic ready;
-    (*dont_touch = "true"*) rv_memory_op op;
-    (*dont_touch = "true"*) logic [mem.ADDR_WIDTH-1:0] addr;
-    (*dont_touch = "true"*) logic [mem.DATA_WIDTH-1:0] data;
-
-    always_comb begin
-        mem.valid = valid;
-        ready = mem.ready;
-        mem.op = op;
-        mem.addr = addr;
-        mem.data = data;
-    end
-
-endmodule

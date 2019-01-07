@@ -1,6 +1,8 @@
 `ifndef __RV_AXI__
 `define __RV_AXI__
 
+// TODO: Break up AXI3/AXI4 and add Lite and Stream
+
 package rv_axi;
 
     typedef enum bit [1:0] {
@@ -17,11 +19,15 @@ package rv_axi;
         RV_AXI_BURST_UNDEF = 2'b11
     } rv_axi_burst;
 
+    // Bufferable implies that writes can be delayed as long as desired until
+    // getting issued to the next level of memory
     typedef enum bit {
         RV_AXI_NON_BUFFERABLE = 1'b0,
         RV_AXI_BUFFERABLE = 1'b1
     } rv_axi_bufferable;
 
+    // Cacheable implies that writes can be rearranged and merged as desired
+    // until getting issued to the next level of memory
     typedef enum bit {
         RV_AXI_NON_CACHEABLE = 1'b0,
         RV_AXI_CACHEABLE = 1'b1
@@ -158,6 +164,8 @@ interface rv_axi_write_resp_intf #(
     parameter ID_WIDTH = 1
 )();
 
+    import rv_axi::*;
+
     logic                  BVALID;
     logic                  BREADY;
 
@@ -187,6 +195,8 @@ interface rv_axi_read_data_intf #(
     parameter DATA_WIDTH = 32,
     parameter ID_WIDTH = 1
 )();
+
+    import rv_axi::*;
 
     logic                  RVALID;
     logic                  RREADY;
@@ -219,6 +229,8 @@ interface rv_axi_write_data_intf #(
     parameter DATA_WIDTH = 32,
     parameter STROBE_WIDTH = DATA_WIDTH / 8
 )();
+
+    import rv_axi::*;
 
     logic                    WVALID;
     logic                    WREADY;
