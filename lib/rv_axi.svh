@@ -17,11 +17,31 @@ package rv_axi;
         RV_AXI_BURST_UNDEF = 2'b11
     } rv_axi_burst;
 
+    typedef enum bit {
+        RV_AXI_NON_BUFFERABLE = 1'b0,
+        RV_AXI_BUFFERABLE = 1'b1
+    } rv_axi_bufferable;
+
+    typedef enum bit {
+        RV_AXI_NON_CACHEABLE = 1'b0,
+        RV_AXI_CACHEABLE = 1'b1
+    } rv_axi_cacheable;
+
+    typedef enum bit {
+        RV_AXI_NO_READ_ALLOCATE = 1'b0,
+        RV_AXI_READ_ALLOCATE = 1'b1
+    } rv_axi_read_allocation;
+
+    typedef enum bit {
+        RV_AXI_NO_WRITE_ALLOCATE = 1'b0,
+        RV_AXI_WRITE_ALLOCATE = 1'b1
+    } rv_axi_write_allocation;
+
     typedef struct packed {
-        bit other_allocate;
-        bit allocate;
-        bit modifiable;
-        bit bufferable;
+        rv_axi_write_allocation write_allocation;
+        rv_axi_read_allocation read_allocation;
+        rv_axi_cacheable cacheable;
+        rv_axi_bufferable bufferable;
     } rv_axi_cache;
 
     typedef enum bit {
