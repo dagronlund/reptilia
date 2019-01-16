@@ -78,7 +78,7 @@ package rv_axi;
 
 endpackage
 
-interface rv_axi_addr_read_intf #(
+interface rv_axi_ar_intf #(
     parameter ADDR_WIDTH = 32,
     parameter USER_WIDTH = 1,
     parameter ID_WIDTH = 1
@@ -119,7 +119,7 @@ interface rv_axi_addr_read_intf #(
 
 endinterface
 
-interface rv_axi_addr_write_intf #(
+interface rv_axi_aw_intf #(
     parameter ADDR_WIDTH = 32,
     parameter USER_WIDTH = 1,
     parameter ID_WIDTH = 1
@@ -160,7 +160,7 @@ interface rv_axi_addr_write_intf #(
 
 endinterface
 
-interface rv_axi_write_resp_intf #(
+interface rv_axi_b_intf #(
     parameter ID_WIDTH = 1
 )();
 
@@ -191,7 +191,7 @@ interface rv_axi_write_resp_intf #(
 
 endinterface
 
-interface rv_axi_read_data_intf #(
+interface rv_axi_r_intf #(
     parameter DATA_WIDTH = 32,
     parameter ID_WIDTH = 1
 )();
@@ -225,7 +225,7 @@ interface rv_axi_read_data_intf #(
 
 endinterface
 
-interface rv_axi_write_data_intf #(
+interface rv_axi_w_intf #(
     parameter DATA_WIDTH = 32,
     parameter STROBE_WIDTH = DATA_WIDTH / 8
 )();
