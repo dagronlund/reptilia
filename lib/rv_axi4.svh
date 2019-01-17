@@ -1,100 +1,91 @@
-`ifndef __RV_AXI__
-`define __RV_AXI__
+`ifndef __RV_AXI4__
+`define __RV_AXI4__
 
-// TODO: Break up AXI3/AXI4 and add Lite and Stream
+// TODO: Add AXI4 Stream
 
-package rv_axi;
+package rv_axi4;
 
-    typedef enum bit [1:0] {
-        RV_AXI_RESP_OKAY = 2'b00, 
-        RV_AXI_RESP_EXOKAY = 2'b01, 
-        RV_AXI_RESP_SLVERR = 2'b10, 
-        RV_AXI_RESP_DECERR = 2'b11
-    } rv_axi_resp;
+    typedef enum logic [1:0] {
+        RV_AXI4_RESP_OKAY = 2'b00, 
+        RV_AXI4_RESP_EXOKAY = 2'b01, 
+        RV_AXI4_RESP_SLVERR = 2'b10, 
+        RV_AXI4_RESP_DECERR = 2'b11
+    } rv_axi4_resp;
 
-    typedef enum bit [1:0] {
-        RV_AXI_BURST_FIXED = 2'b00,
-        RV_AXI_BURST_INCR = 2'b01,
-        RV_AXI_BURST_WRAP = 2'b10,
-        RV_AXI_BURST_UNDEF = 2'b11
-    } rv_axi_burst;
+    typedef enum logic [1:0] {
+        RV_AXI4_BURST_FIXED = 2'b00,
+        RV_AXI4_BURST_INCR = 2'b01,
+        RV_AXI4_BURST_WRAP = 2'b10,
+        RV_AXI4_BURST_UNDEF = 2'b11
+    } rv_axi4_burst;
 
-    // Bufferable implies that writes can be delayed as long as desired until
-    // getting issued to the next level of memory
-    typedef enum bit {
-        RV_AXI_NON_BUFFERABLE = 1'b0,
-        RV_AXI_BUFFERABLE = 1'b1
-    } rv_axi_bufferable;
+    typedef enum logic {
+        RV_AXI4_NON_BUFFERABLE = 1'b0,
+        RV_AXI4_BUFFERABLE = 1'b1
+    } rv_axi4_bufferable;
 
-    // Cacheable implies that writes can be rearranged and merged as desired
-    // until getting issued to the next level of memory
-    typedef enum bit {
-        RV_AXI_NON_CACHEABLE = 1'b0,
-        RV_AXI_CACHEABLE = 1'b1
-    } rv_axi_cacheable;
+    typedef enum logic {
+        RV_AXI4_NON_MODIFIABLE = 1'b0,
+        RV_AXI4_MODIFIABLE = 1'b1
+    } rv_axi4_modifiable;
 
-    typedef enum bit {
-        RV_AXI_NO_READ_ALLOCATE = 1'b0,
-        RV_AXI_READ_ALLOCATE = 1'b1
-    } rv_axi_read_allocation;
-
-    typedef enum bit {
-        RV_AXI_NO_WRITE_ALLOCATE = 1'b0,
-        RV_AXI_WRITE_ALLOCATE = 1'b1
-    } rv_axi_write_allocation;
+    typedef enum logic {
+        RV_AXI4_UNALLOCATED = 1'b0,
+        RV_AXI4_ALLOCATED = 1'b1
+    } rv_axi4_allocation;
 
     typedef struct packed {
-        rv_axi_write_allocation write_allocation;
-        rv_axi_read_allocation read_allocation;
-        rv_axi_cacheable cacheable;
-        rv_axi_bufferable bufferable;
-    } rv_axi_cache;
+        rv_axi4_allocation allocation;
+        rv_axi4_allocation other_allocation;
+        rv_axi4_modifiable cacheable;
+        rv_axi4_bufferable bufferable;
+    } rv_axi4_cache;
 
-    typedef enum bit {
-        RV_AXI_LOCK_NORMAL = 1'b0,
-        RV_AXI_LOCK_EXCLUSIVE = 1'b1
-    } rv_axi_lock;
+    typedef enum logic {
+        RV_AXI4_LOCK_NORMAL = 1'b0,
+        RV_AXI4_LOCK_EXCLUSIVE = 1'b1
+    } rv_axi4_lock;
 
-    typedef enum bit {
-        RV_AXI_UNPRIVILEDGED_ACCESS = 1'b0,
-        RV_AXI_PRIVILEDGED_ACCESS = 1'b1
-    } rv_axi_privilege;
+    typedef enum logic {
+        RV_AXI4_UNPRIVILEDGED_ACCESS = 1'b0,
+        RV_AXI4_PRIVILEDGED_ACCESS = 1'b1
+    } rv_axi4_privilege;
 
-    typedef enum bit {
-        RV_AXI_SECURE_ACCESS = 1'b0,
-        RV_AXI_NONSECURE_ACCESS = 1'b1
-    } rv_axi_security;
+    typedef enum logic {
+        RV_AXI4_SECURE_ACCESS = 1'b0,
+        RV_AXI4_NONSECURE_ACCESS = 1'b1
+    } rv_axi4_security;
 
-    typedef enum bit {
-        RV_AXI_DATA_ACCESS = 1'b0,
-        RV_AXI_INSTRUCTION_ACCESS = 1'b1
-    } rv_axi_access;
+    typedef enum logic {
+        RV_AXI4_DATA_ACCESS = 1'b0,
+        RV_AXI4_INSTRUCTION_ACCESS = 1'b1
+    } rv_axi4_access;
 
     typedef struct packed {
-        rv_axi_access access;
-        rv_axi_security security;
-        rv_axi_privilege privilege;
-    } rv_axi_prot;
+        rv_axi4_access access;
+        rv_axi4_security security;
+        rv_axi4_privilege privilege;
+    } rv_axi4_prot;
 
 endpackage
 
-interface rv_axi_ar_intf #(
+interface rv_axi4_ar_intf #(
     parameter ADDR_WIDTH = 32,
     parameter USER_WIDTH = 1,
     parameter ID_WIDTH = 1
 )();
 
-    import rv_axi::*;
+    import rv_axi4::*;
 
     logic                  ARVALID;
     logic                  ARREADY;
 
     logic [ADDR_WIDTH-1:0] ARADDR;
-    rv_axi_burst           ARBURST;
-    rv_axi_cache           ARCACHE;
+    rv_axi4_burst           ARBURST;
+    rv_axi4_cache           ARCACHE;
     logic [7:0]            ARLEN;
-    rv_axi_lock            ARLOCK;
-    rv_axi_prot            ARPROT;
+    rv_axi4_lock            ARLOCK;
+    rv_axi4_prot            ARPROT;
     logic [3:0]            ARQOS;
     logic [2:0]            ARSIZE;
     logic [USER_WIDTH-1:0] ARUSER;
@@ -119,23 +110,23 @@ interface rv_axi_ar_intf #(
 
 endinterface
 
-interface rv_axi_aw_intf #(
+interface rv_axi4_aw_intf #(
     parameter ADDR_WIDTH = 32,
     parameter USER_WIDTH = 1,
     parameter ID_WIDTH = 1
 )();
 
-    import rv_axi::*;
+    import rv_axi4::*;
 
     logic                  AWVALID;
     logic                  AWREADY;
 
     logic [ADDR_WIDTH-1:0] AWADDR;
-    rv_axi_burst           AWBURST;
-    rv_axi_cache           AWCACHE;
+    rv_axi4_burst           AWBURST;
+    rv_axi4_cache           AWCACHE;
     logic [7:0]            AWLEN;
-    rv_axi_lock            AWLOCK;
-    rv_axi_prot            AWPROT;
+    rv_axi4_lock            AWLOCK;
+    rv_axi4_prot            AWPROT;
     logic [3:0]            AWQOS;
     logic [2:0]            AWSIZE;
     logic [USER_WIDTH-1:0] AWUSER;
@@ -160,16 +151,16 @@ interface rv_axi_aw_intf #(
 
 endinterface
 
-interface rv_axi_b_intf #(
+interface rv_axi4_b_intf #(
     parameter ID_WIDTH = 1
 )();
 
-    import rv_axi::*;
+    import rv_axi4::*;
 
     logic                  BVALID;
     logic                  BREADY;
 
-    rv_axi_resp            BRESP;
+    rv_axi4_resp            BRESP;
     logic [ID_WIDTH-1:0]   BID;
 
     modport out(
@@ -191,19 +182,19 @@ interface rv_axi_b_intf #(
 
 endinterface
 
-interface rv_axi_r_intf #(
+interface rv_axi4_r_intf #(
     parameter DATA_WIDTH = 32,
     parameter ID_WIDTH = 1
 )();
 
-    import rv_axi::*;
+    import rv_axi4::*;
 
     logic                  RVALID;
     logic                  RREADY;
 
     logic [DATA_WIDTH-1:0] RDATA;
     logic                  RLAST;
-    rv_axi_resp            RRESP;
+    rv_axi4_resp            RRESP;
     logic [ID_WIDTH-1:0]   RID;
 
     modport out(
@@ -225,12 +216,12 @@ interface rv_axi_r_intf #(
 
 endinterface
 
-interface rv_axi_w_intf #(
+interface rv_axi4_w_intf #(
     parameter DATA_WIDTH = 32,
     parameter STROBE_WIDTH = DATA_WIDTH / 8
 )();
 
-    import rv_axi::*;
+    import rv_axi4::*;
 
     logic                    WVALID;
     logic                    WREADY;
