@@ -1,0 +1,6 @@
+# Linting Temp Files
+xvhdl.log
+xvhdl.pb
+xvlog.log
+xvlog.pb
+xsim.dir/

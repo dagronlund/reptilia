@@ -54,7 +54,7 @@ module rv_shift_register #(
 
     input logic shift_in = 1'b0,
     output logic shift_out,
-    output logic shift_peek,
+    // output logic shift_peek,
 
     input logic load_enable = 1'b0,
     input logic [WIDTH-1:0] load_value = {WIDTH{1'b0}}
@@ -72,7 +72,7 @@ module rv_shift_register #(
 
     always_comb begin
         shift_out = value[WIDTH-1];
-        shift_peek = value[WIDTH-2];
+        // shift_peek = value[WIDTH-2];
     end
 
 endmodule
