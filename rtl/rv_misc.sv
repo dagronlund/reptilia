@@ -1,5 +1,29 @@
 `timescale 1ns/1ps
 
+module clk_rst_gen #(
+    parameter ACTIVE_HIGH = 1,
+    parameter CYCLES = 1
+)(
+    output logic clk, rst
+    // input logic trigger_rst = 1'b0
+);
+    int i;
+
+    initial begin
+        clk = 0;
+        rst = 1;
+        for (i = 0; i < CYCLES; i++) begin
+            #5 clk = 1;
+            #5 clk = 0;
+        end
+        rst = 0;
+        forever begin 
+            #5 clk = ~clk;
+        end
+    end
+
+endmodule
+
 interface rv_io_intf #()();
 
     logic i, o, t;
@@ -54,7 +78,6 @@ module rv_shift_register #(
 
     input logic shift_in = 1'b0,
     output logic shift_out,
-    // output logic shift_peek,
 
     input logic load_enable = 1'b0,
     input logic [WIDTH-1:0] load_value = {WIDTH{1'b0}}
@@ -72,7 +95,6 @@ module rv_shift_register #(
 
     always_comb begin
         shift_out = value[WIDTH-1];
-        // shift_peek = value[WIDTH-2];
     end
 
 endmodule
