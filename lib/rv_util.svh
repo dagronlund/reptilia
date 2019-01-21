@@ -11,7 +11,7 @@ Original STATIC_ASSERT from Reid Long
 
 `define STATIC_ASSERT(condition) \
     generate \
-    if (!condition) begin \
+    if (!(condition)) begin \
         initial begin \
             $error("FAILED ASSERTION: %s:%d, %s", `__FILE__, `__LINE__, `STRINGIFY(condition)); \
         end \
