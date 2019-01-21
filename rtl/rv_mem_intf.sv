@@ -7,7 +7,7 @@ interface rv_mem_intf #(
     parameter DATA_WIDTH = 32,
     parameter ADDR_WIDTH = 10
 )(
-    input logic clk, rst
+    input logic clk = 'b0, rst = 'b0
 );
 
     import rv_mem::*;
