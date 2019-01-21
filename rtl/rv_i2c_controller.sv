@@ -2,6 +2,7 @@
 
 `include "../lib/rv_util.svh"
 `include "../lib/rv_i2c.svh"
+`include "../lib/rv_axi4_lite.svh"
 
 `BUILD_STREAM_INTF_PACKAGED(rv_i2c, rv_i2c_command)
 `BUILD_STREAM_INTF_PACKAGED(rv_i2c, rv_i2c_result)
@@ -276,10 +277,8 @@ module rv_i2c_phy_tx #()(
         // Only generate results when at end of stop
         result_block = (cs == I2C_STOP) && quad_counter_done;
     end
-    
 
 endmodule
-
 
 module rv_i2c_phy_tx_tb();
 
@@ -318,8 +317,10 @@ module rv_i2c_phy_tx_tb();
             default: 'b0
         };
 
-        command_stream.send(cmd_temp);
-        result_stream.recv(result_temp);
+        fork
+            command_stream.send(cmd_temp);
+            result_stream.recv(result_temp);
+        join
 
         cmd_temp = '{
             op: RV_I2C_READ, 
@@ -331,8 +332,10 @@ module rv_i2c_phy_tx_tb();
             default: 'b0
         };
 
-        command_stream.send(cmd_temp);
-        result_stream.recv(result_temp);
+        fork
+            command_stream.send(cmd_temp);
+            result_stream.recv(result_temp);
+        join
     end
 
     initial begin
