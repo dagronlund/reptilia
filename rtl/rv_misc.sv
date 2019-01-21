@@ -69,11 +69,12 @@ module rv_counter #(
 endmodule
 
 module rv_shift_register #(
-    parameter WIDTH = 8
+    parameter WIDTH = 8,
+    parameter RESET = 'b0
 )(
     input logic clk, rst,
 
-    output logic enable,
+    input logic enable,
     output logic [WIDTH-1:0] value,
 
     input logic shift_in = 1'b0,
@@ -85,11 +86,11 @@ module rv_shift_register #(
 
     always_ff @(posedge clk) begin
         if(rst) begin
-            value <= {WIDTH{1'b0}};
+            value <= RESET;
         end else if (load_enable) begin
             value <= load_value;
         end else if (enable) begin
-            value <= {value[WIDTH-1:1], shift_in};
+            value <= {value[WIDTH-2:0], shift_in};
         end
     end
 

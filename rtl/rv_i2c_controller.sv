@@ -1,6 +1,10 @@
 `timescale 1ns/1ps
 
 `include "../lib/rv_util.svh"
+`include "../lib/rv_i2c.svh"
+
+`BUILD_STREAM_INTF_PACKAGED(rv_i2c, rv_i2c_command)
+`BUILD_STREAM_INTF_PACKAGED(rv_i2c, rv_i2c_result)
 
 module rv_i2c_controller (
     input logic clk, rst,
@@ -16,38 +20,9 @@ module rv_i2c_controller (
     rv_io_intf.out scl
 );
 
+    
+
 endmodule
-
-typedef enum logic {
-    RV_I2C_WRITE = 1'b0,
-    RV_I2C_READ = 1'b1
-} rv_i2c_op;
-
-typedef enum logic {
-    RV_I2C_SUCCESS = 1'b0,
-    RV_I2C_ACK_FAILURE = 1'b1
-} rv_i2c_status;
-
-typedef enum logic {
-    RV_I2C_8 = 1'b0,
-    RV_I2C_16 = 1'b1
-} rv_i2c_size;
-
-typedef struct packed {
-    rv_i2c_op op;
-    rv_i2c_size addr_size;
-    rv_i2c_size data_size;
-    logic [6:0] device;
-    logic [15:0] addr, data;
-} rv_i2c_command;
-
-typedef struct packed {
-    rv_i2c_status status;
-    logic [15:0] data;
-} rv_i2c_result;
-
-`BUILD_STREAM_INTF(rv_i2c_command)
-`BUILD_STREAM_INTF(rv_i2c_result)
 
 // TODO: Support multi-master arbitration
 module rv_i2c_phy_tx #()(
@@ -56,12 +31,25 @@ module rv_i2c_phy_tx #()(
     rv_i2c_command_stream_intf.in command_stream,
     rv_i2c_result_stream_intf.in result_stream,
 
-    input logic [9:0] cycles,
-    input logic [10:0] delay,
+    input logic [9:0] cycles = 10'd249, // (100 MHz / 400 kHz)
+    input logic [9:0] delay = 10'd0,
 
     rv_io_intf.out sda,
     rv_io_intf.out scl  
 );
+
+    /*
+    () Indicates the state can repeat for MSB and LSB
+    Write:
+        IDLE -> START -> DEVICE_WRITE -> (WRITE_ADDR) -> (WRITE_DATA) -> STOP
+    Read:
+        IDLE -> START -> DEVICE_WRITE -> (WRITE_ADDR) -> REPEATED_START -> DEVICE_READ -> (READ_DATA) -> STOP 
+    */
+
+    import rv_i2c::*;
+
+    // I2C is an open drain driver and when T is low, the output is enabled
+    assign {scl.o, sda.o} = 2'b00;
 
     logic enable, command_block, result_block;
     rv_seq_flow_controller #(
@@ -86,6 +74,19 @@ module rv_i2c_phy_tx #()(
         I2C_WRITE_DATA_MSB, I2C_WRITE_DATA_LSB, 
         I2C_READ_DATA_MSB, I2C_READ_DATA_LSB
     } i2c_state;
+
+    // State update logic
+    i2c_state cs, ns;
+    logic next_scl;
+    always_ff @ (posedge clk) begin
+        if (rst) begin
+            cs <= I2C_IDLE;
+            scl.t <= 1'b1;
+        end else if (enable) begin
+            cs <= ns;
+            scl.t <= next_scl;
+        end
+    end
 
     logic cycle_enable, cycle_clear, cycle_counter_done;
     logic [9:0] current_cycle;
@@ -116,41 +117,47 @@ module rv_i2c_phy_tx #()(
     );
 
     // SDA is produced by a shift register
-    logic current_sda;
     logic sda_shift_enable, sda_load_enable;
-    logic [8:0] sda_load_value;
+    // logic [8:0] sda_load_value;
     rv_shift_register #(
-        .WIDTH(9)
+        .WIDTH(9),
+        .RESET(9'b111111111)
     ) sda_shift_register_inst (
         .clk, .rst,
 
         .enable(sda_shift_enable),
         .load_enable(sda_load_enable),
-        .load_value(sda_load_value),
+        .load_value(calculate_sda_sequence(cs, command_stream.data)),
 
-        .shift_out(current_sda)
+        .shift_out(sda.t)
     );
 
-    // State update logic
-    i2c_state cs, ns;
-    logic current_scl, next_scl;
-    always_ff @ (posedge clk) begin
-        if (rst) begin
-            cs <= I2C_IDLE;
-            current_scl <= 1'b1;
-        end else begin
-            cs <= ns;
-            current_scl <= next_scl;
+    logic sda_in_clear_enable;
+    logic sda_in_shift_enable;
+    logic [15:0] sda_in_value;
+    rv_shift_register #(
+        .WIDTH(16)
+    ) sda_in_shift_register_inst (
+        .clk, .rst,
+
+        .enable(sda_in_shift_enable),
+        .value(sda_in_value),
+        .shift_in(sda.i),
+
+        .load_enable(sda_in_clear_enable)
+    );
+
+    // Error sticky bit
+    logic set_ack_error, clear_ack_error;
+    always_ff @(posedge clk) begin
+        if(rst || clear_ack_error) begin
+            result_stream.data.status <= RV_I2C_SUCCESS;
+        end else if (set_ack_error) begin
+            result_stream.data.status <= RV_I2C_ACK_FAILURE;
         end
     end
 
-    // I2C is an open drain driver and when T is low, the output is enabled
-    logic scl_in, sda_in;
-    assign {scl.o, sda.o} = 2'b00;
-    assign {scl.t, sda.t} = {current_scl, current_sda};
-    assign {scl_in, sda_in} = {scl.i, sda.i};
-
-    function logic [9:0] calculate_sda_sequence(
+    function logic [8:0] calculate_sda_sequence(
             input i2c_state state, input rv_i2c_command command
     );
         case (state)
@@ -219,7 +226,7 @@ module rv_i2c_phy_tx #()(
         quad_clear = (cs == I2C_IDLE) || (cs != ns); 
         bit_clear = (cs == I2C_IDLE) || (cs != ns);
         
-        // Shift SDA a quarter cycle past SCL
+        // Shift SDA a quarter cycle past SCL falling edge
         if (cs == I2C_IDLE) begin
             sda_shift_enable = 1'b0;
             sda_load_enable = 1'b0;
@@ -232,18 +239,42 @@ module rv_i2c_phy_tx #()(
             sda_load_enable = cycle_counter_done && (current_quad == 2'b00) && (current_bit == 4'b0); 
         end
 
+        // Start SCL high and then toggle every two quads
         if (ns == I2C_IDLE || ns == I2C_START) begin
             next_scl = 1'b1;
         end else begin
-            // TODO ...
+            if (cycle_counter_done && (current_quad == 2'b01 || current_quad == 2'b11)) begin
+                next_scl = ~scl.t;
+            end else begin
+                next_scl = scl.t;
+            end
         end
 
-        sda_load_value = calculate_sda_sequence(cs, command_stream.data);
+        // Handle reading in SDA on the during the last half of SCL high
+        sda_in_clear_enable = (cs == I2C_IDLE);
+        sda_in_shift_enable = 1'b0;
+        if (cs == I2C_READ_DATA_MSB || cs == I2C_READ_DATA_LSB) begin
+            if (current_cycle == delay &&  current_quad == 2'b11 && current_bit != 4'd8) begin
+                sda_in_shift_enable = 1'b1;
+            end
+        end
+        result_stream.data.data = sda_in_value;
+
+        // Handle reading in ACK confirmation on the last bit of each write cycle
+        clear_ack_error = (cs == I2C_IDLE);
+        set_ack_error = 1'b0;
+        if (cs == I2C_DEVICE_WRITE || cs == I2C_DEVICE_READ ||
+                cs == I2C_WRITE_ADDR_MSB || cs == I2C_WRITE_ADDR_LSB ||
+                cs == I2C_WRITE_DATA_MSB || cs == I2C_WRITE_DATA_LSB) begin
+            if (current_cycle == delay &&  current_quad == 2'b11 && current_bit == 4'd8) begin
+                set_ack_error = (sda.i == 1'b1);
+            end
+        end
 
         // Only accept commands when in IDLE
         command_block = (cs == I2C_IDLE);
         // Only generate results when at end of stop
-        result_block = (cs == I2C_STOP) && bit_counter_done;
+        result_block = (cs == I2C_STOP) && quad_counter_done;
     end
     
 
@@ -252,88 +283,66 @@ endmodule
 
 module rv_i2c_phy_tx_tb();
 
+    import rv_i2c::*;
+
     logic clk, rst;
     clk_rst_gen clk_rst_gen_inst(.clk, .rst);
 
-    rv_i2c_command_stream_intf command_stream();
-    rv_i2c_result_stream_intf result_stream();
+    rv_i2c_command_stream_intf command_stream(.clk, .rst);
+    rv_i2c_result_stream_intf result_stream(.clk, .rst);
 
-    logic [9:0] cycles = 10'd250;
-    logic [10:0] delay = 11'd0;
+    logic [9:0] cycles = 10'd1;
+    logic [9:0] delay = 10'd0;
 
     rv_io_intf sda();
     rv_io_intf scl();
 
     rv_i2c_phy_tx rv_i2c_phy_inst (.*);
 
+    rv_i2c_command cmd_temp;
+    rv_i2c_result result_temp;
+
     initial begin
-        // ...
+        command_stream.valid = 1'b0;
+        result_stream.ready = 1'b0;
         while (rst) @ (posedge clk);
+        for (int i = 0; i < 10; i++) @ (posedge clk);
+
+        cmd_temp = '{
+            op: RV_I2C_WRITE, 
+            addr_size: RV_I2C_8, 
+            data_size: RV_I2C_8,
+            device: 7'b1101010,
+            addr: 16'hee,
+            data: 16'h55,
+            default: 'b0
+        };
+
+        command_stream.send(cmd_temp);
+        result_stream.recv(result_temp);
+
+        cmd_temp = '{
+            op: RV_I2C_READ, 
+            addr_size: RV_I2C_8, 
+            data_size: RV_I2C_8,
+            device: 7'b1101010,
+            addr: 16'hee,
+            data: 16'h55,
+            default: 'b0
+        };
+
+        command_stream.send(cmd_temp);
+        result_stream.recv(result_temp);
+    end
+
+    initial begin
+        sda.i = 'b1;
+
+        while ('b1) begin
+            @ (posedge scl.t);
+            sda.i <= ~sda.i;
+        end
 
     end
 
 endmodule
-
-
-// Write:
-// IDLE -> START -> DEVICE_WRITE -> (WRITE_ADDR) -> (WRITE_DATA) -> STOP
-
-// Read:
-// IDLE -> START -> DEVICE_WRITE -> (WRITE_ADDR) -> REPEATED_START -> DEVICE_READ -> (READ_DATA) -> STOP 
-
-// function logic calculate_sda(
-//         input i2c_state state, input logic [1:0] quad,
-//         input logic sda_past, sda_present
-// );
-//     case (state)
-//     I2C_IDLE: return 1'b1;
-//     I2C_START:
-//         case (quad)
-//         2'b11: return 1'b0;
-//         default: return 1'b1;
-//         endcase
-//     I2C_REPEATED_START:
-//         case (quad)
-//         2'b11: return 1'b0;
-//         default: return 1'b1;
-//         endcase
-//     I2C_STOP:
-//         case (quad)
-//         2'b00: return sda_past;
-//         2'b01: return 1'b0;
-//         2'b10: return 1'b0;
-//         2'b11: return 1'b1;
-//         endcase
-//     default:
-//         case (quad)
-//         2'b00: return sda_past;
-//         default: return sda_present;
-//         endcase
-//     endcase
-// endfunction
-
-// // Allows speed to updated, divides each clock cycle into four quadrants
-// logic [9:0] cycle_limit, cycle_delay;
-
-// always_ff @(posedge clk) begin
-//     if(rst) begin
-//         cycle_limit <= DEFAULT_CYCLES[11:2];
-//         update_delay <= DEFAULT_DELAY;
-//     end else if (update) begin
-//         cycle_limit <= update_cycles[11:2];
-//         cycle_delay <= update_delay;
-//     end
-// end
-
-/*
-() Indicates the state can repeat for MSB and LSB
-
-Write:
-IDLE -> START -> DEVICE_WRITE -> (WRITE_ADDR) -> (WRITE_DATA) -> STOP
-
-Read:
-IDLE -> START -> DEVICE_WRITE -> (WRITE_ADDR) -> REPEATED_START -> DEVICE_READ -> (READ_DATA) -> STOP 
-*/
-
-// parameter [11:0] DEFAULT_CYCLES = 250, // (100 MHz / 400 kHz)
-// parameter [10:0] DEFAULT_DELAY = 0
