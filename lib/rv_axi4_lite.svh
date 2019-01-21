@@ -34,9 +34,10 @@ package rv_axi4_lite;
 endpackage
 
 interface rv_axi4_lite_ar_intf #(
-    parameter ADDR_WIDTH = 32,
-    parameter USER_WIDTH = 1
-)();
+    parameter ADDR_WIDTH = 32
+)(
+    input logic clk = 'b0, rst = 'b0
+);
 
     import rv_axi4_lite::*;
 
@@ -44,7 +45,7 @@ interface rv_axi4_lite_ar_intf #(
     logic                  ARREADY;
 
     logic [ADDR_WIDTH-1:0] ARADDR;
-    rv_axi4_lite_prot            ARPROT;
+    rv_axi4_lite_prot      ARPROT;
 
     modport out(
         output ARVALID, 
@@ -63,12 +64,31 @@ interface rv_axi4_lite_ar_intf #(
         input ARADDR, ARPROT
     );
 
+    task send(input logic [ADDR_WIDTH-1:0] addr, input rv_axi4_lite_prot prot);
+        ARADDR <= addr;
+        ARPROT <= prot; 
+        ARVALID <= 1'b1; 
+        @ (posedge clk); 
+        while (!ARREADY) @ (posedge clk); 
+        ARVALID <= 1'b0;
+    endtask
+
+    task recv(output logic [ADDR_WIDTH-1:0] addr, output rv_axi4_lite_prot prot);
+        ARREADY <= 1'b1; 
+        @ (posedge clk); 
+        while (!ARVALID) @ (posedge clk); 
+        ARREADY <= 1'b0; 
+        addr = ARADDR;
+        prot = ARPROT;
+    endtask
+
 endinterface
 
 interface rv_axi4_lite_aw_intf #(
-    parameter ADDR_WIDTH = 32,
-    parameter USER_WIDTH = 1
-)();
+    parameter ADDR_WIDTH = 32
+)(
+    input logic clk = 'b0, rst = 'b0
+);
 
     import rv_axi4_lite::*;
 
@@ -76,7 +96,7 @@ interface rv_axi4_lite_aw_intf #(
     logic                  AWREADY;
 
     logic [ADDR_WIDTH-1:0] AWADDR;
-    rv_axi4_lite_prot            AWPROT;
+    rv_axi4_lite_prot      AWPROT;
 
     modport out(
         output AWVALID,
@@ -95,17 +115,37 @@ interface rv_axi4_lite_aw_intf #(
         input AWADDR, AWPROT
     );
 
+    task send(input logic [ADDR_WIDTH-1:0] addr, input rv_axi4_lite_prot prot);
+        AWADDR <= addr;
+        AWPROT <= prot; 
+        AWVALID <= 1'b1; 
+        @ (posedge clk); 
+        while (!AWREADY) @ (posedge clk); 
+        AWVALID <= 1'b0;
+    endtask
+
+    task recv(output logic [ADDR_WIDTH-1:0] addr, output rv_axi4_lite_prot prot);
+        AWREADY <= 1'b1; 
+        @ (posedge clk); 
+        while (!AWVALID) @ (posedge clk); 
+        AWREADY <= 1'b0; 
+        addr = AWADDR;
+        prot = AWPROT;
+    endtask
+
 endinterface
 
 interface rv_axi4_lite_b_intf #(
-)();
+)(
+    input logic clk = 'b0, rst = 'b0
+);
 
     import rv_axi4_lite::*;
 
-    logic                  BVALID;
-    logic                  BREADY;
+    logic             BVALID;
+    logic             BREADY;
 
-    rv_axi4_lite_resp            BRESP;
+    rv_axi4_lite_resp BRESP;
 
     modport out(
         output BVALID,
@@ -124,11 +164,29 @@ interface rv_axi4_lite_b_intf #(
         input BRESP
     );
 
+    task send(input rv_axi4_lite_resp resp);
+        BRESP <= resp; 
+        BVALID <= 1'b1; 
+        @ (posedge clk); 
+        while (!BREADY) @ (posedge clk); 
+        BVALID <= 1'b0;
+    endtask
+
+    task recv(output rv_axi4_lite_resp resp);
+        BREADY <= 1'b1; 
+        @ (posedge clk); 
+        while (!BVALID) @ (posedge clk); 
+        BREADY <= 1'b0; 
+        resp = BRESP;
+    endtask
+
 endinterface
 
 interface rv_axi4_lite_r_intf #(
     parameter DATA_WIDTH = 32
-)();
+)(
+    input logic clk = 'b0, rst = 'b0
+);
 
     import rv_axi4_lite::*;
 
@@ -136,7 +194,7 @@ interface rv_axi4_lite_r_intf #(
     logic                  RREADY;
 
     logic [DATA_WIDTH-1:0] RDATA;
-    rv_axi4_lite_resp            RRESP;
+    rv_axi4_lite_resp      RRESP;
 
     modport out(
         output RVALID,
@@ -155,12 +213,32 @@ interface rv_axi4_lite_r_intf #(
         input RDATA, RRESP
     );
 
+    task send(input logic [DATA_WIDTH-1:0] data, input rv_axi4_lite_resp resp);
+        RDATA <= data;
+        RRESP <= resp; 
+        RVALID <= 1'b1; 
+        @ (posedge clk); 
+        while (!RREADY) @ (posedge clk); 
+        RVALID <= 1'b0;
+    endtask
+
+    task recv(output logic [DATA_WIDTH-1:0] data, output rv_axi4_lite_resp resp);
+        RREADY <= 1'b1; 
+        @ (posedge clk); 
+        while (!RVALID) @ (posedge clk); 
+        RREADY <= 1'b0; 
+        data = RDATA;
+        resp = RRESP;
+    endtask
+
 endinterface
 
 interface rv_axi4_lite_w_intf #(
     parameter DATA_WIDTH = 32,
     parameter STROBE_WIDTH = DATA_WIDTH / 8
-)();
+)(
+    input logic clk = 'b0, rst = 'b0
+);
 
     import rv_axi4_lite::*;
 
@@ -186,6 +264,24 @@ interface rv_axi4_lite_w_intf #(
         input WVALID, WREADY,
         input WDATA, WSTRB
     );
+
+    task send(input logic [DATA_WIDTH-1:0] data, input logic [STROBE_WIDTH-1:0] strb);
+        WDATA <= data;
+        WSTRB <= strb; 
+        WVALID <= 1'b1; 
+        @ (posedge clk); 
+        while (!WREADY) @ (posedge clk); 
+        WVALID <= 1'b0;
+    endtask
+
+    task recv(output logic [DATA_WIDTH-1:0] data, output logic [STROBE_WIDTH-1:0] strb);
+        WREADY <= 1'b1; 
+        @ (posedge clk); 
+        while (!WVALID) @ (posedge clk); 
+        WREADY <= 1'b0; 
+        data = WDATA;
+        strb = WSTRB;
+    endtask
 
 endinterface
 
