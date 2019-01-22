@@ -1,5 +1,6 @@
 `timescale 1ns/1ps
 
+`include "../lib/rv_interrupt.svh"
 `include "../lib/rv_util.svh"
 `include "../lib/rv_i2c.svh"
 `include "../lib/rv_axi4_lite.svh"
@@ -7,21 +8,197 @@
 `BUILD_STREAM_INTF_PACKAGED(rv_i2c, rv_i2c_command)
 `BUILD_STREAM_INTF_PACKAGED(rv_i2c, rv_i2c_result)
 
-module rv_i2c_controller (
+/*
+rv_i2c_controller:
+
+TODO: Add interrupt support
+
+Implements a simple I2C controller managed by an AXI4-Lite bus, and
+consumes 4kB or 10 bits of address space.
+
+Register Map:
+    Addr  Name                       Bitfield
+    'h0:  Status (R)                 {30'b0, ACK_ERROR, BUSY}
+    'h4:  Device (R/W)               {25'b0, DEVICE[6:0]}
+    'h8:  Read Result (R)            {16'b0, RESULT[15:0]}
+    'hC:  Timing (R/W)               {6'b0, DELAY[9:0], 6'b0, CYCLES[9:0]}
+
+    'h10: Write 8 Addr, 8 Data (W)   {8'b0, ADDR[7:0], 8'b0, DATA[7:0]}
+    'h14: Write 8 Addr, 16 Data (W)  {8'b0, ADDR[7:0], DATA[15:0]}
+    'h18: Write 16 Addr, 8 Data (W)  {ADDR[15:0], 8'b0, DATA[7:0]}
+    'h1C: Write 16 Addr, 16 Data (W) {ADDR[15:0], DATA[15:0]}
+
+    'h20: Read 8 Addr, 8 Data (W)    {8'b0, ADDR[7:0], 8'b0, DATA[7:0]}
+    'h24: Read 8 Addr, 16 Data (W)   {8'b0, ADDR[7:0], DATA[15:0]}
+    'h28: Read 16 Addr, 8 Data (W)   {ADDR[15:0], 8'b0, DATA[7:0]}
+    'h2C: Read 16 Addr, 16 Data (W)  {ADDR[15:0], DATA[15:0]}
+*/
+module rv_i2c_controller #(
+    parameter DEFAULT_CYCLES = 10'd249, // (100 MHz / 400 kHz)
+    parameter DEFAULT_DELAY = 10'd0
+)(
     input logic clk, rst,
     
-    rv_axi_addr_read_intf.in axi_ar,
-    rv_axi_read_data_intf.out axi_r,
-    
-    rv_axi_addr_write_intf.in axi_aw,
-    rv_axi_write_data_intf.in axi_w,
-    rv_axi_write_resp_intf.out axi_b,
+    rv_axi4_lite_aw_intf.in axi_aw,
+    rv_axi4_lite_w_intf.in  axi_w,
+    rv_axi4_lite_b_intf.out axi_b,
+    rv_axi4_lite_ar_intf.in axi_ar,
+    rv_axi4_lite_r_intf.out axi_r,
 
     rv_io_intf.out sda,
     rv_io_intf.out scl
 );
 
+    import rv_mem::*;
+    import rv_i2c::*;
+
+    logic [9:0] cycles, delay;
+
+    rv_mem_intf mem_command(.clk, .rst);
+    rv_mem_intf mem_result(.clk, .rst);
+
+    rv_axi4_lite_slave rv_axi4_lite_slave_inst(
+        .clk, .rst,
+        .axi_aw, .axi_w, .axi_b, .axi_ar, .axi_r,
+        .mem_command, .mem_result
+    );
     
+    rv_i2c_command_stream_intf command_stream(.clk, .rst);
+    rv_i2c_result_stream_intf result_stream(.clk, .rst);
+
+    rv_i2c_phy_tx rv_i2c_phy_tx_inst(
+        .clk, .rst,
+        .command_stream, .result_stream,
+        .cycles, .delay,
+        .sda, .scl
+    );
+
+    rv_i2c_register_map  #(
+        .DEFAULT_CYCLES(DEFAULT_CYCLES),
+        .DEFAULT_DELAY(DEFAULT_DELAY)
+    ) rv_i2c_register_map_inst (
+        .clk, .rst,
+        .mem_command, .mem_result,
+        .command_stream, .result_stream,
+        .cycles, .delay
+    );
+
+endmodule
+
+module rv_i2c_register_map #(
+    parameter DEFAULT_CYCLES = 10'd249, // (100 MHz / 400 kHz)
+    parameter DEFAULT_DELAY = 10'd0
+)(
+    input logic clk, rst,
+    
+    rv_mem_intf.in mem_command,
+    rv_mem_intf.out mem_result,
+
+    rv_i2c_command_stream_intf.out command_stream,
+    rv_i2c_result_stream_intf.in result_stream,
+
+    output logic [9:0] cycles, delay
+);
+
+    import rv_mem::*;
+    import rv_i2c::*;
+
+    typedef struct packed {
+        logic ack_error;
+        logic busy;
+    } i2c_status_flags;
+
+    // Current State
+    i2c_status_flags current_status;
+    logic [6:0] current_device;
+    logic [15:0] current_result;
+
+    function automatic logic is_i2c_command(input logic [9:0] addr);
+        return addr == 'h10 || addr == 'h14 || addr == 'h18 || addr == 'h1C ||
+                addr == 'h20 || addr == 'h24 || addr == 'h28 || addr == 'h2C;
+    endfunction
+
+    function automatic rv_i2c_command get_i2c_command(
+        input logic [9:0] addr,
+        input logic [31:0] data,
+        input logic [6:0] current_device
+    );
+        rv_i2c_command cmd;
+
+        cmd.device = current_device;
+        cmd.addr = data[31:16];
+        cmd.data = data[15:0];
+        // 'h10, 'h14, 'h18, 'h1C
+        cmd.op = (addr[4] == 'h1) ? RV_I2C_WRITE : RV_I2C_READ;
+        // 'h10, 'h14, 'h20, 'h24
+        cmd.addr_size = (addr[3] == 'h0) ? RV_I2C_8 : RV_I2C_16;
+        // 'h10, 'h18, 'h20, 'h28
+        cmd.data_size = (addr[2] == 'h0) ? RV_I2C_8 : RV_I2C_16;
+
+        return cmd;
+    endfunction
+
+    // HAZARD: Sequence memory results, relies on on AXI4-Lite slave ordering
+    always_ff @ (posedge clk) begin
+        mem_result.addr <= mem_command.addr;
+        case (mem_command.addr[9:0])
+        'h0: mem_result.data <= {30'b0, current_status};
+        'h4: mem_result.data <= {25'b0, current_device};
+        'h8: mem_result.data <= {16'b0, current_result};
+        'hC: mem_result.data <= {6'b0, delay, 6'b0, cycles};
+        default: mem_result.data <= 'b0;
+        endcase
+    end
+
+    // Handle writes to the registers
+    always_ff @ (posedge clk) begin
+        if (rst) begin
+            current_status <= '{ack_error: 'b0, busy: 'b0};
+            current_device <= 'b0;
+            current_result <= 'b0;
+            cycles <= DEFAULT_CYCLES;
+            delay <= DEFAULT_DELAY;
+            command_stream.data <= '{default: 'b0};
+        end else begin
+            // Handle memory writes
+            if (mem_command.valid && mem_command.op == RV_MEM_WRITE) begin
+                // Update Read/Write Registers
+                case (mem_command.addr[9:0])
+                'h4: current_device <= mem_command.data[6:0];
+                'hC: {delay, cycles} <= {mem_command.data[25:16], mem_command.data[9:0]};
+                endcase
+
+                // Start I2C operation from Write-Only Registers
+                if (is_i2c_command(mem_command.addr[9:0]) && !current_status.busy) begin
+                    current_status.busy <= 1'b1;
+                    command_stream.data <= get_i2c_command(mem_command.addr, 
+                            mem_command.data, current_device);
+                end
+            end
+        
+            // Clear busy and set results
+            if (result_stream.valid) begin
+                current_status.busy <= 1'b0;
+                current_status.ack_error <= result_stream.data.status;
+                current_result <= result_stream.data.data;
+            end
+        end
+    end
+
+    always_comb begin
+        // Always accept memory requests
+        mem_command.ready = 1'b1;
+
+        // Always provide memory results
+        mem_result.valid = 1'b1;
+        mem_result.op = RV_MEM_READ;
+
+        // Always accept i2c results
+        result_stream.ready = 1'b1;
+
+        // Run command stream
+        command_stream.valid = current_status.busy;
+    end
 
 endmodule
 
@@ -30,17 +207,17 @@ module rv_i2c_phy_tx #()(
     input logic clk, rst,
 
     rv_i2c_command_stream_intf.in command_stream,
-    rv_i2c_result_stream_intf.in result_stream,
+    rv_i2c_result_stream_intf.out result_stream,
 
-    input logic [9:0] cycles = 10'd249, // (100 MHz / 400 kHz)
-    input logic [9:0] delay = 10'd0,
+    input logic [9:0] cycles,
+    input logic [9:0] delay,
 
     rv_io_intf.out sda,
     rv_io_intf.out scl  
 );
 
     /*
-    () Indicates the state can repeat for MSB and LSB
+    () Indicates the state can repeat for both MSB and LSB
     Write:
         IDLE -> START -> DEVICE_WRITE -> (WRITE_ADDR) -> (WRITE_DATA) -> STOP
     Read:
@@ -346,6 +523,79 @@ module rv_i2c_phy_tx_tb();
             sda.i <= ~sda.i;
         end
 
+    end
+
+endmodule
+
+module rv_i2c_controller_tb();
+
+    import rv_axi4_lite::*;
+    import rv_i2c::*;
+
+    logic clk, rst;
+    clk_rst_gen clk_rst_gen_inst(.clk, .rst);
+
+    rv_axi4_lite_aw_intf axi_aw(.clk, .rst);
+    rv_axi4_lite_w_intf  axi_w(.clk, .rst);
+    rv_axi4_lite_b_intf  axi_b(.clk, .rst);
+    rv_axi4_lite_ar_intf axi_ar(.clk, .rst);
+    rv_axi4_lite_r_intf  axi_r(.clk, .rst);
+
+    rv_io_intf sda();
+    rv_io_intf scl();
+
+    rv_i2c_controller rv_i2c_controller_inst(.*);
+
+
+    logic [31:0] data_result;
+    rv_axi4_lite_resp resp_result;
+
+    task read(input logic [31:0] addr, 
+            output logic [31:0] data, 
+            output rv_axi4_lite_resp resp);
+        axi_ar.send(addr, rv_axi4_lite_prot'(3'b0));
+        axi_r.recv(data, resp);
+    endtask
+
+    task write(input logic [31:0] addr, 
+            input logic [31:0] data, 
+            output rv_axi4_lite_resp resp);
+        fork
+            axi_aw.send(addr, rv_axi4_lite_prot'(3'b0));
+            axi_w.send(data, 'hf);
+        join
+        axi_b.recv(resp);
+    endtask
+
+    initial begin
+        axi_aw.AWVALID = 'b0;
+        axi_w.WVALID = 'b0;
+        axi_b.BREADY = 'b0;
+        axi_ar.ARVALID = 'b0;
+        axi_r.RREADY = 'b0;
+        while (rst) @ (posedge clk);
+
+        // Check status
+        read('h0, data_result, resp_result);
+
+        // Set Device
+        write('h4, 'h42, resp_result);
+
+        // Check status
+        read('h0, data_result, resp_result);        
+
+        // Read Device
+        read('h4, data_result, resp_result);
+
+        // Read Timing
+        read('hC, data_result, resp_result);
+
+        // Start 8x8 Write
+        write('h10, {8'b0, 8'hee, 8'b0, 8'h55}, resp_result);
+
+        do begin
+            read('h0, data_result, resp_result);
+        end while (data_result[0]);
     end
 
 endmodule
