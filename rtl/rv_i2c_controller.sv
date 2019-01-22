@@ -4,6 +4,7 @@
 `include "../lib/rv_util.svh"
 `include "../lib/rv_i2c.svh"
 `include "../lib/rv_axi4_lite.svh"
+`include "../lib/rv_io.svh"
 
 `BUILD_STREAM_INTF_PACKAGED(rv_i2c, rv_i2c_command)
 `BUILD_STREAM_INTF_PACKAGED(rv_i2c, rv_i2c_result)

@@ -24,15 +24,6 @@ module clk_rst_gen #(
 
 endmodule
 
-interface rv_io_intf #()();
-
-    logic i, o, t;
-    modport out(output o, t, input i);
-    modport in(input o, t, output i);
-    modport view(input i, o, t);
-
-endinterface
-
 module rv_counter #(
     parameter WIDTH = 8
 )(
