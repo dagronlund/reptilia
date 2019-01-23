@@ -1,6 +1,17 @@
 # risc-v
 SystemVerilog RISC-V implementation and libraries
 
+## Folder Structure
+
+rtl/
+	Systemverilog (\*.sv) files containing modules that are going to be synthesized into logic 
+
+intf/
+	Systemverilog (\*.sv) files containing interfaces that will be used to connect different modules together
+
+lib/
+	Systemverilog header (\*.svh) files containing packages with enumerations, structs, and functions that will contain shared behavior between modules.
+
 ## Stream Libraries
 Managing and pipelining streams is a critical part of digital logic design, and a consistent naming convention and library support is crucial part of maintainable design.
 
@@ -17,6 +28,26 @@ The following standard state machine controller are provided for working with st
 	...
 2. rv_comb_flow_controler
 	...
+
+
+## Pre-Preprocessor Notes
+To run this on windows requires Cygwin installed with the following packages:
+- bison
+- flex
+- gcc-g++
+- libcrypt-devel
+- make
+- perl
+
+[Installation Instructions](https://www.veripool.org/projects/verilog-perl/wiki/Installing)
+
+git clone http://git.veripool.org/git/Verilog-Perl
+perl Makefile.PL
+make
+
+To run the preprocessor for wrappers in this repository use the following command as an example (in Cygwin)
+
+perl vppreproc --noline --noblank --nocomment +define+__PRE_PREPROCESSOR__ wrapper.sv --o wrapper_processed.sv
 
 ## Random Notes
 1. ABSOLUTELY NEVER put an interface or module definition in a header file, Vivado loses it brainz
