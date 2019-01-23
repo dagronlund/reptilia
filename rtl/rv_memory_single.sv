@@ -45,20 +45,29 @@ module rv_memory_single #(
         .outputs_block({data_valid})
     );
 
-    always_ff @(posedge clk) begin
-        if(rst) begin
-            data_valid <= 1'b0;
-        end else if (enable) begin
-            if (command.op == RV_MEM_READ) begin
-                data_valid <= 1'b1;
-            end else begin // write
-                data[command.addr] <= command.data;
-                data_valid <= (WRITE_PROPAGATE != 0);
-            end
+    rv_memory_single_port #(
+        .DATA_WIDTH(DATA_WIDTH),
+        .ADDR_WIDTH(ADDR_WIDTH)
+    ) rv_memory_single_port_inst (
+        .clk, .rst,
 
-            result.data <= data[command.addr];
-            result.op <= command.op;
-            result.addr <= command.addr;
+        .enable(!rst && enable),
+        .write_enable(command.op == RV_MEM_WRITE),
+        .addr_in(command.addr),
+        .data_in(command.data),
+        .data_out(result.data)
+    );
+
+    always_ff @ (posedge clk) begin
+        if (rst) begin
+            data_valid <= 1'b0;
+        end else begin
+            if (enable) begin
+                data_valid <= (command.op == RV_MEM_READ) ? 
+                        1'b1 : (WRITE_PROPAGATE != 0);
+                result.op <= command.op;
+                result.addr <= command.addr;
+            end
         end
     end
 

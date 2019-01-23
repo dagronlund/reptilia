@@ -67,61 +67,43 @@ module rv_memory_double #(
         .outputs_block({data_valid1})
     );
 
-    /*
-    Note:
-    Using four seperate always_ff blocks is super important for Vivado to 
-    recognize that this is a true-dual-port block-ram, without a weird output
-    register stage.
+    rv_memory_double_port #(
+        .DATA_WIDTH(DATA_WIDTH),
+        .ADDR_WIDTH(ADDR_WIDTH)
+    ) rv_memory_double_port_inst (
+        .clk, .rst,
 
-    A single always_ff block will imply some priority when writing to the
-    block-ram at the same time and place, which won't synthesize.
-    */
+        .enable0(!rst && enable0),
+        .write_enable0(command0.op == RV_MEM_WRITE),
+        .addr_in0(command0.addr),
+        .data_in0(command0.data),
+        .data_out0(result0.data),
+
+        .enable1(!rst && enable1),
+        .write_enable1(command1.op == RV_MEM_WRITE),
+        .addr_in1(command1.addr),
+        .data_in1(command1.data),
+        .data_out1(result1.data)
+    );
 
     always_ff @ (posedge clk) begin
         if (rst) begin
             data_valid0 <= 1'b0;
-        end else if (enable0) begin
-            if (command0.op == RV_MEM_READ) begin
-                data_valid0 <= 1'b1;
-            end else begin // write
-                data_valid0 <= (WRITE_PROPAGATE != 0);
-            end
-
-            result0.op <= command0.op;
-            result0.addr <= command0.addr;
-        end
-    end
-
-    always_ff @ (posedge clk) begin
-        if (!rst && enable0) begin
-            if (command0.op == RV_MEM_WRITE) begin
-                data[command0.addr] <= command0.data;
-            end
-            result0.data <= data[command0.addr];
-        end
-    end
-
-    always_ff @ (posedge clk) begin
-        if (rst) begin
             data_valid1 <= 1'b0;
-        end else if (enable1) begin
-            if (command1.op == RV_MEM_READ) begin
-                data_valid1 <= 1'b1;
-            end else begin // write
-                data_valid1 <= (WRITE_PROPAGATE != 0);
+        end else begin
+            if (enable0) begin
+                data_valid0 <= (command0.op == RV_MEM_READ) ? 
+                        1'b1 : (WRITE_PROPAGATE != 0);
+                result0.op <= command0.op;
+                result0.addr <= command0.addr;
             end
 
-            result1.op <= command1.op;
-            result1.addr <= command1.addr;
-        end
-    end
-
-    always_ff @ (posedge clk) begin
-        if (!rst && enable1) begin
-            if (command1.op == RV_MEM_WRITE) begin
-                data[command1.addr] <= command1.data;
+            if (enable1) begin
+                data_valid1 <= (command1.op == RV_MEM_READ) ? 
+                        1'b1 : (WRITE_PROPAGATE != 0);
+                result1.op <= command1.op;
+                result1.addr <= command1.addr;
             end
-            result1.data <= data[command1.addr];
         end
     end
 

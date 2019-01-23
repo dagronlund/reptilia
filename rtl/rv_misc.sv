@@ -1,5 +1,11 @@
 `timescale 1ns/1ps
 
+/*
+A collection of small, single cycle utility modules, which avoid using
+interfaces and should generally be integrated as part of the state of a
+larger state machine.
+*/
+
 module clk_rst_gen #(
     parameter ACTIVE_HIGH = 1,
     parameter CYCLES = 1
@@ -87,6 +93,85 @@ module rv_shift_register #(
 
     always_comb begin
         shift_out = value[WIDTH-1];
+    end
+
+endmodule
+
+module rv_memory_single_port #(
+    parameter DATA_WIDTH = 32,
+    parameter ADDR_WIDTH = 10
+)(
+    input logic clk, rst,
+
+    input logic enable, write_enable,
+    input logic [ADDR_WIDTH-1:0] addr_in,
+    input logic [DATA_WIDTH-1:0] data_in,
+
+    output logic [DATA_WIDTH-1:0] data_out
+);
+
+    localparam DATA_LENGTH = 2**ADDR_WIDTH;
+
+    logic [DATA_WIDTH-1:0] data [DATA_LENGTH];
+
+    always_ff @(posedge clk) begin
+        if (enable) begin
+            if (write_enable) begin
+                data[addr_in] <= data_in;
+            end
+            data_out <= data[addr_in];
+        end
+    end
+
+endmodule
+
+// TODO: Add asymmetric data widths
+module rv_memory_double_port #(
+    parameter DATA_WIDTH = 32,
+    parameter ADDR_WIDTH = 10
+)(
+    input logic clk, rst,
+
+    input logic enable0, write_enable0,
+    input logic [ADDR_WIDTH-1:0] addr_in0,
+    input logic [DATA_WIDTH-1:0] data_in0,
+    output logic [DATA_WIDTH-1:0] data_out0,
+
+    input logic enable1, write_enable1,
+    input logic [ADDR_WIDTH-1:0] addr_in1,
+    input logic [DATA_WIDTH-1:0] data_in1,
+    output logic [DATA_WIDTH-1:0] data_out1
+);
+
+    localparam DATA_LENGTH = 2**ADDR_WIDTH;
+
+    logic [DATA_WIDTH-1:0] data [DATA_LENGTH];
+
+    /*
+    Using two seperate always_ff blocks is super important for Vivado to 
+    recognize that this is a true-dual-port block-ram, without a weird output
+    register stage.
+
+    A single always_ff block will imply some priority when writing to the
+    block-ram at the same time and place, which won't synthesize.
+    */
+
+    always_ff @(posedge clk) begin
+        if (enable0) begin
+            if (write_enable0) begin
+                data[addr_in0] <= data_in0;
+            end
+            data_out0 <= data[addr_in0];
+        end
+    end
+
+    always_ff @(posedge clk) begin
+        if (enable1) begin
+            if (write_enable1) begin
+                data[addr_in1] <= data_in1;
+            end
+            data_out1 <= data[addr_in1];
+        end
     end
 
 endmodule
