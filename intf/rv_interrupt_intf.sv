@@ -1,7 +1,4 @@
-`ifndef __RV_INTERRUPT__
-`define __RV_INTERRUPT__
-
-`include "../lib/rv_util.svh"
+`timescale 1ns/1ps
 
 interface rv_interrupt_intf #()(
     input logic clk = 'b0, rst = 'b0
@@ -38,5 +35,3 @@ interface rv_interrupt_intf #()(
     endtask
 
 endinterface
-
-`endif

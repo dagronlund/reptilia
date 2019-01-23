@@ -1,5 +1,4 @@
-`ifndef __RV_IO__
-`define __RV_IO__
+`timescale 1ns/1ps
 
 interface rv_io_intf #()();
 
@@ -9,5 +8,3 @@ interface rv_io_intf #()();
     modport view(input i, o, t);
 
 endinterface
-
-`endif

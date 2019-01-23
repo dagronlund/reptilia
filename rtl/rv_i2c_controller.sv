@@ -1,10 +1,8 @@
 `timescale 1ns/1ps
 
-`include "../lib/rv_interrupt.svh"
 `include "../lib/rv_util.svh"
 `include "../lib/rv_i2c.svh"
 `include "../lib/rv_axi4_lite.svh"
-`include "../lib/rv_io.svh"
 
 `BUILD_STREAM_INTF_PACKAGED(rv_i2c, rv_i2c_command)
 `BUILD_STREAM_INTF_PACKAGED(rv_i2c, rv_i2c_result)
@@ -35,8 +33,8 @@ Register Map:
     'h2C: Read 16 Addr, 16 Data (W)  {ADDR[15:0], DATA[15:0]}
 */
 module rv_i2c_controller #(
-    parameter DEFAULT_CYCLES = 10'd249, // (100 MHz / 400 kHz)
-    parameter DEFAULT_DELAY = 10'd0
+    parameter logic [9:0] DEFAULT_CYCLES = 10'd249, // (100 MHz / 400 kHz)
+    parameter logic [9:0] DEFAULT_DELAY = 10'd0
 )(
     input logic clk, rst,
     
@@ -87,8 +85,8 @@ module rv_i2c_controller #(
 endmodule
 
 module rv_i2c_register_map #(
-    parameter DEFAULT_CYCLES = 10'd249, // (100 MHz / 400 kHz)
-    parameter DEFAULT_DELAY = 10'd0
+    parameter logic [9:0] DEFAULT_CYCLES = 10'd249, // (100 MHz / 400 kHz)
+    parameter logic [9:0] DEFAULT_DELAY = 10'd0
 )(
     input logic clk, rst,
     
