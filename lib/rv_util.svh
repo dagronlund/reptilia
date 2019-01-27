@@ -7,6 +7,10 @@ Utilities for RISC-V development
 Original STATIC_ASSERT from Reid Long
 */
 
+let MAX(a,b) = (a > b) ? a : b;
+
+let MIN(a,b) = (a < b) ? a : b;
+
 `define STRINGIFY(str) `"str`"
 
 `define STATIC_ASSERT(condition) \

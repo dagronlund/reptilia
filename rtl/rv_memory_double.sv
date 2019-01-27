@@ -11,7 +11,7 @@
  * be used.
  */
 module rv_memory_double #(
-    parameter WRITE_PROPAGATE = 0 // Writes generate a result as well
+    parameter WRITE_RESPOND = 0 // Writes generate a result as well
 )(
     input logic clk, rst,
     rv_mem_intf.in command0, // Inbound Commands
@@ -73,6 +73,8 @@ module rv_memory_double #(
     ) rv_memory_double_port_inst (
         .clk, .rst,
 
+        // Memory values do not get reset on the device after startup,
+        // so avoid writing to them during normal reset
         .enable0(!rst && enable0),
         .write_enable0(command0.op == RV_MEM_WRITE),
         .addr_in0(command0.addr),
@@ -93,14 +95,14 @@ module rv_memory_double #(
         end else begin
             if (enable0) begin
                 data_valid0 <= (command0.op == RV_MEM_READ) ? 
-                        1'b1 : (WRITE_PROPAGATE != 0);
+                        1'b1 : (WRITE_RESPOND != 0);
                 result0.op <= command0.op;
                 result0.addr <= command0.addr;
             end
 
             if (enable1) begin
                 data_valid1 <= (command1.op == RV_MEM_READ) ? 
-                        1'b1 : (WRITE_PROPAGATE != 0);
+                        1'b1 : (WRITE_RESPOND != 0);
                 result1.op <= command1.op;
                 result1.addr <= command1.addr;
             end

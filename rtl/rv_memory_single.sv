@@ -12,7 +12,7 @@
  */
  
 module rv_memory_single #(
-    parameter WRITE_PROPAGATE = 0 // Writes generate a result as well
+    parameter WRITE_RESPOND = 0 // Writes generate a result as well
 )(
     input logic clk, rst,
     rv_mem_intf.in command, // Inbound Commands
@@ -51,6 +51,8 @@ module rv_memory_single #(
     ) rv_memory_single_port_inst (
         .clk, .rst,
 
+        // Memory values do not get reset on the device after startup,
+        // so avoid writing to them during normal reset
         .enable(!rst && enable),
         .write_enable(command.op == RV_MEM_WRITE),
         .addr_in(command.addr),
@@ -64,7 +66,7 @@ module rv_memory_single #(
         end else begin
             if (enable) begin
                 data_valid <= (command.op == RV_MEM_READ) ? 
-                        1'b1 : (WRITE_PROPAGATE != 0);
+                        1'b1 : (WRITE_RESPOND != 0);
                 result.op <= command.op;
                 result.addr <= command.addr;
             end
@@ -84,7 +86,7 @@ module rv_memory_single_tb ();
     rv_mem_intf mem_result(.*);
 
     rv_memory_single #(
-        .WRITE_PROPAGATE(0)
+        .WRITE_RESPOND(0)
     ) mem_inst0 (
         .clk, .rst,
         .command(mem_command),
