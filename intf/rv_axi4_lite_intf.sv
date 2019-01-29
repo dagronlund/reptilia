@@ -2,6 +2,8 @@
 
 `include "../lib/rv_axi4_lite.svh"
 
+// TODO: Rename signal names to lowercase
+
 interface rv_axi4_lite_ar_intf #(
     parameter ADDR_WIDTH = 32
 )(

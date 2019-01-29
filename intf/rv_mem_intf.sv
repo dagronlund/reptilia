@@ -6,7 +6,9 @@ interface rv_mem_intf #(
     parameter DATA_WIDTH = 32,
     parameter ADDR_WIDTH = 10,
     // Indicates that the address steps by bytes regardless of the data width
-    parameter ADDR_BYTE_SHIFTED = 0
+    parameter ADDR_BYTE_SHIFTED = 0,
+    // Indicates that the bus only carries data (i.e. a read response)
+    parameter DATA_ONLY = 0
 )(
     input logic clk = 'b0, rst = 'b0
 );
