@@ -1,14 +1,16 @@
 `timescale 1ns/1ps
 
+`include "../lib/rv_util.svh"
+
 /*
-A collection of small, single cycle utility modules, which avoid using
-interfaces and should generally be integrated as part of the state of a
-larger state machine.
-*/
+ * A collection of small, single cycle utility modules, which avoid using
+ * interfaces and should generally be integrated as part of the state of a
+ * larger state machine.
+ */
 
 module clk_rst_gen #(
     parameter ACTIVE_HIGH = 1,
-    parameter CYCLES = 1
+    parameter CYCLES = 5
 )(
     output logic clk, rst
     // input logic trigger_rst = 1'b0
@@ -30,12 +32,33 @@ module clk_rst_gen #(
 
 endmodule
 
+module rv_register #(
+    parameter WIDTH = 8
+)(
+    input logic clk, rst,
+
+    input logic load_enable = 1'b0,
+    input logic [WIDTH-1:0] load_value = {WIDTH{1'b0}},
+
+    output logic [WIDTH-1:0] value
+);
+
+    always_ff @(posedge clk) begin
+        if(rst) begin
+            value <= 'b0;
+        end else if (load_enable) begin
+            value <= load_value;
+        end
+    end
+
+endmodule
+
 module rv_counter #(
     parameter WIDTH = 8
 )(
     input logic clk, rst,
 
-    input logic enable, clear,
+    input logic enable, clear = 1'b0,
     output logic [WIDTH-1:0] value,
 
     input logic load_enable = 1'b0,
@@ -174,4 +197,40 @@ module rv_memory_double_port #(
         end
     end
 
+endmodule
+
+module rv_memory_distributed #(
+    parameter DATA_WIDTH = 1,
+    parameter ADDR_WIDTH = 5,
+    parameter READ_PORTS = 1
+)(
+    input logic clk, rst,
+
+    input logic write_enable,
+    input logic [ADDR_WIDTH-1:0] write_addr,
+    input logic [DATA_WIDTH-1:0] write_data_in,
+    output logic [DATA_WIDTH-1:0] write_data_out,
+
+    input logic [ADDR_WIDTH-1:0] read_addr [READ_PORTS],
+    output logic [DATA_WIDTH-1:0] read_data_out [READ_PORTS]
+);
+
+    localparam DATA_LENGTH = 2**ADDR_WIDTH;
+
+    (* ram_style="distributed" *)
+    logic [DATA_WIDTH-1:0] data [DATA_LENGTH];
+
+    always_ff @(posedge clk) begin
+        if (write_enable) begin
+            data[write_addr] <= write_data_in;
+        end
+    end
+
+    always_comb begin
+        write_data_out = data[write_addr];
+        for (int i = 0; i < READ_PORTS; i++) begin
+            read_data_out[i] = data[read_addr[i]];
+        end
+    end
+   
 endmodule
