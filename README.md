@@ -41,16 +41,21 @@ To run this on windows requires Cygwin installed with the following packages:
 
 [Installation Instructions](https://www.veripool.org/projects/verilog-perl/wiki/Installing)
 
+```
 git clone http://git.veripool.org/git/Verilog-Perl
 perl Makefile.PL
 make
+```
 
 To run the preprocessor for wrappers in this repository use the following command as an example (in Cygwin)
 
+```
 perl vppreproc --noline --noblank --nocomment +define+__PRE_PREPROCESSOR__ wrapper.sv --o wrapper_processed.sv
+```
 
 ## Random Notes
 1. ABSOLUTELY NEVER put an interface or module definition in a header file, Vivado loses it brainz
 2. Use $bit(interface.bus) instead of interface.BUS_WIDTH to parameterize bit widths when possible
 3. When referencing a parameter or type passed through an interface port (i.e my_intf.BUS_WIDTH or $bits(my_intf.bus)), make sure that it is assigned to a localparam, not a parameter
 4. Always put interfaces in a seperate \*.sv file and only put packages in \*.svh files.
+5. Never include a header file from another header file, the simulator can handle this but the synthesis engine cannot properly handle the relative includes. Instead the file using those the primary header needs to include the secondary header itself. Vivado has the ```-include_dirs /somepath/somewhere``` option for synthesis but all of directories with header files would need to be included here, and usually with absolute paths since these paths are otherwise relative to the directory that Vivado was started in.
