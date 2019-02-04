@@ -37,17 +37,16 @@ module rv_register #(
 )(
     input logic clk, rst,
 
-    input logic load_enable = 1'b0,
-    input logic [WIDTH-1:0] load_value = {WIDTH{1'b0}},
-
+    input logic enable = 'b0,
+    input logic [WIDTH-1:0] next_value = 'b0,
     output logic [WIDTH-1:0] value
 );
 
     always_ff @(posedge clk) begin
         if(rst) begin
             value <= 'b0;
-        end else if (load_enable) begin
-            value <= load_value;
+        end else if (enable) begin
+            value <= next_value;
         end
     end
 
@@ -59,35 +58,38 @@ module rv_counter #(
     input logic clk, rst,
 
     input logic enable, clear = 1'b0,
-    output logic [WIDTH-1:0] value,
+    output logic [WIDTH-1:0] value, next_value,
 
     input logic load_enable = 1'b0,
-    input logic [WIDTH-1:0] load_value = {WIDTH{1'b0}},
+    input logic [WIDTH-1:0] load_value = 'b0,
 
     input logic [WIDTH-1:0] max = {WIDTH{1'b1}},
     output logic complete
 );
 
-    always_ff @(posedge clk) begin
-        if(rst || clear) begin
-            value <= {WIDTH{1'b0}};
-        end else if (load_enable) begin
-            value <= load_value;
-        end else if (enable) begin
-            if (complete) begin
-                value <= {WIDTH{1'b0}};
-            end else begin
-                value <= value + 1'b1;
-            end
-        end
-    end
+    rv_register #(
+        .WIDTH(WIDTH)
+    ) rv_register_inst (
+        .clk, .rst,
+        .enable(enable || clear), // TODO: Hmm
+        .next_value(next_value),
+        .value(value)
+    );
 
     always_comb begin
         complete = (value == max) && enable;
+        if (load_enable) begin
+            next_value = load_value;
+        end else if (complete || clear) begin
+            next_value = {WIDTH{1'b0}};
+        end else begin
+            next_value = value + 'b1;
+        end 
     end
 
 endmodule
 
+// TODO: Change to use register module
 module rv_shift_register #(
     parameter WIDTH = 8,
     parameter RESET = 'b0
@@ -95,7 +97,7 @@ module rv_shift_register #(
     input logic clk, rst,
 
     input logic enable,
-    output logic [WIDTH-1:0] value,
+    output logic [WIDTH-1:0] value, next_value,
 
     input logic shift_in = 1'b0,
     output logic shift_out,
@@ -214,6 +216,9 @@ module rv_memory_distributed #(
     input logic [ADDR_WIDTH-1:0] read_addr [READ_PORTS],
     output logic [DATA_WIDTH-1:0] read_data_out [READ_PORTS]
 );
+
+    // Make sure it fits in distributed RAM
+    `STATIC_ASSERT(ADDR_WIDTH <= 9)
 
     localparam DATA_LENGTH = 2**ADDR_WIDTH;
 
