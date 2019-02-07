@@ -9,6 +9,7 @@
 package gecko;
 
     import rv32::*;
+    import rv32i::*;
 
     typedef logic [1:0] gecko_byte_offset_t;
     typedef logic [3:0] gecko_store_mask_t;
