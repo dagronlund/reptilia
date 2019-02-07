@@ -13,12 +13,40 @@ package gecko;
     typedef logic [1:0] gecko_byte_offset_t;
     typedef logic [3:0] gecko_store_mask_t;
 
+    typedef struct packed {
+        rv32_reg_value_t rs1_value;
+        rv32_reg_value_t rs2_value;
+        rv32_reg_addr_t rd_addr;
+    } gecko_reg_command_t;
+
+    typedef struct packed {
+        rv32_reg_value_t rd_value;
+        rv32_reg_addr_t rd_addr;
+    } gecko_reg_result_t;
+
+    typedef logic [4:0] gecko_shift_amount_t;
+
+    typedef enum logic [2:0] {
+        GECKO_SHIFT_STRIDE_1 = 'h0,
+        GECKO_SHIFT_STRIDE_2 = 'h1,
+        GECKO_SHIFT_STRIDE_4 = 'h2,
+        GECKO_SHIFT_STRIDE_8 = 'h3,
+        GECKO_SHIFT_STRIDE_16 = 'h4,
+        GECKO_SHIFT_STRIDE_UNDEF = 'hX
+    } gecko_shift_stride_t;
+
     typedef enum logic [1:0] {
         GECKO_SHIFT_LL = 'h0, // Left Logical
         GECKO_SHIFT_RL = 'h1, // Right Logical
         GECKO_SHIFT_RA = 'h2, // Right Arithmetic
-        GECKO_SHIFT_UNDEF = 'h3
+        GECKO_SHIFT_UNDEF = 'hX
     } gecko_shift_type_t;
+
+    typedef struct packed {
+        gecko_shift_type_t shift_type;
+        gecko_shift_amount_t shift;
+        gecko_shift_stride_t stride;
+    } gecko_shift_command_t;
 
     typedef enum logic {
         GECKO_MATH_COMMAND_NORMAL = 'h0,
@@ -29,24 +57,6 @@ package gecko;
         rv32i_funct_ir_t op;
         gecko_math_command_alternate_t alt;
     } gecko_math_command_t;
-
-    typedef struct packed {
-        rv32_reg_value_t rs1_value;
-        rv32_reg_value_t rs2_value;
-        rv32_reg_addr_t rd_addr;
-    } gecko_reg_command_t;
-
-    typedef struct packed {
-        rv32_reg_value_t rs1_value;
-        rv32_reg_addr_t rd_addr;
-        gecko_shift_type_t shift_type;
-        logic [4:0] amount;
-    } gecko_shift_command_t;
-
-    typedef struct packed {
-        rv32_reg_value_t rd_value;
-        rv32_reg_addr_t rd_addr;
-    } gecko_reg_result_t;
 
     typedef struct packed {
         rv32_reg_value_t add_sub_result;
@@ -163,6 +173,64 @@ package gecko;
         RV32I_FUNCT3_LS_BU: return {24'b0, bshifted_value[7:0]};
         RV32I_FUNCT3_LS_HU: return {16'b0, hshifted_value[15:0]};
         default: return value; // RV32I_FUNCT3_LS_W
+        endcase
+    endfunction
+
+    function automatic rv32_reg_value_t gecko_reverse_bits(
+        input rv32_reg_value_t value
+    );
+        int i;
+        rv32_reg_value_t reversed;
+        for (i = 0; i < 32; i++) begin
+            reversed[i] = value[31 - i];
+        end
+        return reversed;
+    endfunction
+
+    function automatic gecko_shift_amount_t gecko_get_actual_shift(
+        input gecko_shift_command_t cmd
+    );
+        unique case (cmd.stride)
+        GECKO_SHIFT_STRIDE_1: return cmd.shift;
+        GECKO_SHIFT_STRIDE_2: return {cmd.shift[3:0], 1'b0};
+        GECKO_SHIFT_STRIDE_4: return {cmd.shift[2:0], 2'b0};
+        GECKO_SHIFT_STRIDE_8: return {cmd.shift[1:0], 3'b0};
+        GECKO_SHIFT_STRIDE_16: return {cmd.shift[0], 4'b0};
+        default: return cmd.shift;
+        endcase
+    endfunction
+
+    function automatic rv32_reg_value_t gecko_full_shift(
+        input rv32_reg_value_t value,
+        input gecko_shift_command_t cmd
+    );
+        int i;
+        gecko_shift_amount_t actual_shift;
+        rv32_reg_value_t oriented_value, shifted_value;
+
+        // Reverse bits if doing right shift
+        case (cmd.shift_type)
+        GECKO_SHIFT_RL, GECKO_SHIFT_RA: oriented_value = gecko_reverse_bits(value);
+        default: oriented_value = value; // GECKO_SHIFT_LL
+        endcase
+
+        // Get corrected shift value
+        actual_shift = gecko_get_actual_shift(cmd);
+
+        // Perform left shift
+        shifted_value = oriented_value << actual_shift;
+
+        // Perform arithmetic correction from the left
+        if (cmd.shift_type == GECKO_SHIFT_RA) begin
+            for (i = 0; i < actual_shift; i++) begin
+                shifted_value[i] |= oriented_value[0];
+            end
+        end
+
+        // Unreverse the bits when doing right shifts
+        case (cmd.shift_type)
+        GECKO_SHIFT_RL, GECKO_SHIFT_RA: return gecko_reverse_bits(value);
+        default: return value; // GECKO_SHIFT_LL
         endcase
     endfunction
 

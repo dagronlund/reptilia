@@ -1,6 +1,20 @@
 # risc-v
 SystemVerilog RISC-V implementation and libraries
 
+## Cores
+
+### Gecko
+Small RV32I core with flexible memory interfaces and lightweight AXI interfaces
+
+### Basilisk
+Gecko core with both integer math, floating point, and vector extensions
+
+### Iguana
+Large RV32G core with multiple coherent memory interfaces and full-featured AXI interfaces
+
+### Komodo
+Iguana core with supervisor extensions for booting Unix operating systems
+
 ## Folder Structure
 
 rtl/
