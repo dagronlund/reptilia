@@ -1,6 +1,10 @@
 `ifndef __RV32I__
 `define __RV32I__
 
+`ifdef _SIMULATION_
+`include "rv32.svh"
+`endif
+
 package rv32i;
 
     import rv::*;
@@ -47,7 +51,7 @@ package rv32i;
         RV32I_FUNCT3_B_BGE = 'h5,
         RV32I_FUNCT3_B_BLTU = 'h6,
         RV32I_FUNCT3_B_BGEU = 'h7,
-        RV32I_FUNCT3_B_UNDEX = 'hX
+        RV32I_FUNCT3_B_UNDEF = 'hX
     } rv32i_funct3_b_t;
 
     typedef union packed {

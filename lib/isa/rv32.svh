@@ -1,6 +1,10 @@
 `ifndef __RV32__
 `define __RV32__
 
+`ifdef _SIMULATION_
+`include "rv.svh"
+`endif
+
 package rv32;
 
     import rv::*;
@@ -9,6 +13,7 @@ package rv32;
     typedef logic [31:0] rv32_imm_t;
     typedef logic [6:0] rv32_opcode_t;
     typedef logic [4:0] rv32_reg_addr_t;
+    typedef logic [31:0] rv32_reg_value_t;
     typedef logic [2:0] rv32_funct3_t;
     typedef logic [6:0] rv32_funct7_t;
     typedef logic [11:0] rv32_funct12_t;
