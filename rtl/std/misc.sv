@@ -1,38 +1,12 @@
 `timescale 1ns/1ps
 
-`include "../lib/rv_util.svh"
-
 /*
  * A collection of small, single cycle utility modules, which avoid using
  * interfaces and should generally be integrated as part of the state of a
  * larger state machine.
  */
 
-module clk_rst_gen #(
-    parameter ACTIVE_HIGH = 1,
-    parameter CYCLES = 5
-)(
-    output logic clk, rst
-    // input logic trigger_rst = 1'b0
-);
-    int i;
-
-    initial begin
-        clk = 0;
-        rst = 1;
-        for (i = 0; i < CYCLES; i++) begin
-            #5 clk = 1;
-            #5 clk = 0;
-        end
-        rst = 0;
-        forever begin 
-            #5 clk = ~clk;
-        end
-    end
-
-endmodule
-
-module rv_register #(
+module register #(
     parameter WIDTH = 8
 )(
     input logic clk, rst,
@@ -52,7 +26,7 @@ module rv_register #(
 
 endmodule
 
-module rv_counter #(
+module counter #(
     parameter WIDTH = 8
 )(
     input logic clk, rst,
@@ -67,9 +41,9 @@ module rv_counter #(
     output logic complete
 );
 
-    rv_register #(
+    register #(
         .WIDTH(WIDTH)
-    ) rv_register_inst (
+    ) register_inst (
         .clk, .rst,
         .enable(enable || clear), // TODO: Hmm
         .next_value(next_value),
@@ -90,7 +64,7 @@ module rv_counter #(
 endmodule
 
 // TODO: Change to use register module
-module rv_shift_register #(
+module shift_register #(
     parameter WIDTH = 8,
     parameter RESET = 'b0
 )(
@@ -122,7 +96,7 @@ module rv_shift_register #(
 
 endmodule
 
-module rv_memory_single_port #(
+module memory_single_port #(
     parameter DATA_WIDTH = 32,
     parameter ADDR_WIDTH = 10
 )(
@@ -151,7 +125,7 @@ module rv_memory_single_port #(
 endmodule
 
 // TODO: Add asymmetric data widths
-module rv_memory_double_port #(
+module memory_double_port #(
     parameter DATA_WIDTH = 32,
     parameter ADDR_WIDTH = 10
 )(
@@ -201,7 +175,7 @@ module rv_memory_double_port #(
 
 endmodule
 
-module rv_memory_distributed #(
+module memory_distributed #(
     parameter DATA_WIDTH = 1,
     parameter ADDR_WIDTH = 5,
     parameter READ_PORTS = 1
@@ -216,9 +190,6 @@ module rv_memory_distributed #(
     input logic [ADDR_WIDTH-1:0] read_addr [READ_PORTS],
     output logic [DATA_WIDTH-1:0] read_data_out [READ_PORTS]
 );
-
-    // Make sure it fits in distributed RAM
-    `STATIC_ASSERT(ADDR_WIDTH <= 9)
 
     localparam DATA_LENGTH = 2**ADDR_WIDTH;
 
