@@ -167,16 +167,17 @@
 task divide;
   input  logic [23:0] a, b;
   output logic [46:0] y;
+  output logic [2:0] guard;
 
   logic [7:0] i;
-  logic [23:0] A, B;
-  logic [47:0] x, A2;
+  logic [72:0] A, B;
+  logic [72:0] x, A2;
 
   begin
-    A = a;
+    A = a<<23;
     B = b;
-    for (i=0; i<24; i++) begin
-      x = B<<(23-i);
+    for (i=0; i<47; i++) begin
+      x = B<<(46-i);
       if (x<=A) begin
         A = A - x;
         y[46-i] = 1;
@@ -185,15 +186,45 @@ task divide;
       end;
     end
 
-    A2 = A<<24;
-    for (i=0; i<23; i++) begin
-      x = B<<(23-i);
+    A2 = A<<3;
+    for (i=0;i<3;i++) begin
+      x = B<<(2-i);
       if (x<=A2) begin
         A2 = A2 - x;
-        y[22-i] = 1;
+        guard[2-i] = 1;
       end else begin
-        y[22-i] = 0;
+        guard[2-i] = 0;
       end;
     end 
   end
+endtask
+
+task round;
+  input  logic [23:0] temp_Y;
+  input  logic [8:0] Y_exp;
+  input  logic [2:0] guard;
+  input  logic exp_n;
+  output logic [30:0] Y;
+
+  logic [23:0] result;
+  logic [7:0] exp;
+  logic OF;
+
+  begin
+    if (guard[2]) begin
+      {OF, result} = temp_Y + 1;
+      exp = Y_exp;
+      if (OF) begin
+        if(exp_n) exp = Y_exp - 1;
+        else exp = Y_exp + 1;
+      end
+    end else begin
+      exp = Y_exp;
+      result = {temp_Y};
+    end
+
+    Y[30:23] = (exp_n) ? (127 - exp) : (exp + 127);
+    Y[22:0] = result[22:0];
+  end
+
 endtask

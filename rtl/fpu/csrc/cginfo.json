@@ -1,0 +1,137 @@
+{
+    "MlibObjs": {},
+    "PrevCompiledModules": {
+        "std": {
+            "reYIK_d": {
+                "bytes": 28470,
+                "out": "reYIK_d.o",
+                "mod": "std",
+                "mode": 4,
+                "checksum": 4294967295,
+                "archive": "archive.158/_prev_archive_1.a"
+            }
+        },
+        "...MASTER...": {
+            "amcQw_d": {
+                "bytes": 7457,
+                "out": "objs/amcQw_d.o",
+                "mod": "...MASTER...",
+                "mode": 4,
+                "checksum": 4294967295
+            }
+        },
+        "_vcs_unit__3246595532": {
+            "WvMdR_d": {
+                "bytes": 17540,
+                "out": "WvMdR_d.o",
+                "mod": "_vcs_unit__3246595532",
+                "mode": 4,
+                "checksum": 4294967295,
+                "archive": "archive.158/_62232_archive_1.a"
+            }
+        },
+        "test_divide": {
+            "ZLtDN_d": {
+                "bytes": 16182,
+                "out": "ZLtDN_d.o",
+                "mod": "test_divide",
+                "mode": 4,
+                "checksum": 4294967295,
+                "archive": "archive.158/_prev_archive_1.a"
+            }
+        }
+    },
+    "NameTable": {
+        "...MASTER...": [
+            "SIM",
+            "amcQw",
+            "module"
+        ],
+        "_vcs_unit__3246595532": [
+            "_vcs_unit__3246595532",
+            "WvMdR",
+            "module"
+        ],
+        "std": [
+            "std",
+            "reYIK",
+            "module"
+        ],
+        "test_divide": [
+            "test_divide",
+            "ZLtDN",
+            "module"
+        ]
+    },
+    "CurCompileModules": [
+        "...MASTER...",
+        "_vcs_unit__3246595532"
+    ],
+    "Misc": {
+        "cwd": "/afs/ece.cmu.edu/usr/cyrila/Private/class/500/risc-v/rtl/fpu",
+        "csrc": "csrc",
+        "daidir": "simv.daidir",
+        "csrc_abs": "/afs/ece.cmu.edu/usr/cyrila/Private/class/500/risc-v/rtl/fpu/csrc",
+        "daidir_abs": "/afs/ece.cmu.edu/usr/cyrila/Private/class/500/risc-v/rtl/fpu/simv.daidir",
+        "default_output_dir": "csrc",
+        "archive_dir": "archive.158"
+    },
+    "PEModules": [],
+    "SIMBData": {
+        "out": "amcQwB.o",
+        "bytes": 65075
+    },
+    "stat": {
+        "ru_self_cgstart": {
+            "ru_utime_sec": 0.044595999999999997,
+            "ru_stime_sec": 0.035473999999999999,
+            "ru_nvcsw": 111,
+            "ru_maxrss_kb": 47780,
+            "ru_nivcsw": 3,
+            "ru_minflt": 12629,
+            "ru_majflt": 0
+        },
+        "outputSizePerQuad": 270.0,
+        "CodeGen(%)": 11.032198858875635,
+        "ru_childs_cgstart": {
+            "ru_utime_sec": 0.0,
+            "ru_stime_sec": 0.0,
+            "ru_nvcsw": 0,
+            "ru_maxrss_kb": 0,
+            "ru_nivcsw": 0,
+            "ru_minflt": 0,
+            "ru_majflt": 0
+        },
+        "nMops": 938,
+        "nQuads": 333,
+        "totalObjSize": 90036,
+        "ru_self_end": {
+            "ru_utime_sec": 0.050125999999999997,
+            "ru_stime_sec": 0.051129000000000001,
+            "ru_nvcsw": 170,
+            "ru_maxrss_kb": 54508,
+            "ru_nivcsw": 4,
+            "ru_minflt": 14719,
+            "ru_majflt": 0
+        },
+        "ru_childs_end": {
+            "ru_utime_sec": 0.0,
+            "ru_stime_sec": 0.0,
+            "ru_nvcsw": 0,
+            "ru_maxrss_kb": 0,
+            "ru_nivcsw": 0,
+            "ru_minflt": 0,
+            "ru_majflt": 0
+        },
+        "Frontend(%)": 88.967801141124369
+    },
+    "LVLData": [
+        "SIM"
+    ],
+    "CompileStrategy": "fullobj",
+    "CurCompileUdps": {},
+    "CompileProcesses": [
+        "cgproc.62232.json"
+    ],
+    "CompileStatus": "Successful"
+}
