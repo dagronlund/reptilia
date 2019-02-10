@@ -3,7 +3,7 @@
 /*
  * You have no idea how cool this module is.
  */
-module flow #(
+module std_flow #(
     parameter NUM_INPUTS = 1, 
     parameter NUM_OUTPUTS = 1
 )(

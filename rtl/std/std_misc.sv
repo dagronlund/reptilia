@@ -6,7 +6,7 @@
  * larger state machine.
  */
 
-module register #(
+ module std_register #(
     parameter WIDTH = 8
 )(
     input logic clk, rst,
@@ -26,7 +26,7 @@ module register #(
 
 endmodule
 
-module counter #(
+module std_counter #(
     parameter WIDTH = 8
 )(
     input logic clk, rst,
@@ -41,9 +41,9 @@ module counter #(
     output logic complete
 );
 
-    register #(
+    std_register #(
         .WIDTH(WIDTH)
-    ) register_inst (
+    ) std_register_inst (
         .clk, .rst,
         .enable(enable || clear), // TODO: Hmm
         .next_value(next_value),
@@ -64,7 +64,7 @@ module counter #(
 endmodule
 
 // TODO: Change to use register module
-module shift_register #(
+module std_shift_register #(
     parameter WIDTH = 8,
     parameter RESET = 'b0
 )(
@@ -96,16 +96,17 @@ module shift_register #(
 
 endmodule
 
-module memory_single_port #(
+module std_block_ram_single #(
     parameter DATA_WIDTH = 32,
-    parameter ADDR_WIDTH = 10
+    parameter ADDR_WIDTH = 10,
+    parameter MASK_WIDTH = DATA_WIDTH / 8
 )(
     input logic clk, rst,
 
-    input logic enable, write_enable,
+    input logic enable, 
+    input logic [MASK_WIDTH-1:0] write_enable,
     input logic [ADDR_WIDTH-1:0] addr_in,
     input logic [DATA_WIDTH-1:0] data_in,
-
     output logic [DATA_WIDTH-1:0] data_out
 );
 
@@ -113,30 +114,38 @@ module memory_single_port #(
 
     logic [DATA_WIDTH-1:0] data [DATA_LENGTH];
 
-    always_ff @(posedge clk) begin
-        if (enable) begin
-            if (write_enable) begin
-                data[addr_in] <= data_in;
+    generate
+        genvar k;
+        for (k = 0; k < MASK_WIDTH; k++) begin
+            always_ff @(posedge clk) begin
+                if (enable) begin
+                    if (write_enable[k]) begin
+                        data[addr_in][((k+1)*8)-1:(k*8)] <= data_in[((k+1)*8)-1:(k*8)];
+                    end
+                    data_out[((k+1)*8)-1:(k*8)] <= data[addr_in][((k+1)*8)-1:(k*8)];
+                end
             end
-            data_out <= data[addr_in];
         end
-    end
+    endgenerate
 
 endmodule
 
 // TODO: Add asymmetric data widths
-module memory_double_port #(
+module std_block_ram_double #(
     parameter DATA_WIDTH = 32,
-    parameter ADDR_WIDTH = 10
+    parameter ADDR_WIDTH = 10,
+    parameter MASK_WIDTH = DATA_WIDTH / 8
 )(
     input logic clk, rst,
 
-    input logic enable0, write_enable0,
+    input logic enable0, 
+    input logic [MASK_WIDTH-1:0] write_enable0,
     input logic [ADDR_WIDTH-1:0] addr_in0,
     input logic [DATA_WIDTH-1:0] data_in0,
     output logic [DATA_WIDTH-1:0] data_out0,
 
-    input logic enable1, write_enable1,
+    input logic enable1, 
+    input logic [MASK_WIDTH-1:0] write_enable1,
     input logic [ADDR_WIDTH-1:0] addr_in1,
     input logic [DATA_WIDTH-1:0] data_in1,
     output logic [DATA_WIDTH-1:0] data_out1
@@ -147,42 +156,46 @@ module memory_double_port #(
     logic [DATA_WIDTH-1:0] data [DATA_LENGTH];
 
     /*
-    Using two seperate always_ff blocks is super important for Vivado to 
-    recognize that this is a true-dual-port block-ram, without a weird output
-    register stage.
-
-    A single always_ff block will imply some priority when writing to the
-    block-ram at the same time and place, which won't synthesize.
-    */
-
-    always_ff @(posedge clk) begin
-        if (enable0) begin
-            if (write_enable0) begin
-                data[addr_in0] <= data_in0;
+     * Using two seperate always_ff blocks is super important for Vivado to 
+     * recognize that this is a true-dual-port block-ram, without a weird output
+     * register stage.
+     *
+     * A single always_ff block will imply some priority when writing to the
+     * block-ram at the same time and place, which won't synthesize.
+     */
+    generate
+        genvar k;
+        for (k = 0; k < MASK_WIDTH; k++) begin
+            always_ff @(posedge clk) begin
+                if (enable0) begin
+                    if (write_enable0[k]) begin
+                        data[addr_in0][((k+1)*8)-1:(k*8)] <= data_in0[((k+1)*8)-1:(k*8)];
+                    end            
+                    data_out0[((k+1)*8)-1:(k*8)] <= data[addr_in0][((k+1)*8)-1:(k*8)];
+                end
             end
-            data_out0 <= data[addr_in0];
-        end
-    end
 
-    always_ff @(posedge clk) begin
-        if (enable1) begin
-            if (write_enable1) begin
-                data[addr_in1] <= data_in1;
+            always_ff @(posedge clk) begin
+                if (enable1) begin
+                    if (write_enable1[k]) begin
+                        data[addr_in1][((k+1)*8)-1:(k*8)] <= data_in1[((k+1)*8)-1:(k*8)];
+                    end
+                    data_out1[((k+1)*8)-1:(k*8)] <= data[addr_in1][((k+1)*8)-1:(k*8)];
+                end
             end
-            data_out1 <= data[addr_in1];
         end
-    end
+    endgenerate
 
 endmodule
 
-module memory_distributed #(
+module std_distributed_ram #(
     parameter DATA_WIDTH = 1,
     parameter ADDR_WIDTH = 5,
     parameter READ_PORTS = 1
 )(
     input logic clk, rst,
 
-    input logic write_enable,
+    input logic [DATA_WIDTH-1:0] write_enable,
     input logic [ADDR_WIDTH-1:0] write_addr,
     input logic [DATA_WIDTH-1:0] write_data_in,
     output logic [DATA_WIDTH-1:0] write_data_out,
@@ -196,11 +209,16 @@ module memory_distributed #(
     (* ram_style="distributed" *)
     logic [DATA_WIDTH-1:0] data [DATA_LENGTH];
 
-    always_ff @(posedge clk) begin
-        if (write_enable) begin
-            data[write_addr] <= write_data_in;
+    generate
+        genvar k;
+        for (k = 0; k < DATA_WIDTH; k++) begin
+            always_ff @(posedge clk) begin
+                if (write_enable[k]) begin
+                    data[write_addr][k] <= write_data_in[k];
+                end
+            end
         end
-    end
+    endgenerate
 
     always_comb begin
         write_data_out = data[write_addr];

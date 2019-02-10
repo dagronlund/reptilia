@@ -1,5 +1,5 @@
-`ifndef __RV_UTIL__
-`define __RV_UTIL__
+`ifndef __STD_UTIL__
+`define __STD_UTIL__
 
 /*
 Utilities for RISC-V development
@@ -16,7 +16,6 @@ function MIN(int a, int b);
 endfunction
 
 // let MAX(a,b) = (a > b) ? a : b;
-
 // let MIN(a,b) = (a < b) ? a : b;
 
 `define STRINGIFY(str) `"str`"

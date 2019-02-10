@@ -1,10 +1,12 @@
 `timescale 1ns/1ps
 
-`include "../lib/rv_mem.svh"
+`include "../../lib/std/std_mem.svh"
 
-interface rv_mem_intf #(
+// TODO: Add cache signals
+interface std_mem_intf #(
     parameter DATA_WIDTH = 32,
     parameter ADDR_WIDTH = 10,
+    parameter MASK_WIDTH = DATA_WIDTH / 8,
     // Indicates that the address steps by bytes regardless of the data width
     parameter ADDR_BYTE_SHIFTED = 0,
     // Indicates that the bus only carries data (i.e. a read response)
@@ -13,34 +15,38 @@ interface rv_mem_intf #(
     input logic clk = 'b0, rst = 'b0
 );
 
-    import rv_mem::*;
-
     logic valid, ready;
-    rv_memory_op op;
+
+    logic                  read_enable;
+    logic [MASK_WIDTH-1:0] write_enable;
     logic [ADDR_WIDTH-1:0] addr;
     logic [DATA_WIDTH-1:0] data;
 
     modport out(
         output valid,
         input ready,
-        output op, addr, data
+        output read_enable, write_enable, addr, data
     );
 
     modport in(
         input valid,
         output ready,
-        input op, addr, data
+        input read_enable, write_enable, addr, data
     );
     
     modport view(
         input valid, ready,
-        input op, addr, data
+        input read_enable, write_enable, addr, data
     );
 
-    task send(input rv_memory_op op_in, 
-            input logic [ADDR_WIDTH-1:0] addr_in, 
-            input logic [DATA_WIDTH-1:0] data_in);
-        op <= op_in;
+    task send(
+        input logic                  read_enable_in,
+        input logic [MASK_WIDTH-1:0] write_enable_in,
+        input logic [ADDR_WIDTH-1:0] addr_in, 
+        input logic [DATA_WIDTH-1:0] data_in
+    );
+        read_enable <= read_enable_in;
+        write_enable <= write_enable_in;
         addr <= addr_in;
         data <= data_in;
 
@@ -50,15 +56,19 @@ interface rv_mem_intf #(
         valid <= 1'b0;
     endtask
 
-    task recv(output rv_memory_op op_out, 
-            output logic [ADDR_WIDTH-1:0] addr_out, 
-            output logic [DATA_WIDTH-1:0] data_out);
+    task recv(
+        output logic                  read_enable_out,
+        output logic [MASK_WIDTH-1:0] write_enable_out,
+        output logic [ADDR_WIDTH-1:0] addr_out,
+        output logic [DATA_WIDTH-1:0] data_out
+    );
         ready <= 1'b1;
         @ (posedge clk);
         while (!valid) @ (posedge clk);
         ready <= 1'b0;
 
-        op_out = op;
+        read_enable_out = read_enable;
+        write_enable_out = write_enable;
         addr_out = addr;
         data_out = data;
     endtask
