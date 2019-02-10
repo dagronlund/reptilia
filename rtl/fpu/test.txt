@@ -1,0 +1,2 @@
+vcs -sverilog -R divide.sv fpu_tasks.sv
+
