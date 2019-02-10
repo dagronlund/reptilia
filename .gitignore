@@ -4,3 +4,9 @@ xvhdl.pb
 xvlog.log
 xvlog.pb
 xsim.dir/
+
+# VCS Temp Files
+simv.daidir/
+csrc/
+simv
+ucli.key
