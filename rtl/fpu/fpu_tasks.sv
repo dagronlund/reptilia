@@ -167,7 +167,7 @@
 task divide;
   input  logic [23:0] a, b;
   output logic [46:0] y;
-  output logic [2:0] guard;
+  output logic [5:0] guard;
 
   logic [7:0] i;
   logic [72:0] A, B;
@@ -186,16 +186,56 @@ task divide;
       end;
     end
 
-    A2 = A<<3;
-    for (i=0;i<3;i++) begin
-      x = B<<(2-i);
+    A2 = A<<6;
+    for (i=0;i<6;i++) begin
+      x = B<<(5-i);
       if (x<=A2) begin
         A2 = A2 - x;
-        guard[2-i] = 1;
+        guard[5-i] = 1;
       end else begin
-        guard[2-i] = 0;
+        guard[5-i] = 0;
       end;
     end 
+  end
+endtask
+
+task square_root;
+  input  logic [47:0] sig;
+  output logic [23:0] mant;
+  output logic [2:0] guard;
+
+  logic [47:0] temp, M, d;
+  logic [4:0] i;
+
+  begin
+    temp = 48'd0;
+    M = 48'd1;
+    for (i=0;i<24;i++) begin
+      temp = {temp[45:0], sig[47:46]};
+      sig = sig<<2;
+      if (M <= temp) begin
+        temp = temp-M;
+        mant[23-i] = 1;
+        d = M+1;
+        M = {d[46:0], 1'd1};
+      end else begin
+        mant[23-i] = 1'd0;
+        M = {M[46:1], 2'd1};
+      end 
+    end
+
+    for (i=0;i<3;i++) begin
+      temp = {temp[45:0], 2'd0};
+      if (M <= temp) begin
+        temp = temp-M;
+        guard[2-i] = 1;
+        d = M+1;
+        M = {d[46:0], 1'd1};
+      end else begin
+        guard[2-i] = 1'd0;
+        M = {M[46:1], 2'd1};
+      end 
+    end
   end
 endtask
 

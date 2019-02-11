@@ -88,7 +88,7 @@ module test_divide();
   logic [31:0] A, B, Y, result, i;
 	logic r;
 
-  parameter NUM_VECTORS=10;
+  parameter NUM_VECTORS=15;
 	logic [99:0] vectors [NUM_VECTORS-1:0];
 	logic [99:0] args;
 	
