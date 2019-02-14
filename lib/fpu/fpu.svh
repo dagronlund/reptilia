@@ -13,6 +13,11 @@ package fpu;
     typedef logic [10:0] fpu_double_exponent_t;
     typedef logic [51:0] fpu_double_mantissa_t;
 
+    parameter fpu_float_t FPU_FLOAT_ZERO = 32'h0000_0000;
+    parameter fpu_float_t FPU_FLOAT_NAN = 32'hFFFF_FFFF;
+    parameter fpu_float_t FPU_FLOAT_POS_INF = 32'h7F80_0000;
+    parameter fpu_float_t FPU_FLOAT_NEG_INF = 32'hFF80_0000;
+
     typedef struct packed {
         fpu_float_sign_t sign;
         fpu_float_exponent_t exponent;
@@ -24,6 +29,21 @@ package fpu;
         fpu_double_exponent_t exponent;
         fpu_double_mantissa_t mantissa;
     } fpu_double_fields_t;
+
+    typedef struct packed {
+        logic [1:0] guard;
+        logic       sticky;
+    } fpu_guard_bits_t;
+
+    typedef struct packed {
+        fpu_float_mantissa_t mantissa;
+        fpu_guard_bits_t guard;
+    } fpu_float_mantissa_result_t;
+
+    typedef struct packed {
+        fpu_double_mantissa_t mantissa;
+        fpu_guard_bits_t guard;
+    } fpu_double_mantissa_result_t;
 
     function automatic fpu_float_fields_t fpu_decode_float(
         input fpu_float_t raw
