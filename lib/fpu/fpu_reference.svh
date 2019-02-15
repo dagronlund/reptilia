@@ -135,6 +135,58 @@ package fpu_reference;
 
     endfunction
 
+    function automatic fpu_float_fields_t fpu_reference_float_round(
+        input fpu_round_mode_t round_mode,
+        input fpu_guard_bits_t guard_bits,
+        input fpu_float_fields_t number
+    );
+        logic enable_rounding, denormalized, rounded_carry;
+        fpu_float_mantissa_complete_t full_mantissa, rounded_mantissa;
+
+        // Find normalized/denormalized mantissa and try rounding up
+        denormalized = (number.exponent == 8'h00);
+        full_mantissa = {~denormalized, number.mantissa};
+        {rounded_carry, rounded_mantissa} = full_mantissa + 'b1;
+
+        // Decide to round up based on different rounding modes
+        if (guard_bits == 3'b100) begin
+            case (round_mode)
+            FPU_ROUND_MODE_EVEN: enable_rounding = number.mantissa[0];
+            FPU_ROUND_MODE_DOWN: enable_rounding = 'b0;
+            FPU_ROUND_MODE_UP:   enable_rounding = 'b1;
+            FPU_ROUND_MODE_ZERO: enable_rounding = number.sign;
+            endcase
+        end else if (guard_bits[2] == 1'b1) begin // Round up
+            enable_rounding = 'b1;
+        end else begin // Round down
+            enable_rounding = 'b0;
+        end
+
+        // Modify results if rounding overflowed
+        if (enable_rounding) begin
+            if (denormalized) begin
+                number.mantissa = rounded_mantissa[22:0];
+                if (rounded_mantissa[23]) begin // Overflow
+                    number.exponent += 1;
+                end
+            end else begin
+                if (rounded_carry) begin // Overflow
+                    number.exponent += 1;
+                    if (number.exponent == 8'hFF) begin // Overflow into infinity
+                        number.mantissa = 23'b0;
+                    end else begin
+                        number.mantissa = rounded_mantissa[23:1];
+                    end
+                end else begin
+                    number.mantissa = rounded_mantissa[22:0];
+                end
+            end
+        end
+
+        return number;
+        
+    endfunction
+
 endpackage
 
 `endif
