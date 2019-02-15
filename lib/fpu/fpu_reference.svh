@@ -24,40 +24,41 @@ package fpu_reference;
     endfunction
 
     typedef struct packed {
+        logic mantissa_lsb;
         logic [1:0] mantissa_msb;
         logic [23:0] mantissa_acc;
-        logic [47:0] manitssa_temp;
-    } fpu_reference_float_sqrt_partial_arguments_t;
+        logic [47:0] mantissa_temp;
+    } fpu_reference_float_sqrt_partial_t;
 
-    typedef struct packed {
-        logic mantissa_lsb;
-        logic [23:0] mantissa_acc;
-        logic [47:0] manitssa_temp;
-    } fpu_reference_float_sqrt_partial_results_t;
-
-    function automatic fpu_float_mantissa_result_t fpu_reference_float_sqrt_partial(
-        input fpu_reference_float_sqrt_partial_arguments_t args
+    function automatic fpu_reference_float_sqrt_partial_t fpu_reference_float_sqrt_partial(
+        input fpu_reference_float_sqrt_partial_t args
     );
-        fpu_reference_float_sqrt_partial_results_t results;
         logic mantissa_acc_lsb = 'b0;
+        logic [47:0] sub_result;
+        logic sub_carry;
 
-        results.mantissa_temp = {args.mantissa_temp[21:0], args.mantissa_msb};
-        results.mantissa_acc = args.mantissa_acc;
+        // Shift in two mantissa bits
+        args.mantissa_temp = {args.mantissa_temp[21:0], args.mantissa_msb};
 
-        if (results.mantissa_acc <= results.mantissa_temp) begin
-            results.mantissa_temp -= results.mantissa_acc;
-            results.mantissa_lsb = 'b1;
-            results.mantissa_acc += 'b1;
+        {sub_carry, sub_result} = args.mantissa_temp - args.mantissa_acc;
+
+        if (!sub_carry) begin // mantissa_temp >= mantissa_acc
+            args.mantissa_temp = sub_result;
+            args.mantissa_lsb = 'b1;
+            args.mantissa_acc += 'b1;
         end else begin
-            results.mantissa_lsb = 'b0;
-            results.mantissa_acc[0] = 'b0;
+            args.mantissa_lsb = 'b0;
+            args.mantissa_acc[0] = 'b0;
         end
-        results.mantissa_acc = {results.mantissa_acc[22:0], 1'b1};
 
-        return results;
+        // Shift in a one in the least signficant bit
+        args.mantissa_acc = {args.mantissa_acc[22:0], 1'b1};
+
+        return args;
     endfunction
 
     // TODO: Does not implement rounding for performance
+    // TODO: Does not handle denormalized
     function automatic fpu_float_fields_t fpu_reference_float_sqrt(
         input fpu_float_fields_t a
     );
@@ -65,8 +66,7 @@ package fpu_reference;
         logic [23:0] actual_mantissa, result_mantissa;
         logic [7:0] actual_exponent, result_exponent;
         logic generates_nan;
-        fpu_reference_float_sqrt_partial_arguments_t sqrt_args;
-        fpu_reference_float_sqrt_partial_results_t sqrt_results;
+        fpu_reference_float_sqrt_partial_t sqrt_partial;
 
         // Find flags for floating point input
         denormalized = (a.exponent == 0);
@@ -101,18 +101,17 @@ package fpu_reference;
 
         // Perform square root on the mantissa
         result_mantissa = 24'b0;
-        sqrt_args.mantissa_msb = actual_mantissa[23:22];
-        sqrt_args.mantissa_acc = 24'b1;
-        sqrt_args.mantissa_temp = 48'd0;
+        sqrt_partial.mantissa_msb = actual_mantissa[23:22];
+        sqrt_partial.mantissa_acc = 24'b1;
+        sqrt_partial.mantissa_temp = 48'd0;
         for (int i = 0; i < 24; i++) begin
-            sqrt_results = fpu_reference_float_sqrt_partial(sqrt_args);
+            sqrt_partial = fpu_reference_float_sqrt_partial(sqrt_partial);
             
             // Update mantissa
-            result_mantissa = result_mantissa << 1;
-            result_mantissa[0] = sqrt_results.mantissa_lsb;
+            result_mantissa = {result_mantissa[22:0], sqrt_partial.mantissa_lsb};
 
             // Shift in new digits from original mantissa
-            sqrt_args.mantissa_msb = actual_mantissa[23:22];
+            sqrt_partial.mantissa_msb = actual_mantissa[23:22];
             actual_mantissa = actual_mantissa << 2;
         end
 
