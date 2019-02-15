@@ -10,3 +10,6 @@ simv.daidir/
 csrc/
 simv
 ucli.key
+
+# C Temp Files
+*.exe
