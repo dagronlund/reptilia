@@ -11,6 +11,9 @@ package gecko;
     import rv32::*;
     import rv32i::*;
 
+    typedef rv32_reg_value_t gecko_pc_t;
+    typedef logic gecko_jump_flag_t;
+
     typedef logic [1:0] gecko_byte_offset_t;
     typedef logic [3:0] gecko_store_mask_t;
 
@@ -79,6 +82,24 @@ package gecko;
         gecko_store_mask_t mask;
     } gecko_store_result_t;
 
+    typedef struct packed {
+        logic absolute_jump;
+        rv32_reg_value_t absolute_addr;
+        logic relative_jump;
+        rv32_reg_value_t relative_addr;
+    } gecko_jump_command_t;
+
+    typedef struct packed {
+        gecko_pc_t pc;
+        gecko_jump_flag_t jump_flag;
+    } gecko_pc_command_t;
+
+    typedef struct packed {
+        gecko_reg_command_t reg_cmd;
+        gecko_math_command_t math_cmd;
+        gecko_jump_flag_t jump_flag;
+    } gecko_alu_command_t;
+
     // Adds or subtracts with a carry bit
     function automatic gecko_add_sub_result_t gecko_add_sub(
         input rv32_reg_value_t a,
@@ -88,7 +109,7 @@ package gecko;
         gecko_add_sub_result_t result;
         rv32_reg_value_t b_inv;
         b_inv = sub ? (~b) : (b);
-        {result.carry, result.sum} = a + b_inv + sub;  
+        {result.carry, result.sum} = a + b_inv + sub;
         return result;
     endfunction
 
@@ -141,13 +162,13 @@ package gecko;
         unique case (mem_op)
         RV32I_FUNCT3_LS_B, RV32I_FUNCT3_LS_BU: begin
             return '{
-                value: value[7:0] << {byte_offset, 3'b0}, 
+                value: {value[7:0], value[7:0], value[7:0], value[7:0]}, 
                 mask: 4'b1 << byte_offset
             };
         end
         RV32I_FUNCT3_LS_H, RV32I_FUNCT3_LS_HU: begin
             return '{
-                value: value[15:0] << {byte_offset[1], 4'b0},
+                value: {value[15:0], value[15:0]},
                 mask: 4'b11 << {byte_offset[1], 1'b0}
             };
         end
