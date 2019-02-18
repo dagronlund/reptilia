@@ -6,7 +6,7 @@
  * larger state machine.
  */
 
- module std_register #(
+module std_register #(
     parameter WIDTH = 8
 )(
     input logic clk, rst,

@@ -9,7 +9,9 @@
  * stage immediately after this will allow for the block memory output 
  * register to be used.
  */
-module std_mem_double #()(
+module std_mem_double #(
+    parameter MANUAL_ADDR_WIDTH = 0 // Set other than zero to override
+)(
     input logic clk, rst,
     std_mem_intf.in command0, command1, // Inbound Commands
     std_mem_intf.out result0, result1 // Outbound Results
@@ -20,7 +22,7 @@ module std_mem_double #()(
     `STATIC_MATCH_MEM(command0, result1)
 
     localparam DATA_WIDTH = $bits(command0.data);
-    localparam ADDR_WIDTH = $bits(command0.addr);
+    localparam ADDR_WIDTH = (MANUAL_ADDR_WIDTH == 0) ? $bits(command0.addr) : MANUAL_ADDR_WIDTH;
     localparam MASK_WIDTH = DATA_WIDTH / 8;
     localparam DATA_LENGTH = 2**ADDR_WIDTH;
 
