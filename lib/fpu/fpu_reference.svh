@@ -60,29 +60,29 @@ package fpu_reference;
     // TODO: Does not implement rounding for performance
     // TODO: Does not handle denormalized
     function automatic fpu_float_fields_t fpu_reference_float_sqrt(
-        input fpu_float_fields_t a
+        input fpu_float_fields_t number
     );
         logic denormalized, mantissa_zero, exponent_negative, number_zero;
-        logic [23:0] actual_mantissa, result_mantissa;
+        fpu_float_mantissa_complete_t actual_mantissa, result_mantissa;
         logic [7:0] actual_exponent, result_exponent;
         logic generates_nan;
         fpu_reference_float_sqrt_partial_t sqrt_partial;
 
         // Find flags for floating point input
-        denormalized = (a.exponent == 0);
-        mantissa_zero = (a.mantissa == 0);
+        denormalized = (number.exponent == 0);
+        mantissa_zero = (number.mantissa == 0);
         number_zero = denormalized && mantissa_zero;
-        generates_nan = (a.exponent == 'hFF);
-        exponent_negative = (a.exponent < 8'd127);
+        generates_nan = (number.exponent == 'hFF) || number.sign;
+        exponent_negative = (number.exponent < 8'd127);
 
         // Decode the actual mantissa based on normalization
-        actual_mantissa = {(denormalized ? 1'b0 : 1'b1), a.mantissa};
+        actual_mantissa = {(denormalized ? 1'b0 : 1'b1), number.mantissa};
 
         // Find the absolute value of the exponent based on excess-127
         if (exponent_negative) begin
-            actual_exponent = denormalized ? (8'd126) : (8'd127 - a.exponent);
+            actual_exponent = denormalized ? (8'd126) : (8'd127 - number.exponent);
         end else begin
-            actual_exponent = a.exponent - 8'd127;
+            actual_exponent = number.exponent - 8'd127;
         end
         
         // Modify mantissa if even/odd/or negative
@@ -125,12 +125,16 @@ package fpu_reference;
         end
 
         // Handle special case
-        if (a.sign || generates_nan) begin // Imaginary number
+        if (generates_nan || denormalized) begin // Imaginary number
             return FPU_FLOAT_NAN;
         end else if (number_zero) begin
             return FPU_FLOAT_ZERO;
         end else begin
-            return '{sign: 'b0, exponent: actual_exponent, mantissa: result_mantissa};
+            return '{
+                sign: 'b0, 
+                exponent: actual_exponent, 
+                mantissa: result_mantissa
+            };
         end
 
     endfunction
@@ -184,7 +188,6 @@ package fpu_reference;
         end
 
         return number;
-        
     endfunction
 
 endpackage
