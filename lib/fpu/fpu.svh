@@ -15,8 +15,8 @@ package fpu;
     typedef logic [51:0] fpu_double_mantissa_t;
     typedef logic [52:0] fpu_double_mantissa_complete_t;
 
-    parameter fpu_float_t FPU_FLOAT_ZERO = 32'h0000_0000;
-    parameter fpu_float_t FPU_FLOAT_NAN = 32'hFFFF_FFFF;
+    parameter fpu_float_t FPU_FLOAT_ZERO    = 32'h0000_0000;
+    parameter fpu_float_t FPU_FLOAT_NAN     = 32'hFFFF_FFFF;
     parameter fpu_float_t FPU_FLOAT_POS_INF = 32'h7F80_0000;
     parameter fpu_float_t FPU_FLOAT_NEG_INF = 32'hFF80_0000;
 
