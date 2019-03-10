@@ -41,7 +41,7 @@ module std_flow #(
 
         // Enable if all outputs are either not being produced, not valid, or being consumed
         for (int i = 0; i < NUM_OUTPUTS; i++) begin
-            enable &= (!produce[i]) || (!valid_output[i]) || (ready_input[i]);   
+            enable &= (!produce[i]) || (!valid_output[i]) || (ready_output[i]);   
         end
 
         // Enable if all inputs are either consumed and present, or not being consumed
