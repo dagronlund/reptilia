@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 
 /*
- * You have no idea how cool this module is.
+ * 👾🌌 You have no idea how cool this module is. 🔭🇺🇸
  */
 module std_flow #(
     parameter NUM_INPUTS = 1, 
