@@ -21,6 +21,7 @@ package rv32i;
         RV32I_OPCODE_JALR = 'h67, // Jump/Link/Register (I-Type)
         RV32I_OPCODE_BRANCH = 'h63, // Branch (B-Type)
         RV32I_OPCODE_SYSTEM = 'h73, // System (I-Type)
+        RV32I_OPCODE_FENCE = 'h0F, // Fence (I-Type)
         RV32I_OPCODE_UNDEF = 7'hXX
     } rv32i_opcode_t;
 
