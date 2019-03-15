@@ -15,139 +15,167 @@ module gecko_execute
     import rv32i::*;
     import gecko::*;
 (
-    // Recieve jump commands
-    input logic                jump_command_valid,
-    input gecko_jump_command_t jump_command_in,
+    input logic clk, rst,
 
-    // Recieve register writeback commands
-    input logic                register_writeback_valid,
-    input gecko_reg_result_t   register_writeback_in,
+    std_stream_intf.in execute_command, // gecko_execute_operation_t
 
-    // Recieve instruction memory and program counter
-    std_mem_intf.in inst_result_in,
-    std_stream_intf.in pc_command_in,
+    std_stream_intf.out mem_command, // gecko_mem_operation_t
+    std_mem_intf.out mem_data,
 
-    // Send commands to execution units
-    std_mem_intf.out data_command_out,
-    std_stream_intf.out csr_command_out,
-    std_stream_intf.out alu_command_out
+    std_stream_intf.out execute_result, // gecko_operation_t
+
+    std_stream_intf.out branch_command, // gecko_branch_command_t
+    std_stream_intf.out branch_signal // gecko_branch_signal_t
 );
 
-    typedef enum logic [1:0] {
-        GECKO_EXECUTE_RESET = 2'b00,
-        GECKO_EXECUTE_NORMAL = 2'b01
-    } gecko_execute_state_t;
-
+    logic enable, enable_mem_command, enable_mem_data, enable_execute, enable_branch, enable_branch_dummy;
     logic consume;
-    logic produce_data, produce_csr, produce_alu;
-    logic enable, data_enable, csr_enable, alu_enable;
+    logic produce_mem_command, produce_mem_data, produce_execute, produce_branch;
 
     // Flow Controller
     std_flow #(
-        .NUM_INPUTS(2),
-        .NUM_OUTPUTS(3)
+        .NUM_INPUTS(1),
+        .NUM_OUTPUTS(5)
     ) std_flow_inst (
         .clk, .rst,
 
-        .valid_input({inst_result_in.valid, pc_command_in.valid}),
-        .ready_input({inst_result_in.ready, pc_command_in.ready}),
+        .valid_input({execute_command.valid}),
+        .ready_input({execute_command.ready}),
+        
+        .valid_output({mem_command.valid, mem_data.valid, execute_result.valid, branch_command.valid, branch_signal.valid}),
+        .ready_output({mem_command.ready, mem_data.ready, execute_result.ready, branch_command.ready, branch_signal.ready}),
 
-        .valid_output({data_command_out.valid, csr_command_out.valid, alu_command_out.valid}),
-        .ready_output({data_command_out.ready, csr_command_out.ready, alu_command_out.ready}),
-
-        // Always consumes both inputs or not
-        .consume({consume, consume}),
-        .produce({produce_data, produce_csr, produce_alu}),
+        .consume({consume}),
+        .produce({produce_mem_command, produce_mem_data, produce_execute, produce_branch, produce_branch}),
 
         .enable,
-        .enable_output({data_enable, csr_enable, alu_enable})
+        .enable_output({enable_mem_command, enable_mem_data, enable_execute, enable_branch, enable_branch_dummy})
     );
 
-    logic state_enable;
-    gecko_execute_state_t state, next_state;
+    gecko_operation_t next_execute_result;
+    gecko_branch_command_t next_branch_command;
+    gecko_branch_signal_t next_branch_signal;
+    gecko_mem_operation_t next_mem_command;
 
-    // Current state register
-    std_register #(
-        .WIDTH($size(gecko_execute_state_t)),
-        .RESET(GECKO_EXECUTE_RESET)
-    ) state_register_inst (
-        .clk, .rst,
-        .enable(state_enable),
-        .next_value(next_state), .value(state)
-    );
+    logic next_read_enable;
+    logic [3:0] next_write_enable;
+    logic [31:0] next_addr, next_data;
 
-    logic reset_counter_enable;
-    rv32_reg_addr_t reset_counter, next_reset_counter;
-
-    // Reset counter register
-    std_register #(
-        .WIDTH($size(rv32_reg_addr_t)),
-        .RESET('b0)
-    ) reset_counter_register_inst (
-        .clk, .rst,
-        .enable(reset_counter_enable),
-        .next_value(next_reset_counter), .value(reset_counter)
-    );
-
-    logic register_write_enable;
-    rv32_reg_addr_t register_write_addr;
-    rv32_reg_value_t register_write_value;
-
-    // Register File
-    std_distributed_ram #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(5),
-        .READ_PORTS(2)
-    ) register_file_inst (
-        .clk, .rst,
-
-        // Always write to all bits in register
-        .write_enable({32{register_write_enable}}),
-        .write_addr(register_write_addr),
-        .write_data_in(register_write_value),
-
-        .read_addr('{}),
-        .read_data_out('{})
-    );
-
+    always_ff @(posedge clk) begin
+        if (enable_execute) begin
+            execute_result.payload <= next_execute_result;
+        end
+        if (enable_branch) begin
+            branch_command.payload <= next_branch_command;
+            branch_signal.payload <= next_branch_signal;
+        end
+        if (enable_mem_command) begin
+            mem_command.payload <= next_mem_command;
+        end
+        if (enable_mem_data) begin
+            mem_data.read_enable <= next_read_enable;
+            mem_data.write_enable <= next_write_enable;
+            mem_data.addr <= next_addr;
+            mem_data.data <= next_data;
+        end
+    end
 
     always_comb begin
-        // Default values
-        state_enable = 'b0;
-        next_state = state;
-        reset_counter_enable = 'b0;
-        next_reset_counter = reset_counter + 'b1;
-        
-        register_write_enable = 'b0;
-        register_write_addr = reset_counter;
-        register_write_value = 'b0;
+        automatic gecko_operation_t current_execute_result;
+        automatic rv32_reg_value_t a, b, c;
+        automatic gecko_execute_operation_t cmd_in;
+        automatic gecko_alternate_t alt;
+        automatic gecko_math_result_t result;
+        automatic gecko_store_result_t store_result;
 
-        case (state)
-        GECKO_EXECUTE_RESET: begin
-            reset_counter_enable = 'b1;
-            if (reset_counter == 'd31) begin
-                state_enable = 'b1;
-                next_state = GECKO_EXECUTE_NORMAL;
-            end
-        end
-        GECKO_EXECUTE_NORMAL: begin
+        cmd_in = gecko_execute_operation_t'(execute_command.payload);
+        current_execute_result = gecko_operation_t'(execute_result.payload);
 
-        end
-        default: begin
+        a = (cmd_in.reuse_rs1) ? current_execute_result.value : cmd_in.rs1_value;
+        b = (cmd_in.reuse_rs2) ? current_execute_result.value : cmd_in.rs2_value;
+        c = (cmd_in.reuse_mem) ? current_execute_result.value : cmd_in.mem_value;
 
-        end
+        consume = 'b1;
+        produce_mem_command = 'b0;
+        produce_mem_data = 'b0;
+        produce_execute = 'b0;
+        produce_branch = 'b0;
+
+        next_execute_result.value = 'b0;
+        next_execute_result.addr = cmd_in.reg_addr;
+        next_execute_result.jump_flag = cmd_in.jump_flag;
+
+        next_mem_command.addr = cmd_in.reg_addr;
+        next_mem_command.op = cmd_in.op.ls;
+        next_mem_command.offset = 'b0;
+        next_mem_command.jump_flag = cmd_in.jump_flag;
+
+        next_branch_signal.branch = 'b0;
+        next_branch_command.branch = 'b0;
+        next_branch_command.relative_addr = cmd_in.immediate_value;
+
+        next_read_enable = 'b0;
+        next_write_enable = 'b0;
+        next_addr = 'b0;
+        next_data = 'b0;
+
+        case (cmd_in.op_type)
+        GECKO_EXECUTE_TYPE_EXECUTE: alt = cmd_in.alu_alternate;
+        GECKO_EXECUTE_TYPE_LOAD: alt = GECKO_NORMAL;
+        GECKO_EXECUTE_TYPE_STORE: alt = GECKO_NORMAL;
+        GECKO_EXECUTE_TYPE_BRANCH: alt = GECKO_ALTERNATE;
         endcase
 
-        // Determine register writing logic
-        if (state == GECKO_EXECUTE_RESET) begin
-            register_write_enable = 'b1;
-        end else if (register_writeback_valid) begin
-            // Make sure to not write to r0
-            register_write_enable = (register_writeback_in.rd_addr != 'b0);
-            register_write_addr = register_writeback_in.rd_addr;
-            register_write_value = register_writeback_in.rd_value;
-        end
+        result = gecko_get_full_math_result(a, b, alt);
 
+        case (cmd_in.op_type)
+        GECKO_EXECUTE_TYPE_EXECUTE: begin
+            produce_execute = 'b1;
+
+            case (cmd_in.op.ir)
+            RV32I_FUNCT3_IR_ADD_SUB: next_execute_result.value = result.add_sub_result;
+            RV32I_FUNCT3_IR_SLL: next_execute_result.value = result.lshift_result;
+            RV32I_FUNCT3_IR_SLT: next_execute_result.value = result.lt ? 32'b1 : 32'b0;
+            RV32I_FUNCT3_IR_SLTU: next_execute_result.value = result.ltu ? 32'b1 : 32'b0;
+            RV32I_FUNCT3_IR_XOR: next_execute_result.value = result.xor_result;
+            RV32I_FUNCT3_IR_SRL_SRA: next_execute_result.value = result.rshift_result;
+            RV32I_FUNCT3_IR_OR: next_execute_result.value = result.or_result;
+            RV32I_FUNCT3_IR_AND: next_execute_result.value = result.and_result;
+            endcase
+        end
+        GECKO_EXECUTE_TYPE_LOAD: begin
+            produce_mem_data = 'b1;
+            produce_mem_command = 'b1;
+
+            next_addr = result.add_sub_result;
+            next_read_enable = 'b1;
+
+            next_mem_command.offset = next_addr[1:0];
+        end
+        GECKO_EXECUTE_TYPE_STORE: begin
+            produce_mem_data = 'b1;
+
+            store_result = gecko_get_store_result(c, result.add_sub_result[1:0], cmd_in.op.ls);
+
+            next_addr = result.add_sub_result;
+            next_data = store_result.value;
+            next_write_enable = store_result.mask;
+        end
+        GECKO_EXECUTE_TYPE_BRANCH: begin
+            produce_branch = 'b1;
+            
+            case (cmd_in.op.b)
+            RV32I_FUNCT3_B_BEQ: if (result.eq) next_branch_command.branch = 'b1;
+            RV32I_FUNCT3_B_BNE: if (!result.eq) next_branch_command.branch = 'b1;
+            RV32I_FUNCT3_B_BLT: if (result.lt) next_branch_command.branch = 'b1;
+            RV32I_FUNCT3_B_BGE: if (!result.lt) next_branch_command.branch = 'b1;
+            RV32I_FUNCT3_B_BLTU: if (result.ltu) next_branch_command.branch = 'b1;
+            RV32I_FUNCT3_B_BGEU: if (!result.ltu) next_branch_command.branch = 'b1;
+            endcase
+
+            next_branch_signal.branch = next_branch_command.branch;
+        end
+        endcase
     end
 
 endmodule

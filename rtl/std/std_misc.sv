@@ -7,7 +7,8 @@
  */
 
 module std_register #(
-    parameter WIDTH = 8
+    parameter WIDTH = 8,
+    parameter logic [WIDTH-1:0] RESET = 'b0
 )(
     input logic clk, rst,
 
@@ -18,7 +19,7 @@ module std_register #(
 
     always_ff @(posedge clk) begin
         if(rst) begin
-            value <= 'b0;
+            value <= RESET;
         end else if (enable) begin
             value <= next_value;
         end

@@ -11,15 +11,18 @@
 
 // TODO: Add branch prediction
 module gecko_fetch
+    import rv::*;
+    import rv32::*;
+    import rv32i::*;
     import gecko::*;
 (
     input logic clk, rst,
 
-    input logic                jump_command_valid,
-    input gecko_jump_command_t jump_command_in,
+    std_stream_intf.in jump_command, // gecko_jump_command_t
+    std_stream_intf.in branch_command, // gecko_branch_command_t
 
-    std_mem_intf.out inst_command_out,
-    std_stream_intf.out pc_command_out
+    std_stream_intf.out instruction_command, // gecko_instruction_operation_t
+    std_mem_intf.out instruction_request
 );
 
     logic enable;
@@ -29,71 +32,66 @@ module gecko_fetch
     ) std_flow_inst (
         .clk, .rst,
 
-        // No actual input streams
         .valid_input('b1),
 
-        .valid_output({inst_command_out.valid, pc_command_out.valid}),
-        .ready_output({inst_command_out.ready, pc_command_out.ready}),
+        .valid_output({instruction_command.valid, instruction_request.valid}),
+        .ready_output({instruction_command.ready, instruction_request.ready}),
 
-        // No actual input streams
         .consume('b1),
         .produce('b11),
 
-        // Really only generating a single output stream
         .enable(enable)
     );
 
-    // Store program counter
-    gecko_pc_t pc, next_pc;
-    std_register #(
-        .WIDTH($size(gecko_pc_t))
-    ) pc_register_inst (
-        .clk, .rst, .enable,
-        .next_value(next_pc), .value(pc)
-    );
+    gecko_instruction_operation_t next_instruction_operation;
+    logic [31:0] next_instruction_addr;
 
-    // Store jump flag
-    gecko_jump_flag_t jump_flag, next_jump_flag;
-    std_register #(
-        .WIDTH($size(gecko_jump_flag_t))
-    ) jump_flag_register_inst (
-        .clk, .rst, .enable,
-        .next_value(next_jump_flag), .value(jump_flag)
-    );
+    always_ff @(posedge clk) begin
+        if (rst) begin
+            instruction_command.payload <= '{pc: (0-4), default: 'b0};
+            instruction_request.addr <= (0-4);
+        end else if (enable) begin
+            instruction_command.payload <= next_instruction_operation;
+            instruction_request.addr <= next_instruction_addr;
+        end
+    end
 
     always_comb begin
-        automatic gecko_pc_command_t pc_command;
-        automatic gecko_pc_t addr_current, addr_step;
+        automatic gecko_instruction_operation_t current_instruction_op;
+        automatic gecko_jump_command_t jump_cmd_in;
+        automatic gecko_branch_command_t branch_cmd_in;
+        automatic gecko_pc_t next_pc_start, next_pc_step;
+        automatic gecko_jump_flag_t next_jump_flag;
 
-        // Work out next pc
-        addr_current = pc;
-        addr_step = 'd4;
-        if (jump_command_valid) begin
-            if (jump_command_in.absolute_jump) begin
-                addr_current = jump_command_in.absolute_addr;
+        branch_command.ready = 'b1;
+        jump_command.ready = 'b1;
+
+        instruction_request.read_enable = 'b1;
+        instruction_request.write_enable = 'b0;
+        instruction_request.data = 'b0;
+
+        current_instruction_op = gecko_instruction_operation_t'(instruction_command.payload);
+        jump_cmd_in = gecko_jump_command_t'(jump_command.payload);
+        branch_cmd_in = gecko_branch_command_t'(branch_command.payload);
+
+        next_pc_start = current_instruction_op.pc;
+        next_pc_step = 'd4;
+        next_jump_flag = current_instruction_op.jump_flag;
+
+        if (jump_command.valid) begin
+            if (jump_cmd_in.absolute_jump) begin
+                next_pc_start = jump_cmd_in.absolute_addr;
             end
-            if (jump_command_in.relative_jump) begin
-                addr_step = jump_command_in.relative_addr;
-            end
-        end
-        next_pc = addr_current + addr_step;
-
-        // Work out next jump flag
-        if (jump_command_valid) begin
-            next_jump_flag = jump_flag + 'b1;
-        end else begin
-            next_jump_flag = jump_flag;
+            next_pc_step = jump_cmd_in.relative_addr;
+            next_jump_flag = next_jump_flag + 'b1;
+        end else if (branch_command.valid && branch_cmd_in.branch) begin
+            next_pc_step = branch_cmd_in.relative_addr;
+            next_jump_flag = next_jump_flag + 'b1;
         end
 
-        // Assign outputs
-        pc_command.pc = pc;
-        pc_command.jump_flag = jump_flag;
-        pc_command_out.payload = pc_command;
-
-        inst_command_out.read_enable = 'b1;
-        inst_command_out.write_enable = 'b0;
-        inst_command_out.addr = pc;
-        inst_command_out.data = 'b0;
+        next_instruction_operation.jump_flag = next_jump_flag;
+        next_instruction_operation.pc = next_pc_start + next_pc_step;
+        next_instruction_addr = next_instruction_operation.pc;
     end
 
 endmodule
