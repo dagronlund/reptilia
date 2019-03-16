@@ -26,6 +26,8 @@ module gecko_system
     logic [63:0] clock_counter; // Works for RDCYCLE and RDTIME
     logic [63:0] instruction_counter;
 
+    logic consume, produce, enable;
+
     // Flow Controller
     std_flow #(
         .NUM_INPUTS(1),
@@ -39,11 +41,13 @@ module gecko_system
         .valid_output({system_result.valid}),
         .ready_output({system_result.ready}),
 
-        .consume({1'b1}),
-        .produce({1'b1}),
+        .consume({consume}),
+        .produce({produce}),
 
         .enable
     );
+
+    gecko_operation_t next_system_result;
 
     always_ff @ (posedge clk) begin
         if (rst) begin
@@ -53,42 +57,57 @@ module gecko_system
             clock_counter <= clock_counter + 'b1;
             instruction_counter <= instruction_counter + instruction_retired;
         end
+        if (enable) begin
+            system_result.payload <= next_system_result;
+        end
     end
 
     always_comb begin
-        automatic gecko_sys_operation_t command_in;
-        automatic gecko_operation_t result_out;
+        automatic gecko_system_operation_t command_in;
 
         command_in = gecko_system_operation_t'(system_command.payload);
 
-        case (command_in.sys_op)
-        RV32I_FUNCT3_SYS_ENV: begin
+        consume = 'b1;
 
-        end
-        RV32I_FUNCT3_SYS_CSRRW: begin // Read Write
+        next_system_result.addr = command_in.rd_addr;
+        next_system_result.speculative = 'b0;
+        next_system_result.value = 'b0;
 
-        end
-        RV32I_FUNCT3_SYS_CSRRS: begin // Read Set
-
-        end
-        RV32I_FUNCT3_SYS_CSRRC: begin // Read Clear
-
-        end
-        RV32I_FUNCT3_SYS_CSRRWI: begin // Read Write Imm
-
-        end
-        RV32I_FUNCT3_SYS_CSRRSI: begin // Read Set Imm
-
-        end
-        RV32I_FUNCT3_SYS_CSRRCI: begin // Read Clear Imm
-
-        end
-        default: begin
-
-        end
+        case (command_in.csr)
+        RV32I_CSR_CYCLE: next_system_result.value = clock_counter[31:0];
+        RV32I_CSR_TIME: next_system_result.value = clock_counter[31:0];
+        RV32I_CSR_INSTRET: next_system_result.value = instruction_counter[31:0];
+        RV32I_CSR_CYCLEH: next_system_result.value = clock_counter[63:32];
+        RV32I_CSR_TIMEH: next_system_result.value = clock_counter[63:32];
+        RV32I_CSR_INSTRETH: next_system_result.value = instruction_counter[63:32];
         endcase
 
-        system_result.payload = result_out;
+        case (command_in.sys_op)
+        RV32I_FUNCT3_SYS_ENV: begin // System Op
+            produce = 'b0;
+        end
+        RV32I_FUNCT3_SYS_CSRRW: begin // Read Write
+            produce = (command_in.rd_addr != 'b0); // Don't produce writeback to x0
+        end
+        RV32I_FUNCT3_SYS_CSRRS: begin // Read Set
+            produce = (command_in.rd_addr != 'b0); // Don't produce writeback to x0
+        end
+        RV32I_FUNCT3_SYS_CSRRC: begin // Read Clear
+            produce = (command_in.rd_addr != 'b0); // Don't produce writeback to x0
+        end
+        RV32I_FUNCT3_SYS_CSRRWI: begin // Read Write Imm
+            produce = (command_in.rd_addr != 'b0); // Don't produce writeback to x0
+        end
+        RV32I_FUNCT3_SYS_CSRRSI: begin // Read Set Imm
+            produce = (command_in.rd_addr != 'b0); // Don't produce writeback to x0
+        end
+        RV32I_FUNCT3_SYS_CSRRCI: begin // Read Clear Imm
+            produce = (command_in.rd_addr != 'b0); // Don't produce writeback to x0
+        end
+        default: begin
+            produce = 'b0;
+        end
+        endcase
     end
 
 endmodule
