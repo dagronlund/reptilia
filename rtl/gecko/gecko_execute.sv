@@ -20,7 +20,7 @@ module gecko_execute
     std_stream_intf.in execute_command, // gecko_execute_operation_t
 
     std_stream_intf.out mem_command, // gecko_mem_operation_t
-    std_mem_intf.out mem_data,
+    std_mem_intf.out mem_request,
 
     std_stream_intf.out execute_result, // gecko_operation_t
 
@@ -28,9 +28,9 @@ module gecko_execute
     std_stream_intf.out branch_signal // gecko_branch_signal_t
 );
 
-    logic enable, enable_mem_command, enable_mem_data, enable_execute, enable_branch, enable_branch_dummy;
+    logic enable, enable_mem_command, enable_mem_request, enable_execute, enable_branch, enable_branch_dummy;
     logic consume;
-    logic produce_mem_command, produce_mem_data, produce_execute, produce_branch;
+    logic produce_mem_command, produce_mem_request, produce_execute, produce_branch;
 
     // Flow Controller
     std_flow #(
@@ -42,14 +42,14 @@ module gecko_execute
         .valid_input({execute_command.valid}),
         .ready_input({execute_command.ready}),
         
-        .valid_output({mem_command.valid, mem_data.valid, execute_result.valid, branch_command.valid, branch_signal.valid}),
-        .ready_output({mem_command.ready, mem_data.ready, execute_result.ready, branch_command.ready, branch_signal.ready}),
+        .valid_output({mem_command.valid, mem_request.valid, execute_result.valid, branch_command.valid, branch_signal.valid}),
+        .ready_output({mem_command.ready, mem_request.ready, execute_result.ready, branch_command.ready, branch_signal.ready}),
 
         .consume({consume}),
-        .produce({produce_mem_command, produce_mem_data, produce_execute, produce_branch, produce_branch}),
+        .produce({produce_mem_command, produce_mem_request, produce_execute, produce_branch, produce_branch}),
 
         .enable,
-        .enable_output({enable_mem_command, enable_mem_data, enable_execute, enable_branch, enable_branch_dummy})
+        .enable_output({enable_mem_command, enable_mem_request, enable_execute, enable_branch, enable_branch_dummy})
     );
 
     gecko_operation_t next_execute_result;
@@ -72,11 +72,11 @@ module gecko_execute
         if (enable_mem_command) begin
             mem_command.payload <= next_mem_command;
         end
-        if (enable_mem_data) begin
-            mem_data.read_enable <= next_read_enable;
-            mem_data.write_enable <= next_write_enable;
-            mem_data.addr <= next_addr;
-            mem_data.data <= next_data;
+        if (enable_mem_request) begin
+            mem_request.read_enable <= next_read_enable;
+            mem_request.write_enable <= next_write_enable;
+            mem_request.addr <= next_addr;
+            mem_request.data <= next_data;
         end
     end
 
@@ -97,18 +97,17 @@ module gecko_execute
 
         consume = 'b1;
         produce_mem_command = 'b0;
-        produce_mem_data = 'b0;
+        produce_mem_request = 'b0;
         produce_execute = 'b0;
         produce_branch = 'b0;
 
         next_execute_result.value = 'b0;
         next_execute_result.addr = cmd_in.reg_addr;
-        next_execute_result.jump_flag = cmd_in.jump_flag;
+        next_execute_result.speculative = cmd_in.speculative;
 
         next_mem_command.addr = cmd_in.reg_addr;
         next_mem_command.op = cmd_in.op.ls;
         next_mem_command.offset = 'b0;
-        next_mem_command.jump_flag = cmd_in.jump_flag;
 
         next_branch_signal.branch = 'b0;
         next_branch_command.branch = 'b0;
@@ -144,7 +143,7 @@ module gecko_execute
             endcase
         end
         GECKO_EXECUTE_TYPE_LOAD: begin
-            produce_mem_data = 'b1;
+            produce_mem_request = 'b1;
             produce_mem_command = 'b1;
 
             next_addr = result.add_sub_result;
@@ -153,7 +152,7 @@ module gecko_execute
             next_mem_command.offset = next_addr[1:0];
         end
         GECKO_EXECUTE_TYPE_STORE: begin
-            produce_mem_data = 'b1;
+            produce_mem_request = 'b1;
 
             store_result = gecko_get_store_result(c, result.add_sub_result[1:0], cmd_in.op.ls);
 
