@@ -10,6 +10,13 @@ package rv32i;
     import rv::*;
     import rv32::*;
 
+    parameter rv32_funct12_t RV32I_CSR_CYCLE = 12'hC00;
+    parameter rv32_funct12_t RV32I_CSR_TIME = 12'hC01;
+    parameter rv32_funct12_t RV32I_CSR_INSTRET = 12'hC02;
+    parameter rv32_funct12_t RV32I_CSR_CYCLEH = 12'hC80;
+    parameter rv32_funct12_t RV32I_CSR_TIMEH = 12'hC81;
+    parameter rv32_funct12_t RV32I_CSR_INSTRETH = 12'hC82;
+
     typedef enum rv32_opcode_t {
         RV32I_OPCODE_OP = 'h33, // Register (R-Type)
         RV32I_OPCODE_IMM = 'h13, // Immediate (I-Type)
