@@ -26,6 +26,8 @@ module gecko_fetch
 );
 
     logic enable;
+    logic ready_input_null;
+    logic [1:0] enable_output_null;
     std_flow #(
         .NUM_INPUTS(1),
         .NUM_OUTPUTS(2)
@@ -33,6 +35,7 @@ module gecko_fetch
         .clk, .rst,
 
         .valid_input('b1),
+        .ready_input(ready_input_null),
 
         .valid_output({instruction_command.valid, instruction_request.valid}),
         .ready_output({instruction_command.ready, instruction_request.ready}),
@@ -40,7 +43,8 @@ module gecko_fetch
         .consume('b1),
         .produce('b11),
 
-        .enable(enable)
+        .enable(enable),
+        .enable_output(enable_output_null)
     );
 
     gecko_instruction_operation_t next_instruction_operation;
