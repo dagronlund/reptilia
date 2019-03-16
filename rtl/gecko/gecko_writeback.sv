@@ -96,7 +96,6 @@ module gecko_writeback
                 mem_operation_partial.offset,
                 mem_operation_partial.op);
         mem_operation.addr = mem_operation_partial.addr;
-        mem_operation.jump_flag = mem_operation_partial.jump_flag;
         mem_operation.speculative = 'b0;
 
         consume_execute = 'b0;
