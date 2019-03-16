@@ -54,7 +54,7 @@ module gecko_decode
 #()(
     input logic clk, rst,
 
-    std_mem_intf.in instruction_data,
+    std_mem_intf.in instruction_result,
     std_stream_intf.in instruction_command, // gecko_instruction_operation_t
 
     std_stream_intf.out system_command, // gecko_system_operation_t
@@ -334,8 +334,8 @@ module gecko_decode
     ) std_flow_inst (
         .clk, .rst,
 
-        .valid_input({instruction_data.valid, instruction_command.valid}),
-        .ready_input({instruction_data.ready, instruction_command.ready}),
+        .valid_input({instruction_result.valid, instruction_command.valid}),
+        .ready_input({instruction_result.ready, instruction_command.ready}),
 
         .valid_output({jump_command.valid, system_command.valid, execute_command.valid}),
         .ready_output({jump_command.ready, system_command.ready, execute_command.ready}),
@@ -423,7 +423,7 @@ module gecko_decode
         branch_cmd_in = gecko_branch_signal_t'(branch_signal.payload);
         inst_cmd_in = gecko_instruction_operation_t'(instruction_command.payload);
         writeback_in = gecko_operation_t'(writeback_result.payload);
-        instruction_fields = rv32_get_fields(instruction_data.data);
+        instruction_fields = rv32_get_fields(instruction_result.data);
 
         branch_signal.ready = 'b1;
 
