@@ -10,7 +10,8 @@
  * register to be used.
  */ 
 module std_mem_single #(
-    parameter MANUAL_ADDR_WIDTH = 0 // Set other than zero to override
+    parameter int MANUAL_ADDR_WIDTH = 0, // Set other than zero to override
+    parameter string HEX_FILE = ""
 )(
     input logic clk, rst,
     std_mem_intf.in command, // Inbound Commands
@@ -32,7 +33,8 @@ module std_mem_single #(
 
     std_block_ram_single #(
         .DATA_WIDTH(DATA_WIDTH),
-        .ADDR_WIDTH(ADDR_WIDTH)
+        .ADDR_WIDTH(ADDR_WIDTH),
+        .HEX_FILE(HEX_FILE)
     ) std_block_ram_single_inst (
         .clk, .rst,
         // Avoid writing to memory values during reset, since they are not reset

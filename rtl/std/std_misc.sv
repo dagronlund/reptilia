@@ -100,7 +100,8 @@ endmodule
 module std_block_ram_single #(
     parameter DATA_WIDTH = 32,
     parameter ADDR_WIDTH = 10,
-    parameter MASK_WIDTH = DATA_WIDTH / 8
+    parameter MASK_WIDTH = DATA_WIDTH / 8,
+    parameter HEX_FILE = ""
 )(
     input logic clk, rst,
 
@@ -114,6 +115,15 @@ module std_block_ram_single #(
     localparam DATA_LENGTH = 2**ADDR_WIDTH;
 
     logic [DATA_WIDTH-1:0] data [DATA_LENGTH];
+
+    initial begin
+        if (HEX_FILE != "") begin
+            for (int i = 0; i < DATA_LENGTH; i++) begin
+                data[i] = 'b0;
+            end
+            $readmemh(HEX_FILE, data);
+        end
+    end
 
     generate
         genvar k;
@@ -135,7 +145,8 @@ endmodule
 module std_block_ram_double #(
     parameter DATA_WIDTH = 32,
     parameter ADDR_WIDTH = 10,
-    parameter MASK_WIDTH = DATA_WIDTH / 8
+    parameter MASK_WIDTH = DATA_WIDTH / 8,
+    parameter HEX_FILE = ""
 )(
     input logic clk, rst,
 
@@ -155,6 +166,15 @@ module std_block_ram_double #(
     localparam DATA_LENGTH = 2**ADDR_WIDTH;
 
     logic [DATA_WIDTH-1:0] data [DATA_LENGTH];
+
+    initial begin
+        if (HEX_FILE != "") begin
+            for (int i = 0; i < DATA_LENGTH; i++) begin
+                data[i] = 'b0;
+            end
+            $readmemh(HEX_FILE, data);
+        end
+    end
 
     /*
      * Using two seperate always_ff blocks is super important for Vivado to 

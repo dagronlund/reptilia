@@ -10,7 +10,8 @@
  * register to be used.
  */
 module std_mem_double #(
-    parameter MANUAL_ADDR_WIDTH = 0 // Set other than zero to override
+    parameter int MANUAL_ADDR_WIDTH = 0, // Set other than zero to override
+    parameter string HEX_FILE = ""
 )(
     input logic clk, rst,
     std_mem_intf.in command0, command1, // Inbound Commands
@@ -34,7 +35,8 @@ module std_mem_double #(
 
     std_block_ram_double #(
         .DATA_WIDTH(DATA_WIDTH),
-        .ADDR_WIDTH(ADDR_WIDTH)
+        .ADDR_WIDTH(ADDR_WIDTH),
+        .HEX_FILE(HEX_FILE)
     ) std_block_ram_double_inst (
         .clk, .rst,
         // Avoid writing to memory values during reset, since they are not reset
