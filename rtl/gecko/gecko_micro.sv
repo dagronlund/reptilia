@@ -28,7 +28,7 @@ module gecko_micro
     std_mem_double #(
         .MANUAL_ADDR_WIDTH(10),
         .ADDR_BYTE_SHIFTED(1),
-        .HEX_FILE("test.bin")
+        .HEX_FILE("test.mem")
     ) memory_inst (
         .clk, .rst,
         .command0(inst_request), .command1(data_request),

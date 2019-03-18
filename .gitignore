@@ -13,3 +13,10 @@ ucli.key
 
 # C Temp Files
 *.exe
+
+# Assembly Temp Files
+*.o
+*.so
+*.bin
+*.mem
+*.out
