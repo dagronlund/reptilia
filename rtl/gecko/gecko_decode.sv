@@ -66,7 +66,8 @@ module gecko_decode
     std_stream_intf.in branch_signal, // gecko_branch_signal_t
     std_stream_intf.in writeback_result, // gecko_operation_t
 
-    output logic faulted_flag, finished_flag
+    output logic faulted_flag, finished_flag,
+    output gecko_retired_count_t retired_instructions
 );
 
     typedef enum logic [2:0] {
@@ -359,6 +360,7 @@ module gecko_decode
     rv32_reg_addr_t reset_counter, next_reset_counter;
     gecko_jump_flag_t jump_flag, next_jump_flag;
     gecko_speculative_count_t speculative_counter, next_speculative_counter;
+    gecko_speculative_count_t speculative_retired_counter, next_speculative_retired_counter;
     gecko_decode_reg_file_status_t reg_file_status, next_reg_file_status;
     rv32_reg_addr_t execute_saved, next_execute_saved;
 
@@ -372,6 +374,7 @@ module gecko_decode
             reset_counter <= 'b0;
             jump_flag <= 'b0;
             speculative_counter <= 'b0;
+            speculative_retired_counter <= 'b0;
             reg_file_status = '{32{GECKO_DECODE_REG_VALID}};
             execute_saved <= 'b0;
         end else begin
@@ -379,6 +382,7 @@ module gecko_decode
             reset_counter <= next_reset_counter;
             jump_flag <= next_jump_flag;
             speculative_counter <= next_speculative_counter;
+            speculative_retired_counter <= next_speculative_retired_counter;
             reg_file_status <= next_reg_file_status;
             execute_saved <= next_execute_saved;
         end
@@ -437,10 +441,11 @@ module gecko_decode
 
         faulted_flag = 'b0;
         finished_flag = 'b0;
+        retired_instructions = 'b0;
 
         // Halt incoming speculative writes until speculation resolved
         if (state == GECKO_DECODE_SPECULATIVE) begin
-            writeback_result.ready = !writeback_in.speculative;
+            writeback_result.ready = !writeback_in.speculative && writeback_result.valid;
         end else begin
             writeback_result.ready = 'b1;
         end
@@ -483,6 +488,7 @@ module gecko_decode
         next_execute_saved = execute_saved;
         next_jump_flag = jump_flag;
         next_speculative_counter = speculative_counter;
+        next_speculative_retired_counter = speculative_retired_counter;
         next_reg_file_status = reg_file_status;
 
         case (state)
@@ -518,7 +524,6 @@ module gecko_decode
                 default: begin
                     consume_instruction = 'b1;
                     send_operation = 'b1;
-                    next_speculative_counter = next_speculative_counter + 'b1;
                     next_execute_command.speculative = 'b1;
                 end
                 endcase
@@ -555,6 +560,14 @@ module gecko_decode
         rd_status = next_reg_file_status[instruction_fields.rd];
 
         if (send_operation) begin
+            if (state == GECKO_DECODE_SPECULATIVE) begin
+                next_speculative_counter = 
+                    next_speculative_counter + (instruction_fields.rd != 'b0);
+                next_speculative_retired_counter = 
+                    next_speculative_retired_counter + 'b1;
+            end else begin
+                retired_instructions = retired_instructions + 'b1;
+            end
             case (rv32i_opcode_t'(instruction_fields.opcode))
             RV32I_OPCODE_OP, RV32I_OPCODE_IMM, RV32I_OPCODE_LUI, RV32I_OPCODE_AUIPC: begin
                 produce_execute = (instruction_fields.rd != 'b0);
@@ -621,7 +634,9 @@ module gecko_decode
             next_execute_saved = execute_saved;
             next_jump_flag = jump_flag;
             next_speculative_counter = speculative_counter;
+            next_speculative_retired_counter = speculative_retired_counter;
             next_reg_file_status = reg_file_status;
+            retired_instructions = 'b0;
         end
 
         // Handle writing back to the register file
@@ -642,7 +657,7 @@ module gecko_decode
             if (writeback_in.speculative) begin
                 next_speculative_counter = next_speculative_counter - 'b1;
                 if (next_speculative_counter == 0) begin
-                    next_state = GECKO_DECODE_NORMAL;
+                    next_state = (state == GECKO_DECODE_MISPREDICTED) ? GECKO_DECODE_NORMAL : state;
                 end
             end
         end
@@ -650,13 +665,14 @@ module gecko_decode
         // Handle incoming branch signals
         if (branch_signal.valid && branch_signal.ready) begin
             if (branch_cmd_in.branch) begin
-                next_state = GECKO_DECODE_MISPREDICTED;
+                next_state = (state == GECKO_DECODE_SPECULATIVE) ? GECKO_DECODE_MISPREDICTED : state;
                 next_jump_flag = next_jump_flag + 'b1;
                 next_execute_saved = 'b0;
             end else begin
-                next_state = GECKO_DECODE_NORMAL;
-                next_speculative_counter = 'b0;
+                next_state = (state == GECKO_DECODE_SPECULATIVE) ? GECKO_DECODE_NORMAL : state;
+                retired_instructions = retired_instructions + next_speculative_retired_counter;
             end
+            next_speculative_retired_counter = 'b0;
         end
     end
 

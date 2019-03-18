@@ -17,7 +17,7 @@ module gecko_system
 (
     input logic clk, rst,
 
-    input logic instruction_retired,
+    input gecko_retired_count_t retired_instructions,
 
     std_stream_intf.in system_command, // gecko_system_operation_t
     std_stream_intf.out system_result // gecko_operation_t
@@ -55,7 +55,7 @@ module gecko_system
             instruction_counter <= 'b0;
         end else begin
             clock_counter <= clock_counter + 'b1;
-            instruction_counter <= instruction_counter + instruction_retired;
+            instruction_counter <= instruction_counter + retired_instructions;
         end
         if (enable) begin
             system_result.payload <= next_system_result;

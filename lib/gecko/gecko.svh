@@ -19,6 +19,7 @@ package gecko;
     // Configurable Types
     typedef logic gecko_jump_flag_t;
     typedef logic [3:0] gecko_speculative_count_t;
+    typedef logic [4:0] gecko_retired_count_t;
 
     typedef struct packed {
         rv32_reg_value_t rs1_value;

@@ -39,8 +39,6 @@ module gecko_core
     std_stream_intf #(.T(gecko_branch_signal_t)) branch_signal (.clk, .rst);
     std_stream_intf #(.T(gecko_branch_command_t)) branch_command (.clk, .rst);
 
-    std_stream_intf #(.T(gecko_instruction_operation_t)) instruction_command (.clk, .rst);
-
     std_stream_intf #(.T(gecko_execute_operation_t)) execute_command (.clk, .rst);
     std_stream_intf #(.T(gecko_system_operation_t)) system_command (.clk, .rst);
 
@@ -54,6 +52,8 @@ module gecko_core
 
     std_stream_intf #(.T(gecko_mem_operation_t)) mem_command_in (.clk, .rst);
     std_stream_intf #(.T(gecko_mem_operation_t)) mem_command_out (.clk, .rst);
+
+    gecko_retired_count_t retired_instructions;
 
     gecko_fetch gecko_fetch_inst
     (
@@ -89,7 +89,7 @@ module gecko_core
         .branch_signal,
         .writeback_result,
 
-        .faulted_flag, .finished_flag
+        .faulted_flag, .finished_flag, .retired_instructions
     );
 
     gecko_execute gecko_execute_inst
@@ -118,7 +118,7 @@ module gecko_core
     (
         .clk, .rst,
 
-        .instruction_retired(1'b1), // TODO
+        .retired_instructions,
 
         .system_command,
         .system_result
