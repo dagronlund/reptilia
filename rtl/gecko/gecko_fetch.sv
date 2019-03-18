@@ -47,16 +47,16 @@ module gecko_fetch
         .enable_output(enable_output_null)
     );
 
-    gecko_instruction_operation_t next_instruction_operation;
-    logic [31:0] next_instruction_addr;
+    gecko_instruction_operation_t next_instruction_command;
+    // logic [31:0] next_instruction_addr;
 
     always_ff @(posedge clk) begin
         if (rst) begin
             instruction_command.payload <= '{pc: (0-4), default: 'b0};
-            instruction_request.addr <= (0-4);
-        end else if (enable) begin
-            instruction_command.payload <= next_instruction_operation;
-            instruction_request.addr <= next_instruction_addr;
+            // instruction_request.addr <= (0-4);
+        end else begin
+            instruction_command.payload <= next_instruction_command;
+            // instruction_request.addr <= next_instruction_addr;
         end
     end
 
@@ -64,8 +64,12 @@ module gecko_fetch
         automatic gecko_instruction_operation_t current_instruction_op;
         automatic gecko_jump_command_t jump_cmd_in;
         automatic gecko_branch_command_t branch_cmd_in;
-        automatic gecko_pc_t next_pc_start, next_pc_step;
+        automatic gecko_pc_t next_base, next_step;
         automatic gecko_jump_flag_t next_jump_flag;
+
+        current_instruction_op = gecko_instruction_operation_t'(instruction_command.payload);
+        jump_cmd_in = gecko_jump_command_t'(jump_command.payload);
+        branch_cmd_in = gecko_branch_command_t'(branch_command.payload);
 
         branch_command.ready = 'b1;
         jump_command.ready = 'b1;
@@ -73,29 +77,45 @@ module gecko_fetch
         instruction_request.read_enable = 'b1;
         instruction_request.write_enable = 'b0;
         instruction_request.data = 'b0;
+        instruction_request.addr = current_instruction_op.pc;
 
-        current_instruction_op = gecko_instruction_operation_t'(instruction_command.payload);
-        jump_cmd_in = gecko_jump_command_t'(jump_command.payload);
-        branch_cmd_in = gecko_branch_command_t'(branch_command.payload);
+        next_instruction_command = current_instruction_op;
 
-        next_pc_start = current_instruction_op.pc;
-        next_pc_step = 'd4;
-        next_jump_flag = current_instruction_op.jump_flag;
+        // next_pc_start = current_instruction_op.pc;
+        // next_pc_step = 'd4;
+        // next_jump_flag = current_instruction_op.jump_flag;
 
-        if (jump_command.valid) begin
-            if (jump_cmd_in.absolute_jump) begin
-                next_pc_start = jump_cmd_in.absolute_addr;
-            end
-            next_pc_step = jump_cmd_in.relative_addr;
-            next_jump_flag = next_jump_flag + 'b1;
-        end else if (branch_command.valid && branch_cmd_in.branch) begin
-            next_pc_step = branch_cmd_in.relative_addr;
-            next_jump_flag = next_jump_flag + 'b1;
+        // if (jump_command.valid) begin
+        //     if (jump_cmd_in.absolute_jump) begin
+        //         next_pc_start = jump_cmd_in.absolute_addr;
+        //     end
+        //     next_pc_step = jump_cmd_in.relative_addr;
+        //     next_jump_flag = next_jump_flag + 'b1;
+        // end else if (branch_command.valid && branch_cmd_in.branch) begin
+        //     next_pc_step = branch_cmd_in.relative_addr;
+        //     next_jump_flag = next_jump_flag + 'b1;
+        // end
+
+        next_base = current_instruction_op.pc;
+        next_step = 'd4;
+
+        if (!enable) begin
+            next_instruction_command = current_instruction_op;
+            next_base = current_instruction_op.pc;
+            next_step = 'b0;
         end
 
-        next_instruction_operation.jump_flag = next_jump_flag;
-        next_instruction_operation.pc = next_pc_start + next_pc_step;
-        next_instruction_addr = next_instruction_operation.pc;
+        if (jump_command.valid) begin
+            next_base = jump_cmd_in.base_addr;
+            next_step = jump_cmd_in.relative_addr;
+            next_instruction_command.jump_flag = next_instruction_command.jump_flag + 'b1;
+        end else if (branch_command.valid && branch_cmd_in.branch) begin
+            next_base = branch_cmd_in.base_addr;
+            next_step = branch_cmd_in.relative_addr;
+            next_instruction_command.jump_flag = next_instruction_command.jump_flag + 'b1;
+        end
+
+        next_instruction_command.pc = next_base + next_step;
     end
 
 endmodule

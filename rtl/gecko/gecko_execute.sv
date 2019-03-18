@@ -111,6 +111,7 @@ module gecko_execute
 
         next_branch_signal.branch = 'b0;
         next_branch_command.branch = 'b0;
+        next_branch_command.base_addr = cmd_in.pc;
         next_branch_command.relative_addr = cmd_in.immediate_value;
 
         next_read_enable = 'b0;

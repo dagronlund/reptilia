@@ -99,13 +99,13 @@ package gecko;
     } gecko_operation_t;
 
     typedef struct packed {
-        logic absolute_jump;
-        rv32_reg_value_t absolute_addr;
+        rv32_reg_value_t base_addr;
         rv32_reg_value_t relative_addr;
     } gecko_jump_command_t;
 
     typedef struct packed {
         logic branch;
+        rv32_reg_value_t base_addr;
         rv32_reg_value_t relative_addr;
     } gecko_branch_command_t;
 
@@ -148,6 +148,7 @@ package gecko;
         logic reuse_rs1, reuse_rs2, reuse_mem;
         rv32_reg_value_t rs1_value, rs2_value, mem_value;
         rv32_reg_value_t immediate_value;
+        rv32_reg_value_t pc;
 
         logic speculative;
     } gecko_execute_operation_t;

@@ -201,6 +201,7 @@ module gecko_decode
 
         execute_op.mem_value = rs2_value;
         execute_op.immediate_value = instruction_fields.imm;
+        execute_op.pc = pc;
 
         case (rv32i_opcode_t'(instruction_fields.opcode))
         RV32I_OPCODE_OP: begin
@@ -312,16 +313,19 @@ module gecko_decode
     function automatic gecko_jump_command_t create_jump_op(
             input rv32_fields_t instruction_fields,
             input rv32_reg_addr_t execute_saved_reg,
-            input rv32_reg_value_t rs1_value, rs2_value
+            input rv32_reg_value_t rs1_value, rs2_value,
+            input rv32_reg_value_t pc
     );
         gecko_jump_command_t jump_cmd;
 
-        jump_cmd.absolute_addr = rs1_value;
+        
         jump_cmd.relative_addr = instruction_fields.imm;
 
         case (rv32i_opcode_t'(instruction_fields.opcode))
-        RV32I_OPCODE_JAL: jump_cmd.absolute_jump = 'b0;
-        RV32I_OPCODE_JALR: jump_cmd.absolute_jump = 'b1;
+        RV32I_OPCODE_JAL: 
+            jump_cmd.base_addr = pc;
+        RV32I_OPCODE_JALR: 
+            jump_cmd.base_addr = rs1_value;
         endcase
 
         return jump_cmd;
@@ -459,7 +463,8 @@ module gecko_decode
         next_system_command = create_system_op(instruction_fields, execute_saved, 
                                                register_read_value0, register_read_value1);
         next_jump_command = create_jump_op(instruction_fields, execute_saved, 
-                                           register_read_value0, register_read_value1);
+                                           register_read_value0, register_read_value1,
+                                           inst_cmd_in.pc);
 
         instruction_requirements = find_instruction_requirements(instruction_fields);
         reg_file_ready = is_register_file_ready(instruction_fields, execute_saved, reg_file_status);
