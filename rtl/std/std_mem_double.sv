@@ -11,7 +11,8 @@
  */
 module std_mem_double #(
     parameter int MANUAL_ADDR_WIDTH = 0, // Set other than zero to override
-    parameter string HEX_FILE = ""
+    parameter int ADDR_BYTE_SHIFTED = 0,
+    parameter HEX_FILE = ""
 )(
     input logic clk, rst,
     std_mem_intf.in command0, command1, // Inbound Commands
@@ -21,10 +22,14 @@ module std_mem_double #(
     `STATIC_MATCH_MEM(command0, result0)
     `STATIC_MATCH_MEM(command0, command1)
     `STATIC_MATCH_MEM(command0, result1)
+    `STATIC_ASSERT((ADDR_BYTE_SHIFTED == 0) || ($bits(command0.data) > 8))
 
     localparam DATA_WIDTH = $bits(command0.data);
-    localparam ADDR_WIDTH = (MANUAL_ADDR_WIDTH == 0) ? $bits(command0.addr) : MANUAL_ADDR_WIDTH;
     localparam MASK_WIDTH = DATA_WIDTH / 8;
+    localparam ADDR_CORRECTION = (ADDR_BYTE_SHIFTED == 0) ? 0 : $clog2(MASK_WIDTH);
+    localparam ADDR_DEFAULT = (MANUAL_ADDR_WIDTH == 0) ?
+            $bits(command0.addr) : MANUAL_ADDR_WIDTH;
+    localparam ADDR_WIDTH = ADDR_DEFAULT - ADDR_CORRECTION;
     localparam DATA_LENGTH = 2**ADDR_WIDTH;
 
     /*
@@ -42,14 +47,14 @@ module std_mem_double #(
         // Avoid writing to memory values during reset, since they are not reset
         .enable0(!rst && enable0),
         .write_enable0(command0.write_enable),
-        .addr_in0(command0.addr),
+        .addr_in0(command0.addr[ADDR_DEFAULT-1:ADDR_CORRECTION]),
         .data_in0(command0.data),
         .data_out0(result0.data),
 
         // Avoid writing to memory values during reset, since they are not reset
         .enable1(!rst && enable1),
         .write_enable1(command1.write_enable),
-        .addr_in1(command1.addr),
+        .addr_in1(command1.addr[ADDR_DEFAULT-1:ADDR_CORRECTION]),
         .data_in1(command1.data),
         .data_out1(result1.data)
     );

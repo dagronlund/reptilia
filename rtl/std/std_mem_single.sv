@@ -11,7 +11,8 @@
  */ 
 module std_mem_single #(
     parameter int MANUAL_ADDR_WIDTH = 0, // Set other than zero to override
-    parameter string HEX_FILE = ""
+    parameter int ADDR_BYTE_SHIFTED = 0,
+    parameter HEX_FILE = ""
 )(
     input logic clk, rst,
     std_mem_intf.in command, // Inbound Commands
@@ -19,10 +20,14 @@ module std_mem_single #(
 );
 
     `STATIC_MATCH_MEM(command, result)
+    `STATIC_ASSERT((ADDR_BYTE_SHIFTED == 0) || ($bits(command.data) > 8))
 
     localparam DATA_WIDTH = $bits(command.data);
-    localparam ADDR_WIDTH = (MANUAL_ADDR_WIDTH == 0) ? $bits(command0.addr) : MANUAL_ADDR_WIDTH;
     localparam MASK_WIDTH = DATA_WIDTH / 8;
+    localparam ADDR_CORRECTION = (ADDR_BYTE_SHIFTED == 0) ? 0 : $clog2(MASK_WIDTH);
+    localparam ADDR_DEFAULT = (MANUAL_ADDR_WIDTH == 0) ? 
+            $bits(command.addr) : MANUAL_ADDR_WIDTH;
+    localparam ADDR_WIDTH = ADDR_DEFAULT - ADDR_CORRECTION;
     localparam DATA_LENGTH = 2**ADDR_WIDTH;
 
     /*
@@ -40,7 +45,7 @@ module std_mem_single #(
         // Avoid writing to memory values during reset, since they are not reset
         .enable(!rst && enable),
         .write_enable(command.write_enable),
-        .addr_in(command.addr),
+        .addr_in(command.addr[ADDR_DEFAULT-1:ADDR_CORRECTION]),
         .data_in(command.data),
         .data_out(result.data)
     );

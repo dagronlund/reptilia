@@ -33,12 +33,6 @@ module gecko_core
     `STATIC_ASSERT($size(data_request.addr) == 32)
     `STATIC_ASSERT($size(data_result.data) == 32)
 
-    // std_mem_intf #(
-    //     .DATA_WIDTH(32),
-    //     .ADDR_WIDTH($size(gecko_pc_t)),
-    //     .ADDR_BYTE_SHIFTED(1)
-    // ) fetch_inst_command_inst (.clk, .rst);
-
     std_stream_intf #(.T(gecko_jump_command_t)) jump_command (.clk, .rst);
     std_stream_intf #(.T(gecko_branch_signal_t)) branch_signal (.clk, .rst);
     std_stream_intf #(.T(gecko_branch_command_t)) branch_command (.clk, .rst);
@@ -66,7 +60,6 @@ module gecko_core
         .jump_command,
         .branch_command,
 
-        // std_stream_intf.out instruction_command, // gecko_instruction_operation_t
         .instruction_command(instruction_command_in),
         .instruction_request(inst_request)
     );
@@ -83,7 +76,6 @@ module gecko_core
     (
         .clk, .rst,
 
-        // std_stream_intf.in instruction_command, // gecko_instruction_operation_t
         .instruction_command(instruction_command_out),
         .instruction_result(inst_result),
 
@@ -102,7 +94,6 @@ module gecko_core
 
         .execute_command,
 
-        // std_stream_intf.out mem_command, // gecko_mem_operation_t
         .mem_command(mem_command_in),
         .mem_request(data_request),
 
@@ -135,7 +126,6 @@ module gecko_core
 
         .execute_result,
 
-        // std_stream_intf.in mem_command, // gecko_mem_operation_t
         .mem_command(mem_command_out),
         .mem_result(data_result),
 
