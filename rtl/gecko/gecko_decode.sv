@@ -64,14 +64,18 @@ module gecko_decode
 
     // Non-flow Controlled
     std_stream_intf.in branch_signal, // gecko_branch_signal_t
-    std_stream_intf.in writeback_result // gecko_operation_t
+    std_stream_intf.in writeback_result, // gecko_operation_t
+
+    output logic faulted_flag, finished_flag
 );
 
-    typedef enum logic [1:0] {
-        GECKO_DECODE_RESET = 2'b00,
-        GECKO_DECODE_NORMAL = 2'b01,
-        GECKO_DECODE_SPECULATIVE = 2'b10,
-        GECKO_DECODE_MISPREDICTED = 2'b11
+    typedef enum logic [2:0] {
+        GECKO_DECODE_RESET = 3'b000,
+        GECKO_DECODE_NORMAL = 3'b001,
+        GECKO_DECODE_SPECULATIVE = 3'b010,
+        GECKO_DECODE_MISPREDICTED = 3'b011,
+        GECKO_DECODE_HALT = 3'b100,
+        GECKO_DECODE_FAULT = 3'bXXX
     } gecko_decode_state_t;
 
     typedef enum logic [1:0] {
@@ -88,7 +92,7 @@ module gecko_decode
         GEKCO_DECODE_REQUIRE_UNDEF = 2'b11
     } gecko_decode_require_t;
 
-    typedef gecko_decode_reg_status_t [31:0] gecko_decode_reg_file_status_t;
+    typedef gecko_decode_reg_status_t gecko_decode_reg_file_status_t [32];
 
     function automatic gecko_decode_require_t find_instruction_requirements(
             input rv32_fields_t instruction_fields
@@ -364,9 +368,7 @@ module gecko_decode
             reset_counter <= 'b0;
             jump_flag <= 'b0;
             speculative_counter <= 'b0;
-            for (int i = 0; i < 32; i++) begin
-                reg_file_status[i] <= GECKO_DECODE_REG_VALID;
-            end
+            reg_file_status = '{32{GECKO_DECODE_REG_VALID}};
             execute_saved <= 'b0;
         end else begin
             state <= next_state;
@@ -410,8 +412,10 @@ module gecko_decode
         .read_data_out('{register_read_value0, register_read_value1})
     );
 
+    logic reg_file_clear;
+
     always_comb begin
-        automatic logic send_operation, reg_file_ready;
+        automatic logic send_operation, reg_file_ready; //, reg_file_clear;
 
         automatic gecko_decode_reg_status_t rd_status;
         automatic gecko_instruction_operation_t inst_cmd_in;
@@ -426,6 +430,9 @@ module gecko_decode
         instruction_fields = rv32_get_fields(instruction_result.data);
 
         branch_signal.ready = 'b1;
+
+        faulted_flag = 'b0;
+        finished_flag = 'b0;
 
         // Halt incoming speculative writes until speculation resolved
         if (state == GECKO_DECODE_SPECULATIVE) begin
@@ -456,6 +463,11 @@ module gecko_decode
 
         instruction_requirements = find_instruction_requirements(instruction_fields);
         reg_file_ready = is_register_file_ready(instruction_fields, execute_saved, reg_file_status);
+
+        reg_file_clear = 'b1;
+        for (int i = 0; i < 32; i++) begin
+            reg_file_clear &= (reg_file_status[i[4:0]] == GECKO_DECODE_REG_VALID);
+        end
 
         register_write_enable = 'b0;
         register_write_addr = reset_counter;
@@ -521,6 +533,13 @@ module gecko_decode
                 endcase
             end
         end
+        GECKO_DECODE_FAULT: begin
+            faulted_flag = 'b1;
+            finished_flag = reg_file_clear;
+        end
+        GECKO_DECODE_HALT: begin
+            finished_flag = reg_file_clear;
+        end
         endcase
 
         rd_status = next_reg_file_status[instruction_fields.rd];
@@ -528,11 +547,11 @@ module gecko_decode
         if (send_operation) begin
             case (rv32i_opcode_t'(instruction_fields.opcode))
             RV32I_OPCODE_OP, RV32I_OPCODE_IMM, RV32I_OPCODE_LUI, RV32I_OPCODE_AUIPC: begin
-                produce_execute = 'b1;
+                produce_execute = (instruction_fields.rd != 'b0);
                 next_execute_saved = next_execute_command.reg_addr;
                 rd_status = write_register_state(rd_status, 'b1);
             end
-            RV32I_OPCODE_LOAD: begin
+            RV32I_OPCODE_LOAD: begin // Issue load regardless of going to x0
                 produce_execute = 'b1;
                 if (execute_saved == next_execute_command.reg_addr) begin
                     next_execute_saved = 'b0;
@@ -545,7 +564,7 @@ module gecko_decode
             end
             RV32I_OPCODE_JAL, RV32I_OPCODE_JALR: begin
                 produce_jump = 'b1;
-                produce_execute = 'b1;
+                produce_execute = (instruction_fields.rd != 'b0);
                 next_execute_saved = next_execute_command.reg_addr;
                 rd_status = write_register_state(rd_status, 'b1);
             end
@@ -553,14 +572,35 @@ module gecko_decode
                 produce_execute = 'b1;
             end
             RV32I_OPCODE_SYSTEM: begin
-                produce_system = 'b1;
-                if (execute_saved == next_system_command.rd_addr) begin
-                    next_execute_saved = 'b0;
+                case (rv32i_funct3_sys_t'(instruction_fields.funct3))
+                RV32I_FUNCT3_SYS_ENV: begin
+                    if (instruction_fields.funct12 == RV32I_CSR_EBREAK) begin
+                        next_state = GECKO_DECODE_HALT;
+                    end else begin
+                        next_state = GECKO_DECODE_FAULT;
+                    end
                 end
-                rd_status = write_register_state(rd_status, 'b0);
+                RV32I_FUNCT3_SYS_CSRRW, RV32I_FUNCT3_SYS_CSRRS, 
+                RV32I_FUNCT3_SYS_CSRRC, RV32I_FUNCT3_SYS_CSRRWI, 
+                RV32I_FUNCT3_SYS_CSRRSI, RV32I_FUNCT3_SYS_CSRRCI: begin
+                    produce_system = 'b1;
+                    if (execute_saved == next_system_command.rd_addr) begin
+                        next_execute_saved = 'b0;
+                    end
+                    rd_status = write_register_state(rd_status, 'b0);    
+                end
+                default: begin
+                    next_state = GECKO_DECODE_FAULT;
+                end
+                endcase
+            end
+            default: begin
+                next_state = GECKO_DECODE_FAULT;
             end
             endcase
-            next_reg_file_status[instruction_fields.rd] = rd_status;
+            if (instruction_fields.rd != 'b0) begin
+                next_reg_file_status[instruction_fields.rd] = rd_status;
+            end
         end
 
         // DANGER: Uses the enable signal to prevent state changes from earlier

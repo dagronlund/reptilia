@@ -24,7 +24,9 @@ module gecko_core
     std_mem_intf.in inst_result,
 
     std_mem_intf.out data_request,
-    std_mem_intf.in data_result
+    std_mem_intf.in data_result,
+
+    output logic faulted_flag, finished_flag
 );
 
     `STATIC_ASSERT($size(inst_request.addr) == 32)
@@ -85,7 +87,9 @@ module gecko_core
         .jump_command,
 
         .branch_signal,
-        .writeback_result
+        .writeback_result,
+
+        .faulted_flag, .finished_flag
     );
 
     gecko_execute gecko_execute_inst

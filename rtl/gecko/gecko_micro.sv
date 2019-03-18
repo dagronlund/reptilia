@@ -15,35 +15,19 @@ module gecko_micro
     import rv32i::*;
     import gecko::*;
 #()(
-    input logic clk, rst
+    input logic clk, rst,
+
+    output logic faulted_flag, finished_flag
 );
 
-    std_mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32),
-        .ADDR_BYTE_SHIFTED(1)
-    ) inst_request (.clk, .rst);
-
-    std_mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32),
-        .ADDR_BYTE_SHIFTED(1)
-    ) inst_result (.clk, .rst);
-
-    std_mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32),
-        .ADDR_BYTE_SHIFTED(1)
-    ) data_request (.clk, .rst);
-
-    std_mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32),
-        .ADDR_BYTE_SHIFTED(1)
-    ) data_result (.clk, .rst);
+    std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) inst_request (.clk, .rst);
+    std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) inst_result (.clk, .rst);
+    std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) data_request (.clk, .rst);
+    std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) data_result (.clk, .rst);
 
     std_mem_double #(
         .MANUAL_ADDR_WIDTH(10),
+        .ADDR_BYTE_SHIFTED(1),
         .HEX_FILE("test.bin")
     ) memory_inst (
         .clk, .rst,
@@ -57,7 +41,8 @@ module gecko_micro
     ) gecko_core_inst (
         .clk, .rst,
         .inst_request, .inst_result,
-        .data_request, .data_result
+        .data_request, .data_result,
+        .faulted_flag, .finished_flag
     );
 
 

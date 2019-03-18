@@ -103,7 +103,7 @@ module gecko_writeback
         consume_system = 'b0;
 
         // Round-Robin input selection
-        unique case (current_priority)
+        case (current_priority)
         GECKO_WRITEBACK_EXECUTE: begin
             if (execute_result.valid) begin
                 consume_execute = 'b1;
