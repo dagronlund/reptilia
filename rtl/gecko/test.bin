@@ -1,8 +1,0 @@
-ff000093 // addi
-ff000093 // addi
-ff000093 // addi
-ff000093 // addi
-ff000093 // addi
-ff000093 // addi
-// 00100073 // ecall
-00000073 // ebreak
