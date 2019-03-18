@@ -17,6 +17,9 @@ package rv32i;
     parameter rv32_funct12_t RV32I_CSR_TIMEH = 12'hC81;
     parameter rv32_funct12_t RV32I_CSR_INSTRETH = 12'hC82;
 
+    parameter rv32_funct12_t RV32I_CSR_ECALL = 12'h000;
+    parameter rv32_funct12_t RV32I_CSR_EBREAK = 12'h001;
+
     typedef enum rv32_opcode_t {
         RV32I_OPCODE_OP = 'h33, // Register (R-Type)
         RV32I_OPCODE_IMM = 'h13, // Immediate (I-Type)
