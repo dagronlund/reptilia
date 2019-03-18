@@ -48,15 +48,12 @@ module gecko_fetch
     );
 
     gecko_instruction_operation_t next_instruction_command;
-    // logic [31:0] next_instruction_addr;
 
     always_ff @(posedge clk) begin
         if (rst) begin
             instruction_command.payload <= '{pc: (0-4), default: 'b0};
-            // instruction_request.addr <= (0-4);
         end else begin
             instruction_command.payload <= next_instruction_command;
-            // instruction_request.addr <= next_instruction_addr;
         end
     end
 
@@ -80,21 +77,6 @@ module gecko_fetch
         instruction_request.addr = current_instruction_op.pc;
 
         next_instruction_command = current_instruction_op;
-
-        // next_pc_start = current_instruction_op.pc;
-        // next_pc_step = 'd4;
-        // next_jump_flag = current_instruction_op.jump_flag;
-
-        // if (jump_command.valid) begin
-        //     if (jump_cmd_in.absolute_jump) begin
-        //         next_pc_start = jump_cmd_in.absolute_addr;
-        //     end
-        //     next_pc_step = jump_cmd_in.relative_addr;
-        //     next_jump_flag = next_jump_flag + 'b1;
-        // end else if (branch_command.valid && branch_cmd_in.branch) begin
-        //     next_pc_step = branch_cmd_in.relative_addr;
-        //     next_jump_flag = next_jump_flag + 'b1;
-        // end
 
         next_base = current_instruction_op.pc;
         next_step = 'd4;

@@ -529,9 +529,14 @@ module gecko_decode
                 consume_instruction = 'b1;
             end else if (reg_file_ready) begin
                 case (rv32i_opcode_t'(instruction_fields.opcode))
+                RV32I_OPCODE_JAL, RV32I_OPCODE_JALR: begin
+                    consume_instruction = 'b1;
+                    send_operation = 'b1;
+                    next_jump_flag = next_jump_flag + 'b1;
+                end
                 RV32I_OPCODE_BRANCH: begin // Can't speculatively branch while cleaning up misprediction 
                 end
-                default: begin 
+                default: begin
                     consume_instruction = 'b1;
                     send_operation = 'b1;
                 end
