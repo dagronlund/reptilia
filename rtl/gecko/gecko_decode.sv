@@ -108,7 +108,7 @@ module gecko_decode
         endcase
     endfunction
 
-    function automatic gecko_decode_reg_status_t write_register_state(
+    function automatic gecko_decode_reg_status_t invalidate_reg_status(
             input gecko_decode_reg_status_t current_status,
             input logic sending_execute
     );
@@ -117,6 +117,17 @@ module gecko_decode
         GECKO_DECODE_REG_INVALID: return GECKO_DECODE_REG_INVALID; // Invalid path
         GECKO_DECODE_REG_EXECUTE0: return GECKO_DECODE_REG_EXECUTE1;
         GECKO_DECODE_REG_EXECUTE1: return GECKO_DECODE_REG_EXECUTE1; // Invalid path
+        endcase
+    endfunction
+
+    function automatic gecko_decode_reg_status_t validate_reg_status(
+            input gecko_decode_reg_status_t current_status
+    );
+        case (current_status)
+        GECKO_DECODE_REG_VALID: return GECKO_DECODE_REG_VALID; // Invalid path
+        GECKO_DECODE_REG_INVALID: return GECKO_DECODE_REG_VALID;
+        GECKO_DECODE_REG_EXECUTE0: return GECKO_DECODE_REG_VALID;
+        GECKO_DECODE_REG_EXECUTE1: return GECKO_DECODE_REG_EXECUTE0;
         endcase
     endfunction
 
@@ -572,24 +583,24 @@ module gecko_decode
             RV32I_OPCODE_OP, RV32I_OPCODE_IMM, RV32I_OPCODE_LUI, RV32I_OPCODE_AUIPC: begin
                 produce_execute = (instruction_fields.rd != 'b0);
                 next_execute_saved = next_execute_command.reg_addr;
-                rd_status = write_register_state(rd_status, 'b1);
+                rd_status = invalidate_reg_status(rd_status, 'b1);
             end
             RV32I_OPCODE_LOAD: begin // Issue load regardless of going to x0
                 produce_execute = 'b1;
                 if (execute_saved == next_execute_command.reg_addr) begin
                     next_execute_saved = 'b0;
                 end
-                rd_status = write_register_state(rd_status, 'b0);
+                rd_status = invalidate_reg_status(rd_status, 'b0);
             end
             RV32I_OPCODE_STORE: begin
                 produce_execute = 'b1;
-                rd_status = write_register_state(rd_status, 'b0);
+                // rd_status = invalidate_reg_status(rd_status, 'b0);
             end
             RV32I_OPCODE_JAL, RV32I_OPCODE_JALR: begin
                 produce_jump = 'b1;
                 produce_execute = (instruction_fields.rd != 'b0);
                 next_execute_saved = next_execute_command.reg_addr;
-                rd_status = write_register_state(rd_status, 'b1);
+                rd_status = invalidate_reg_status(rd_status, 'b1);
             end
             RV32I_OPCODE_BRANCH: begin
                 produce_execute = 'b1;
@@ -610,7 +621,7 @@ module gecko_decode
                     if (execute_saved == next_system_command.rd_addr) begin
                         next_execute_saved = 'b0;
                     end
-                    rd_status = write_register_state(rd_status, 'b0);    
+                    rd_status = invalidate_reg_status(rd_status, 'b0);    
                 end
                 default: begin
                     next_state = GECKO_DECODE_FAULT;
@@ -643,12 +654,6 @@ module gecko_decode
         if (writeback_result.valid && writeback_result.ready) begin
             // Throw away writes to x0 and mispeculated results
             if (writeback_in.addr != 'b0 && !(state == GECKO_DECODE_MISPREDICTED && writeback_in.speculative)) begin
-                case (next_reg_file_status[writeback_in.addr])
-                GECKO_DECODE_REG_EXECUTE1: 
-                    next_reg_file_status[writeback_in.addr] = GECKO_DECODE_REG_EXECUTE0;
-                default: 
-                    next_reg_file_status[writeback_in.addr] = GECKO_DECODE_REG_VALID;
-                endcase
                 register_write_enable = 'b1;
                 register_write_addr = writeback_in.addr;
                 register_write_value = writeback_in.value;
@@ -660,12 +665,19 @@ module gecko_decode
                     next_state = (state == GECKO_DECODE_MISPREDICTED) ? GECKO_DECODE_NORMAL : state;
                 end
             end
+            // Validate register regardless of speculative
+            next_reg_file_status[writeback_in.addr] = validate_reg_status(next_reg_file_status[writeback_in.addr]);
         end
 
         // Handle incoming branch signals
         if (branch_signal.valid && branch_signal.ready) begin
             if (branch_cmd_in.branch) begin
-                next_state = (state == GECKO_DECODE_SPECULATIVE) ? GECKO_DECODE_MISPREDICTED : state;
+                // Return to normal immediately if no speculative instructions executed
+                if (next_speculative_counter == 0) begin
+                    next_state = (state == GECKO_DECODE_SPECULATIVE) ? GECKO_DECODE_NORMAL : state;
+                end else begin
+                    next_state = (state == GECKO_DECODE_SPECULATIVE) ? GECKO_DECODE_MISPREDICTED : state;
+                end
                 next_jump_flag = next_jump_flag + 'b1;
                 next_execute_saved = 'b0;
             end else begin
