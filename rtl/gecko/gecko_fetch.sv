@@ -15,7 +15,9 @@ module gecko_fetch
     import rv32::*;
     import rv32i::*;
     import gecko::*;
-(
+#(
+    parameter gecko_pc_t START_ADDR = 'b0
+)(
     input logic clk, rst,
 
     std_stream_intf.in jump_command, // gecko_jump_command_t
@@ -51,7 +53,7 @@ module gecko_fetch
 
     always_ff @(posedge clk) begin
         if (rst) begin
-            instruction_command.payload <= '{pc: (0-4), default: 'b0};
+            instruction_command.payload <= '{pc: (START_ADDR-4), default: 'b0};
         end else begin
             instruction_command.payload <= next_instruction_command;
         end

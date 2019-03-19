@@ -16,7 +16,8 @@ module gecko_core
     import gecko::*;
 #(
     parameter int INST_LATENCY = 1,
-    parameter int DATA_LATENCY = 1
+    parameter int DATA_LATENCY = 1,
+    parameter gecko_pc_t START_ADDR = 'b0
 )(
     input logic clk, rst,
 
@@ -55,8 +56,9 @@ module gecko_core
 
     gecko_retired_count_t retired_instructions;
 
-    gecko_fetch gecko_fetch_inst
-    (
+    gecko_fetch #(
+        .START_ADDR(START_ADDR)
+    ) gecko_fetch_inst (
         .clk, .rst,
 
         .jump_command,

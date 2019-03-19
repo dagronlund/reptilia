@@ -14,7 +14,9 @@ module gecko_micro
     import rv32::*;
     import rv32i::*;
     import gecko::*;
-#()(
+#(
+    parameter gecko_pc_t START_ADDR = 'h0
+)(
     input logic clk, rst,
 
     output logic faulted_flag, finished_flag
@@ -37,7 +39,8 @@ module gecko_micro
 
     gecko_core #(
         .INST_LATENCY(1),
-        .DATA_LATENCY(1)
+        .DATA_LATENCY(1),
+        .START_ADDR(START_ADDR)
     ) gecko_core_inst (
         .clk, .rst,
         .inst_request, .inst_result,
