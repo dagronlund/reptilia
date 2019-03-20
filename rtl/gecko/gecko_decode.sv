@@ -76,7 +76,8 @@ module gecko_decode
         GECKO_DECODE_SPECULATIVE = 3'b010,
         GECKO_DECODE_MISPREDICTED = 3'b011,
         GECKO_DECODE_HALT = 3'b100,
-        GECKO_DECODE_FAULT = 3'bXXX
+        GECKO_DECODE_FAULT = 3'b101,
+        GECKO_DECODE_UNDEF = 3'bXXX
     } gecko_decode_state_t;
 
     typedef enum logic [1:0] {
@@ -182,9 +183,27 @@ module gecko_decode
             return is_register_readable(rs1, ex_saved, rf_status) && 
                     is_register_readable(rs2, ex_saved, rf_status);
         end
-        RV32I_OPCODE_FENCE, RV32I_OPCODE_SYSTEM: begin // rd, rs1
+        RV32I_OPCODE_FENCE: begin // rd, rs1
+            return 'b1;
+        end
+        RV32I_OPCODE_SYSTEM: begin // rd, rs1
+`ifdef __SIMULATION__
+            case (rv32i_funct3_sys_t'(instruction_fields.funct3))
+            RV32I_FUNCT3_SYS_ENV: begin
+                return (rf_status['d10] == GECKO_DECODE_REG_VALID) &&
+                        (rf_status['d11] == GECKO_DECODE_REG_VALID) &&
+                        (rf_status[rd] == GECKO_DECODE_REG_VALID);
+
+            end
+            default: begin
+                return (rf_status[rs1] == GECKO_DECODE_REG_VALID) &&
+                        (rf_status[rd] == GECKO_DECODE_REG_VALID);
+            end
+            endcase        
+`else
             return (rf_status[rs1] == GECKO_DECODE_REG_VALID) &&
                     (rf_status[rd] == GECKO_DECODE_REG_VALID);
+`endif
         end
         default: begin
             return 'b1;
@@ -379,6 +398,29 @@ module gecko_decode
     gecko_execute_operation_t next_execute_command;
     gecko_jump_command_t next_jump_command; 
 
+`ifdef __SIMULATION__
+    logic simulation_ecall;
+    logic simulation_write_char;
+    logic [7:0] simulation_char;
+    integer file;
+    initial begin
+        file = $fopen("log.txt", "w");
+        $display("Opened file");
+        @ (posedge clk);
+        while (1) begin
+            if (simulation_write_char) begin
+                $fwrite(file, "%c", simulation_char);
+            end
+            if (state == GECKO_DECODE_HALT || state == GECKO_DECODE_FAULT) begin
+                $display("Closed file");
+                $fclose(file);
+                break;
+            end
+            @ (posedge clk);
+        end
+    end
+`endif
+
     always_ff @(posedge clk) begin
         if(rst) begin
             state <= GECKO_DECODE_RESET;
@@ -431,10 +473,8 @@ module gecko_decode
         .read_data_out('{register_read_value0, register_read_value1})
     );
 
-    logic reg_file_clear;
-
     always_comb begin
-        automatic logic send_operation, reg_file_ready; //, reg_file_clear;
+        automatic logic send_operation, reg_file_ready, reg_file_clear;
 
         automatic gecko_decode_reg_status_t rd_status;
         automatic gecko_instruction_operation_t inst_cmd_in;
@@ -447,6 +487,12 @@ module gecko_decode
         inst_cmd_in = gecko_instruction_operation_t'(instruction_command.payload);
         writeback_in = gecko_operation_t'(writeback_result.payload);
         instruction_fields = rv32_get_fields(instruction_result.data);
+
+`ifdef __SIMULATION__
+        simulation_ecall = 'b0;
+        simulation_write_char = 'b0;
+        simulation_char = 'b0;
+`endif
 
         branch_signal.ready = 'b1;
 
@@ -566,6 +612,9 @@ module gecko_decode
         GECKO_DECODE_HALT: begin
             finished_flag = reg_file_clear;
         end
+        GECKO_DECODE_UNDEF: begin
+            next_state = GECKO_DECODE_RESET;
+        end
         endcase
 
         rd_status = next_reg_file_status[instruction_fields.rd];
@@ -608,11 +657,35 @@ module gecko_decode
             RV32I_OPCODE_SYSTEM: begin
                 case (rv32i_funct3_sys_t'(instruction_fields.funct3))
                 RV32I_FUNCT3_SYS_ENV: begin
-                    if (instruction_fields.funct12 == RV32I_CSR_EBREAK) begin
-                        next_state = GECKO_DECODE_HALT;
-                    end else begin
+`ifdef __SIMULATION__
+                    // Read out a0 and a1 registers, SIMULATION ONLY
+                    register_read_addr0 = 'd10;
+                    register_read_addr1 = 'd11;
+
+                    case (instruction_fields.funct12)
+                    RV32I_CSR_EBREAK: begin // System Exit
+                        if (register_read_value0 == 0) begin
+                            next_state = GECKO_DECODE_HALT;
+                        end else begin
+                            next_state = GECKO_DECODE_FAULT;
+                        end
+                    end
+                    RV32I_CSR_ECALL: begin // System Call
+                        if (enable) begin
+                            simulation_ecall = 'b1;
+                            if (register_read_value0 == 0) begin
+                                simulation_write_char = 'b1;
+                                simulation_char = register_read_value1[7:0];
+                            end
+                        end
+                    end
+                    default: begin
                         next_state = GECKO_DECODE_FAULT;
                     end
+                    endcase
+`else
+                    next_state = GECKO_DECODE_HALT; // Halt if encountered
+`endif
                 end
                 RV32I_FUNCT3_SYS_CSRRW, RV32I_FUNCT3_SYS_CSRRS, 
                 RV32I_FUNCT3_SYS_CSRRC, RV32I_FUNCT3_SYS_CSRRWI, 

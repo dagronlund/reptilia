@@ -23,8 +23,11 @@ module gecko_system
     std_stream_intf.out system_result // gecko_operation_t
 );
 
-    logic [63:0] clock_counter; // Works for RDCYCLE and RDTIME
-    logic [63:0] instruction_counter;
+    // Clock counter works for RDCYCLE and RDTIME
+    gecko_retired_count_t retired_instructions_buf;
+    logic clock_counter_carry, instruction_counter_carry;
+    logic [31:0] clock_counter_partial, instruction_counter_partial;
+    logic [63:0] clock_counter, instruction_counter;
 
     logic consume, produce, enable;
 
@@ -51,11 +54,23 @@ module gecko_system
 
     always_ff @ (posedge clk) begin
         if (rst) begin
+            clock_counter_carry <= 'b0;
+            instruction_counter_carry <= 'b0;
+            clock_counter_partial <= 'b0;
+            instruction_counter_partial <= 'b0;
             clock_counter <= 'b0;
             instruction_counter <= 'b0;
         end else begin
-            clock_counter <= clock_counter + 'b1;
-            instruction_counter <= instruction_counter + retired_instructions;
+            retired_instructions_buf <= retired_instructions;
+            // Lower half of addition
+            {clock_counter_carry, clock_counter_partial} <= clock_counter_partial + 'b1;
+            {instruction_counter_carry, instruction_counter_partial} <= instruction_counter_partial + retired_instructions_buf;
+            // Upper half of addition (passthrough)
+            clock_counter[31:0] <= clock_counter_partial;
+            instruction_counter[31:0] <= instruction_counter_partial;
+            // Upper half of addition
+            clock_counter[63:32] <= clock_counter[63:32] + clock_counter_carry;
+            instruction_counter[63:32] <= instruction_counter[63:32] + instruction_counter_carry;
         end
         if (enable) begin
             system_result.payload <= next_system_result;

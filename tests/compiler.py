@@ -9,14 +9,16 @@ name_bin = base_name + ".bin"
 name_mem = base_name + ".mem"
 
 call(["C:/gnu_riscv/bin/riscv-none-embed-gcc.exe", 
-        "-lgcc", 
-        "-nostdlib", 
+        # "-nostdlib",
+        "-lgcc",
         "-nostartfiles", 
         "-Wl,--no-relax", 
         "-T", "linker_script.lds", 
         "-march=rv32i", 
         "-mabi=ilp32", 
-        name_c, "crt0.s", "libmem.c", 
+        "-O3",
+        # Files to include
+        name_c, "crt0.s", "libmem.c", "libio.c",
         "-o", name_o]) # Compiler
 call(["C:/gnu_riscv/bin/riscv-none-embed-objcopy.exe", "-O", "binary", name_o, name_bin]) # Symbol Removal
 call(["python", "hex_converter.py", name_bin, name_mem]) # Hex Conversion
