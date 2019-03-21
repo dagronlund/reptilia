@@ -174,26 +174,32 @@ package gecko;
     // Performs all ALU operations except for shifting
     function automatic gecko_math_result_t gecko_get_full_math_result(
         input rv32_reg_value_t a, b,
-        input gecko_alternate_t alt
+        input logic alt
     );
+        logic sub_overflow;
         rv32_reg_signed_t a_signed = a;
         gecko_math_result_t math_result;
-        gecko_add_sub_result_t add_sub_result = gecko_add_sub(a, b, alt == GECKO_ALTERNATE);
+        gecko_add_sub_result_t add_sub_result = gecko_add_sub(a, b, alt);
+
+        sub_overflow = (a[31] != b[31]) && (a[31] != add_sub_result.sum[31]);
 
         math_result.or_result = a | b;
         math_result.and_result = a & b;
         math_result.xor_result = a ^ b;
 
         math_result.eq = !(|math_result.xor_result);
-        math_result.lt = add_sub_result.sum[31];
-        math_result.ltu = add_sub_result.carry;
+        math_result.lt = add_sub_result.sum[31] ^ sub_overflow;
+        math_result.ltu = !add_sub_result.carry && !math_result.eq;
 
         math_result.add_sub_result = add_sub_result.sum;
 
         // TODO: Test if shift helpers are better
         math_result.lshift_result = a << b[4:0];
-        math_result.rshift_result = (alt == GECKO_ALTERNATE) ? 
-                (a_signed >>> b[4:0]) : (a >> b[4:0]);
+        if (alt) begin
+            math_result.rshift_result = a_signed >>> b[4:0];
+        end else begin
+            math_result.rshift_result = a >> b[4:0];
+        end
 
         return math_result;
     endfunction

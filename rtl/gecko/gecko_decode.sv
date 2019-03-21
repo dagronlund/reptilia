@@ -240,7 +240,6 @@ module gecko_decode
             execute_op.op = instruction_fields.funct3;
             execute_op.alu_alternate = (instruction_fields.funct7 == RV32I_FUNCT7_ALT_INT) ? 
                     GECKO_ALTERNATE : GECKO_NORMAL;
-            execute_op.alu_alternate = GECKO_NORMAL; // wack
         end
         RV32I_OPCODE_IMM: begin
             execute_op.op_type = GECKO_EXECUTE_TYPE_EXECUTE;
@@ -399,6 +398,19 @@ module gecko_decode
     gecko_jump_command_t next_jump_command; 
 
 `ifdef __SIMULATION__
+
+    typedef struct packed {
+        logic register_pending;
+        logic inst_branch;
+        logic inst_jump;
+        logic inst_execute;
+        logic inst_load;
+        logic inst_store;
+        logic inst_system;
+    } debug_signals_t;
+
+    debug_signals_t debug_signals;
+
     logic simulation_ecall;
     logic simulation_write_char;
     logic [7:0] simulation_char;
@@ -418,6 +430,13 @@ module gecko_decode
             end
             @ (posedge clk);
         end
+        while (!finished_flag) @ (posedge clk);
+        if (faulted_flag) begin
+            $display("Exit Error!!!");
+        end else begin
+            $display("Exit Success!!!");
+        end
+        $finish();
     end
 `endif
 
@@ -488,12 +507,6 @@ module gecko_decode
         writeback_in = gecko_operation_t'(writeback_result.payload);
         instruction_fields = rv32_get_fields(instruction_result.data);
 
-`ifdef __SIMULATION__
-        simulation_ecall = 'b0;
-        simulation_write_char = 'b0;
-        simulation_char = 'b0;
-`endif
-
         branch_signal.ready = 'b1;
 
         faulted_flag = 'b0;
@@ -535,6 +548,41 @@ module gecko_decode
         for (int i = 0; i < 32; i++) begin
             reg_file_clear &= (reg_file_status[i[4:0]] == GECKO_DECODE_REG_VALID);
         end
+
+`ifdef __SIMULATION__
+        simulation_ecall = 'b0;
+        simulation_write_char = 'b0;
+        simulation_char = 'b0;
+
+        debug_signals = '{default: 'b0};
+        debug_signals.register_pending = !reg_file_ready;
+
+        case (rv32i_opcode_t'(instruction_fields.opcode))
+        RV32I_OPCODE_OP, RV32I_OPCODE_IMM, RV32I_OPCODE_LUI, RV32I_OPCODE_AUIPC: begin
+            debug_signals.inst_execute = 'b1;
+        end
+        RV32I_OPCODE_LOAD: begin
+            debug_signals.inst_execute = 'b1;
+            debug_signals.inst_load = 'b1;
+        end
+        RV32I_OPCODE_STORE: begin
+            debug_signals.inst_execute = 'b1;
+            debug_signals.inst_store = 'b1;
+        end
+        RV32I_OPCODE_JAL, RV32I_OPCODE_JALR: begin
+            debug_signals.inst_jump = 'b1;
+        end
+        RV32I_OPCODE_BRANCH: begin
+            debug_signals.inst_execute = 'b1;
+            debug_signals.inst_branch = 'b1;
+        end
+        RV32I_OPCODE_SYSTEM: begin
+            debug_signals.inst_system = 'b1;
+        end
+        default: begin
+        end
+        endcase
+`endif
 
         register_write_enable = 'b0;
         register_write_addr = reset_counter;
@@ -628,6 +676,7 @@ module gecko_decode
             end else begin
                 retired_instructions = retired_instructions + 'b1;
             end
+            
             case (rv32i_opcode_t'(instruction_fields.opcode))
             RV32I_OPCODE_OP, RV32I_OPCODE_IMM, RV32I_OPCODE_LUI, RV32I_OPCODE_AUIPC: begin
                 produce_execute = (instruction_fields.rd != 'b0);
@@ -705,6 +754,7 @@ module gecko_decode
                 next_state = GECKO_DECODE_FAULT;
             end
             endcase
+
             if (instruction_fields.rd != 'b0) begin
                 next_reg_file_status[instruction_fields.rd] = rd_status;
             end
@@ -735,7 +785,7 @@ module gecko_decode
             if (writeback_in.speculative) begin
                 next_speculative_counter = next_speculative_counter - 'b1;
                 if (next_speculative_counter == 0) begin
-                    next_state = (state == GECKO_DECODE_MISPREDICTED) ? GECKO_DECODE_NORMAL : state;
+                    next_state = (state == GECKO_DECODE_MISPREDICTED) ? GECKO_DECODE_NORMAL : next_state;
                 end
             end
             // Validate register regardless of speculative
@@ -747,14 +797,14 @@ module gecko_decode
             if (branch_cmd_in.branch) begin
                 // Return to normal immediately if no speculative instructions executed
                 if (next_speculative_counter == 0) begin
-                    next_state = (state == GECKO_DECODE_SPECULATIVE) ? GECKO_DECODE_NORMAL : state;
+                    next_state = (state == GECKO_DECODE_SPECULATIVE) ? GECKO_DECODE_NORMAL : next_state;
                 end else begin
-                    next_state = (state == GECKO_DECODE_SPECULATIVE) ? GECKO_DECODE_MISPREDICTED : state;
+                    next_state = (state == GECKO_DECODE_SPECULATIVE) ? GECKO_DECODE_MISPREDICTED : next_state;
                 end
                 next_jump_flag = next_jump_flag + 'b1;
                 next_execute_saved = 'b0;
             end else begin
-                next_state = (state == GECKO_DECODE_SPECULATIVE) ? GECKO_DECODE_NORMAL : state;
+                next_state = (state == GECKO_DECODE_SPECULATIVE) ? GECKO_DECODE_NORMAL : next_state;
                 retired_instructions = retired_instructions + next_speculative_retired_counter;
             end
             next_speculative_retired_counter = 'b0;

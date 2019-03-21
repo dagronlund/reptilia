@@ -28,7 +28,7 @@ module gecko_micro
     std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) data_result (.clk, .rst);
 
     std_mem_double #(
-        .MANUAL_ADDR_WIDTH(12),
+        .MANUAL_ADDR_WIDTH(16),
         .ADDR_BYTE_SHIFTED(1),
         .HEX_FILE("test.mem")
     ) memory_inst (
