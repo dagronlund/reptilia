@@ -33,15 +33,27 @@ package fpu;
     } fpu_double_fields_t;
 
     typedef struct packed {
+        logic inf;
+        logic nan;
+        logic norm;
+        logic zero;
+    } fpu_float_conditions_t;
+
+    typedef struct packed {
+        logic [47:0] quotient;
+        logic [2:0] guard;
+    } fpu_division_result_t;
+
+    typedef struct packed {
         logic [1:0] guard;
         logic       sticky;
     } fpu_guard_bits_t;
 
     typedef enum logic [1:0] {
-        FPU_ROUND_MODE_EVEN,
-        FPU_ROUND_MODE_DOWN,
-        FPU_ROUND_MODE_UP,
-        FPU_ROUND_MODE_ZERO
+        FPU_ROUND_MODE_EVEN = 2'd0,
+        FPU_ROUND_MODE_DOWN = 2'd1,
+        FPU_ROUND_MODE_UP = 2'd2,
+        FPU_ROUND_MODE_ZERO = 2'd3
     } fpu_round_mode_t;
 
     typedef struct packed {

@@ -11,13 +11,6 @@ package fpu_ultrascale_native;
         return (a * b) + c;
     endfunction
 
-    // TODO: Replace * with dsp24_mac
-    function automatic logic [23:0] mult_24(
-        input logic [23:0] a, b
-    );
-        return a * b;
-    endfunction
-
 endpackage
 
 `endif
