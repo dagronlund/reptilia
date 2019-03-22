@@ -122,7 +122,8 @@ module gecko_execute
         case (cmd_in.op_type)
         GECKO_EXECUTE_TYPE_EXECUTE: begin
             // Supports SLT and SLTU
-            if (cmd_in.op.ir == RV32I_FUNCT3_IR_ADD_SUB) begin
+            if (cmd_in.op.ir == RV32I_FUNCT3_IR_ADD_SUB || 
+                    cmd_in.op.ir == RV32I_FUNCT3_IR_SRL_SRA) begin
                 alt = cmd_in.alu_alternate;
             end else begin
                 alt = GECKO_ALTERNATE;
@@ -143,10 +144,7 @@ module gecko_execute
             RV32I_FUNCT3_IR_ADD_SUB: next_execute_result.value = result.add_sub_result;
             RV32I_FUNCT3_IR_SLL: next_execute_result.value = result.lshift_result;
             RV32I_FUNCT3_IR_SLT: next_execute_result.value = result.lt ? 32'b1 : 32'b0;
-            RV32I_FUNCT3_IR_SLTU: begin
-                // $display("Performing SLTU on %h - %h with result %h", a, b, result.ltu);
-                next_execute_result.value = result.ltu ? 32'b1 : 32'b0;
-            end
+            RV32I_FUNCT3_IR_SLTU: next_execute_result.value = result.ltu ? 32'b1 : 32'b0;
             RV32I_FUNCT3_IR_XOR: next_execute_result.value = result.xor_result;
             RV32I_FUNCT3_IR_SRL_SRA: next_execute_result.value = result.rshift_result;
             RV32I_FUNCT3_IR_OR: next_execute_result.value = result.or_result;

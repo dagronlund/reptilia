@@ -431,11 +431,15 @@ module gecko_decode
             @ (posedge clk);
         end
         while (!finished_flag) @ (posedge clk);
+        file = $fopen("status.txt", "w");
         if (faulted_flag) begin
             $display("Exit Error!!!");
+            $fwrite(file, "Failure");
         end else begin
             $display("Exit Success!!!");
+            $fwrite(file, "Success");
         end
+        $fclose(file);
         $finish();
     end
 `endif
@@ -607,13 +611,23 @@ module gecko_decode
             if (inst_cmd_in.jump_flag != jump_flag) begin
                 consume_instruction = 'b1;
             end else if (reg_file_ready) begin
-                consume_instruction = 'b1;
-                send_operation = 'b1;
                 case (rv32i_opcode_t'(instruction_fields.opcode))
-                RV32I_OPCODE_JAL, RV32I_OPCODE_JALR: 
+                RV32I_OPCODE_JAL, RV32I_OPCODE_JALR: begin
+                    consume_instruction = 'b1;
+                    send_operation = 'b1;
                     next_jump_flag = next_jump_flag + 'b1;
-                RV32I_OPCODE_BRANCH: 
-                    next_state = GECKO_DECODE_SPECULATIVE;
+                end
+                RV32I_OPCODE_BRANCH: begin
+                    if (speculative_counter == 'b0) begin
+                        consume_instruction = 'b1;
+                        send_operation = 'b1;
+                        next_state = GECKO_DECODE_SPECULATIVE;
+                    end
+                end
+                default: begin
+                    consume_instruction = 'b1;
+                    send_operation = 'b1;
+                end
                 endcase
             end
         end
