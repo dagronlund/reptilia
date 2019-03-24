@@ -7,7 +7,7 @@
  */
 
 module std_register #(
-    parameter WIDTH = 8,
+    parameter int WIDTH = 8,
     parameter logic [WIDTH-1:0] RESET = 'b0
 )(
     input logic clk, rst,
@@ -28,7 +28,7 @@ module std_register #(
 endmodule
 
 module std_counter #(
-    parameter WIDTH = 8
+    parameter int WIDTH = 8
 )(
     input logic clk, rst,
 
@@ -66,8 +66,8 @@ endmodule
 
 // TODO: Change to use register module
 module std_shift_register #(
-    parameter WIDTH = 8,
-    parameter RESET = 'b0
+    parameter int WIDTH = 8,
+    parameter logic [WIDTH-1:0] RESET = 'b0
 )(
     input logic clk, rst,
 
@@ -98,14 +98,16 @@ module std_shift_register #(
 endmodule
 
 module std_block_ram_single #(
-    parameter DATA_WIDTH = 32,
-    parameter ADDR_WIDTH = 10,
-    parameter MASK_WIDTH = DATA_WIDTH / 8,
+    parameter int DATA_WIDTH = 32,
+    parameter int ADDR_WIDTH = 10,
+    parameter int MASK_WIDTH = DATA_WIDTH / 8,
+    parameter int ENABLE_OUTPUT_REG = 0,
     parameter HEX_FILE = ""
 )(
     input logic clk, rst,
 
-    input logic enable, 
+    input logic enable,
+    input logic enable_output,
     input logic [MASK_WIDTH-1:0] write_enable,
     input logic [ADDR_WIDTH-1:0] addr_in,
     input logic [DATA_WIDTH-1:0] data_in,
@@ -125,6 +127,8 @@ module std_block_ram_single #(
         end
     end
 
+    logic [DATA_WIDTH-1:0] data_out_temp;
+
     generate
         genvar k;
         for (k = 0; k < MASK_WIDTH; k++) begin
@@ -133,9 +137,19 @@ module std_block_ram_single #(
                     if (write_enable[k]) begin
                         data[addr_in][((k+1)*8)-1:(k*8)] <= data_in[((k+1)*8)-1:(k*8)];
                     end
-                    data_out[((k+1)*8)-1:(k*8)] <= data[addr_in][((k+1)*8)-1:(k*8)];
+                    data_out_temp[((k+1)*8)-1:(k*8)] <= data[addr_in][((k+1)*8)-1:(k*8)];
                 end
             end
+        end
+
+        if (ENABLE_OUTPUT_REG) begin
+            always_ff @(posedge clk) begin
+                if (enable_output) begin
+                    data_out <= data_out_temp;
+                end
+            end
+        end else begin
+            assign data_out = data_out_temp;
         end
     endgenerate
 
@@ -143,20 +157,24 @@ endmodule
 
 // TODO: Add asymmetric data widths
 module std_block_ram_double #(
-    parameter DATA_WIDTH = 32,
-    parameter ADDR_WIDTH = 10,
-    parameter MASK_WIDTH = DATA_WIDTH / 8,
+    parameter int DATA_WIDTH = 32,
+    parameter int ADDR_WIDTH = 10,
+    parameter int MASK_WIDTH = DATA_WIDTH / 8,
+    parameter int ENABLE_OUTPUT_REG0 = 0,
+    parameter int ENABLE_OUTPUT_REG1 = 0,
     parameter HEX_FILE = ""
 )(
     input logic clk, rst,
 
     input logic enable0, 
+    input logic enable_output0,
     input logic [MASK_WIDTH-1:0] write_enable0,
     input logic [ADDR_WIDTH-1:0] addr_in0,
     input logic [DATA_WIDTH-1:0] data_in0,
     output logic [DATA_WIDTH-1:0] data_out0,
 
     input logic enable1, 
+    input logic enable_output1,
     input logic [MASK_WIDTH-1:0] write_enable1,
     input logic [ADDR_WIDTH-1:0] addr_in1,
     input logic [DATA_WIDTH-1:0] data_in1,
@@ -176,6 +194,8 @@ module std_block_ram_double #(
         end
     end
 
+    logic [DATA_WIDTH-1:0] data_out_temp0, data_out_temp1;
+
     /*
      * Using two seperate always_ff blocks is super important for Vivado to 
      * recognize that this is a true-dual-port block-ram, without a weird output
@@ -192,7 +212,7 @@ module std_block_ram_double #(
                     if (write_enable0[k]) begin
                         data[addr_in0][((k+1)*8)-1:(k*8)] <= data_in0[((k+1)*8)-1:(k*8)];
                     end            
-                    data_out0[((k+1)*8)-1:(k*8)] <= data[addr_in0][((k+1)*8)-1:(k*8)];
+                    data_out_temp0[((k+1)*8)-1:(k*8)] <= data[addr_in0][((k+1)*8)-1:(k*8)];
                 end
             end
 
@@ -201,9 +221,29 @@ module std_block_ram_double #(
                     if (write_enable1[k]) begin
                         data[addr_in1][((k+1)*8)-1:(k*8)] <= data_in1[((k+1)*8)-1:(k*8)];
                     end
-                    data_out1[((k+1)*8)-1:(k*8)] <= data[addr_in1][((k+1)*8)-1:(k*8)];
+                    data_out_temp1[((k+1)*8)-1:(k*8)] <= data[addr_in1][((k+1)*8)-1:(k*8)];
                 end
             end
+        end
+
+        if (ENABLE_OUTPUT_REG0) begin
+            always_ff @(posedge clk) begin
+                if (enable_output0) begin
+                    data_out0 <= data_out_temp0;
+                end
+            end
+        end else begin
+            assign data_out0 = data_out_temp0;
+        end
+
+        if (ENABLE_OUTPUT_REG1) begin
+            always_ff @(posedge clk) begin
+                if (enable_output1) begin
+                    data_out1 <= data_out_temp1;
+                end
+            end
+        end else begin
+            assign data_out1 = data_out_temp1;
         end
     endgenerate
 

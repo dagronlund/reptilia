@@ -51,7 +51,7 @@ module std_mem_stage #(
         mask_t data_out_write_enable [LATENCY];
         addr_t data_out_addr [LATENCY];
         data_t data_out_data [LATENCY];
-        
+
         for (k = 0; k < LATENCY; k++) begin
             if (k == 0) begin
                 assign data_in_valid[k] = data_in.valid;

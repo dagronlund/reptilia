@@ -15,6 +15,7 @@ module gecko_micro
     import rv32i::*;
     import gecko::*;
 #(
+    parameter ADDR_SPACE_WIDTH = 16,
     parameter INST_LATENCY = 2,
     parameter DATA_LATENCY = 2,
     parameter gecko_pc_t START_ADDR = 'h0
@@ -35,7 +36,7 @@ module gecko_micro
     std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) data_result_registered (.clk, .rst);
 
     std_mem_stage #(
-        .LATENCY(INST_LATENCY - 1)
+        .LATENCY((INST_LATENCY > 1) ? (INST_LATENCY - 2) : 0)
     ) inst_register_stage (
         .clk, .rst,
         .data_in(inst_result),
@@ -43,7 +44,7 @@ module gecko_micro
     );
 
     std_mem_stage #(
-        .LATENCY(DATA_LATENCY - 1)
+        .LATENCY((DATA_LATENCY > 1) ? (DATA_LATENCY - 2) : 0)
     ) data_register_stage (
         .clk, .rst,
         .data_in(data_result),
@@ -51,8 +52,10 @@ module gecko_micro
     );
 
     std_mem_double #(
-        .MANUAL_ADDR_WIDTH(16),
+        .MANUAL_ADDR_WIDTH(ADDR_SPACE_WIDTH),
         .ADDR_BYTE_SHIFTED(1),
+        .ENABLE_OUTPUT_REG0((INST_LATENCY > 1) ? 1 : 0),
+        .ENABLE_OUTPUT_REG1((DATA_LATENCY > 1) ? 1 : 0),
         .HEX_FILE("test.mem")
     ) memory_inst (
         .clk, .rst,

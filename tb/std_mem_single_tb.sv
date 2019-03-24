@@ -8,11 +8,11 @@ module std_mem_single_tb();
     logic clk, rst;
     clk_rst_gen clk_rst_gen_inst(.clk, .rst);
 
-    std_mem_intf mem_command(.*);
-    std_mem_intf mem_result(.*);
+    std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(10)) mem_command (.clk, .rst);
+    std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(10)) mem_result (.clk, .rst);
 
     std_mem_single #(
-        .WRITE_RESPOND(0)
+        .ENABLE_OUTPUT_REG(1)
     ) mem_inst0 (
         .clk, .rst,
         .command(mem_command),
@@ -45,6 +45,9 @@ module std_mem_single_tb();
         mem_result.ready = 0;
         while (rst) @ (posedge clk);
 
+        @ (posedge clk);
+        @ (posedge clk);
+        @ (posedge clk);
         @ (posedge clk);
         @ (posedge clk);
         @ (posedge clk);
