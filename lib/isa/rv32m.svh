@@ -1,6 +1,10 @@
 `ifndef __RV32M__
 `define __RV32M__
 
+`ifdef __SIMULATION__
+`include "rv32.svh"
+`endif
+
 package rv32m;
 
     import rv::*;

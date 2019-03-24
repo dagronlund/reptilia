@@ -1,7 +1,7 @@
 `ifndef __GECKO__
 `define __GECKO__
 
-`ifdef _SIMULATION_
+`ifdef __SIMULATION__
 `include "../isa/rv32.svh"
 `include "../isa/rv32i.svh"
 `endif
