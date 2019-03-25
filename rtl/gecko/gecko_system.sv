@@ -60,6 +60,7 @@ module gecko_system
             instruction_counter_partial <= 'b0;
             clock_counter <= 'b0;
             instruction_counter <= 'b0;
+            retired_instructions_buf <= 'b0;
         end else begin
             retired_instructions_buf <= retired_instructions;
             // Lower half of addition

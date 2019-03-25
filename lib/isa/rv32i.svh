@@ -1,7 +1,7 @@
 `ifndef __RV32I__
 `define __RV32I__
 
-`ifdef _SIMULATION_
+`ifdef __SIMULATION__
 `include "rv32.svh"
 `endif
 
