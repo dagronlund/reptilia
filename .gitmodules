@@ -1,0 +1,3 @@
+[submodule "tests/libair"]
+	path = tests/libair
+	url = https://github.com/dagronlund/libair.git
