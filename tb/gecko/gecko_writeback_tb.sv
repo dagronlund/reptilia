@@ -51,16 +51,18 @@ module gecko_writeback_tb
         fork
         begin
             fork
-                mem_command.send('{addr: 'h1, jump_flag: 'b0, 
+                mem_command.send('{addr: 'h1F, reg_status: 'd0,
                     op: RV32I_FUNCT3_LS_W, offset: 'h2});
                 mem_result.send(0, 0, 0, 'hAABBCCDD);
             join
         end
         begin
-            execute_result.send('{value: 'h42, addr: 'h1F, jump_flag: 'b1});
+            execute_result.send('{value: 'h42, addr: 'h1F, reg_status: 'd2, speculative: 'b0});
+            execute_result.send('{value: 'h42, addr: 'h1F, reg_status: 'd0, speculative: 'b0});
         end
         begin
-            system_result.send('{value: 'h42, addr: 'h1F, jump_flag: 'b1});
+            system_result.send('{value: 'h42, addr: 'h1F, reg_status: 'd1, speculative: 'b0});
+            system_result.send('{value: 'h42, addr: 'h1F, reg_status: 'd3, speculative: 'b0});
         end
         join
     end

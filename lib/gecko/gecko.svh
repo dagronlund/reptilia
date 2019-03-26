@@ -18,8 +18,12 @@ package gecko;
 
     // Configurable Types
     typedef logic gecko_jump_flag_t;
+    typedef logic [2:0] gecko_reg_status_t;
     typedef logic [3:0] gecko_speculative_count_t;
     typedef logic [4:0] gecko_retired_count_t;
+
+    parameter gecko_reg_status_t GECKO_REG_STATUS_VALID = 'b0;
+    parameter gecko_reg_status_t GECKO_REG_STATUS_FULL = (-1);
 
     typedef struct packed {
         rv32_reg_value_t rs1_value;
@@ -94,9 +98,10 @@ package gecko;
      *************************************************************************/
 
     typedef struct packed {
-        rv32_reg_value_t value;
         rv32_reg_addr_t addr;
+        gecko_reg_status_t reg_status;
         logic speculative;
+        rv32_reg_value_t value;
     } gecko_operation_t;
 
     typedef struct packed {
@@ -121,14 +126,16 @@ package gecko;
 
     typedef struct packed {
         rv32_reg_addr_t addr;
+        gecko_reg_status_t reg_status;
         rv32i_funct3_ls_t op;
         gecko_byte_offset_t offset;
     } gecko_mem_operation_t;
 
     typedef struct packed {
+        rv32_reg_addr_t reg_addr;
+        gecko_reg_status_t reg_status;
         rv32_reg_addr_t imm_value;
         rv32_reg_value_t rs1_value;
-        rv32_reg_addr_t rd_addr;
         rv32i_funct3_sys_t sys_op;
         rv32_funct12_t csr;
     } gecko_system_operation_t;
@@ -141,17 +148,18 @@ package gecko;
     } gecko_execute_type_t;
 
     typedef struct packed {
+        rv32_reg_addr_t reg_addr;
+        gecko_reg_status_t reg_status;
+        logic speculative;
+
         gecko_execute_type_t op_type;
         rv32i_funct3_t op;
         gecko_alternate_t alu_alternate;
-        rv32_reg_addr_t reg_addr;
 
         logic reuse_rs1, reuse_rs2, reuse_mem;
         rv32_reg_value_t rs1_value, rs2_value, mem_value;
         rv32_reg_value_t immediate_value;
         rv32_reg_value_t pc;
-
-        logic speculative;
     } gecko_execute_operation_t;
 
     /*************************************************************************

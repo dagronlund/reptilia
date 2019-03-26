@@ -104,10 +104,12 @@ module gecko_execute
         next_execute_result.value = 'b0;
         next_execute_result.addr = cmd_in.reg_addr;
         next_execute_result.speculative = cmd_in.speculative;
+        next_execute_result.reg_status = cmd_in.reg_status;
 
         next_mem_command.addr = cmd_in.reg_addr;
         next_mem_command.op = cmd_in.op.ls;
         next_mem_command.offset = 'b0;
+        next_mem_command.reg_status = cmd_in.reg_status;
 
         next_branch_signal.branch = 'b0;
         next_branch_command.branch = 'b0;

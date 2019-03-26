@@ -85,8 +85,9 @@ module gecko_system
 
         consume = 'b1;
 
-        next_system_result.addr = command_in.rd_addr;
+        next_system_result.addr = command_in.reg_addr;
         next_system_result.speculative = 'b0;
+        next_system_result.reg_status = command_in.reg_status;
         next_system_result.value = 'b0;
 
         case (command_in.csr)
@@ -103,22 +104,22 @@ module gecko_system
             produce = 'b0;
         end
         RV32I_FUNCT3_SYS_CSRRW: begin // Read Write
-            produce = (command_in.rd_addr != 'b0); // Don't produce writeback to x0
+            produce = (command_in.reg_addr != 'b0); // Don't produce writeback to x0
         end
         RV32I_FUNCT3_SYS_CSRRS: begin // Read Set
-            produce = (command_in.rd_addr != 'b0); // Don't produce writeback to x0
+            produce = (command_in.reg_addr != 'b0); // Don't produce writeback to x0
         end
         RV32I_FUNCT3_SYS_CSRRC: begin // Read Clear
-            produce = (command_in.rd_addr != 'b0); // Don't produce writeback to x0
+            produce = (command_in.reg_addr != 'b0); // Don't produce writeback to x0
         end
         RV32I_FUNCT3_SYS_CSRRWI: begin // Read Write Imm
-            produce = (command_in.rd_addr != 'b0); // Don't produce writeback to x0
+            produce = (command_in.reg_addr != 'b0); // Don't produce writeback to x0
         end
         RV32I_FUNCT3_SYS_CSRRSI: begin // Read Set Imm
-            produce = (command_in.rd_addr != 'b0); // Don't produce writeback to x0
+            produce = (command_in.reg_addr != 'b0); // Don't produce writeback to x0
         end
         RV32I_FUNCT3_SYS_CSRRCI: begin // Read Clear Imm
-            produce = (command_in.rd_addr != 'b0); // Don't produce writeback to x0
+            produce = (command_in.reg_addr != 'b0); // Don't produce writeback to x0
         end
         default: begin
             produce = 'b0;
