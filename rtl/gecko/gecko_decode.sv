@@ -53,7 +53,9 @@ module gecko_decode
     import rv32i::*;
     import gecko::*;
     import gecko_decode_util::*;
-#()(
+#(
+    parameter int NUM_FORWARDED = 0
+)(
     input logic clk, rst,
 
     std_mem_intf.in instruction_result,
@@ -67,6 +69,9 @@ module gecko_decode
     // Non-flow Controlled
     std_stream_intf.in branch_signal, // gecko_branch_signal_t
     std_stream_intf.in writeback_result, // gecko_operation_t
+
+    // Vivado does not like zero-width arrays
+    input gecko_forwarded_t forwarded_results [NUM_FORWARDED == 0 ? 1 : NUM_FORWARDED],
 
     output logic faulted_flag, finished_flag,
     output gecko_retired_count_t retired_instructions
@@ -229,7 +234,8 @@ module gecko_decode
 
     always_comb begin
         automatic logic send_operation, enable_write_rd, reg_file_ready, reg_file_clear;
-
+        automatic gecko_decode_operands_status_t operands_status;
+        automatic rv32_reg_value_t rs1_value, rs2_value;
         automatic gecko_reg_status_t rd_status, rd_counter;
         automatic gecko_instruction_operation_t inst_cmd_in;
         automatic gecko_operation_t writeback_in;
@@ -262,23 +268,60 @@ module gecko_decode
         produce_execute = 'b0;
         produce_system = 'b0;
 
-        // Get register values
+`ifdef __SIMULATION__
+        if (instruction_fields.opcode == RV32I_OPCODE_SYSTEM && 
+                instruction_fields.funct3 == RV32I_FUNCT3_SYS_ENV) begin
+            // Read out a0 and a1 registers, SIMULATION ONLY
+            instruction_fields.rs1 = 'd10;
+            instruction_fields.rs2 = 'd11;
+        end
+`endif
+
+        // Get the status of the current register file
+        operands_status = gecko_decode_find_operand_status(instruction_fields, 
+                execute_saved, reg_file_status);
+
+        // Set register file addresses
         register_read_addr0 = instruction_fields.rs1;
         register_read_addr1 = instruction_fields.rs2;
 
+        // Get register values
+        rs1_value = register_read_value0;
+        rs2_value = register_read_value1;
+
+        for (int i = 0; i < NUM_FORWARDED; i++) begin
+            if (forwarded_results[i].valid && (state == GECKO_DECODE_NORMAL || 
+                    !forwarded_results[i].speculative)) begin
+                // Check forwarding for result of rs1
+                if (!operands_status.rs1_valid && 
+                        forwarded_results[i].addr == instruction_fields.rs1 &&
+                        forwarded_results[i].reg_status + 1 == reg_file_counter[instruction_fields.rs1]) begin
+                    rs1_value = forwarded_results[i].value;
+                    operands_status.rs1_valid = 'b1;
+                end
+
+                // Check forwarding for result of rs2
+                if (!operands_status.rs2_valid && 
+                        forwarded_results[i].addr == instruction_fields.rs2 &&
+                        forwarded_results[i].reg_status + 1 == reg_file_counter[instruction_fields.rs2]) begin
+                    rs2_value = forwarded_results[i].value;
+                    operands_status.rs2_valid = 'b1;
+                end
+            end
+        end
+
+        reg_file_ready = operands_status.rs1_valid && operands_status.rs2_valid && 
+                operands_status.rd_valid;
+
         // Build commands
         next_execute_command = create_execute_op(instruction_fields, execute_saved, 
-                                                 register_read_value0, register_read_value1,
-                                                 inst_cmd_in.pc);
+                                                 rs1_value, rs2_value, inst_cmd_in.pc);
         next_system_command = create_system_op(instruction_fields, execute_saved, 
-                                               register_read_value0, register_read_value1);
+                                               rs1_value, rs2_value);
         next_jump_command = create_jump_op(instruction_fields, execute_saved, 
-                                           register_read_value0, register_read_value1,
-                                           inst_cmd_in.pc);
+                                           rs1_value, rs2_value, inst_cmd_in.pc);
         next_execute_command.reg_status = reg_file_counter[instruction_fields.rd];
         next_system_command.reg_status = reg_file_counter[instruction_fields.rd];
-
-        reg_file_ready = is_register_file_ready(instruction_fields, execute_saved, reg_file_status);
 
         reg_file_clear = 'b1;
         for (int i = 0; i < 32; i++) begin
@@ -455,10 +498,6 @@ module gecko_decode
                 case (rv32i_funct3_sys_t'(instruction_fields.funct3))
                 RV32I_FUNCT3_SYS_ENV: begin
 `ifdef __SIMULATION__
-                    // Read out a0 and a1 registers, SIMULATION ONLY
-                    register_read_addr0 = 'd10;
-                    register_read_addr1 = 'd11;
-
                     case (instruction_fields.funct12)
                     RV32I_CSR_EBREAK: begin // System Exit
                         if (register_read_value0 == 0) begin

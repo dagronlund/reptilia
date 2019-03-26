@@ -38,6 +38,10 @@ module gecko_writeback
     std_stream_intf.out writeback_result // gecko_operation_t
 );
 
+    // Check that status counter can count up to the number
+    // of independent input streams to the writeback module
+    `STATIC_ASSERT($pow(2, $size(gecko_reg_status_t)) >= 3)
+
     typedef enum logic [1:0] {
         GECKO_WRITEBACK_RESET = 2'b00,
         GECKO_WRITEBACK_EXECUTE = 2'b01,

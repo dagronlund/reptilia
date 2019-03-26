@@ -105,6 +105,13 @@ package gecko;
     } gecko_operation_t;
 
     typedef struct packed {
+        rv32_reg_addr_t addr;
+        logic valid, speculative;
+        gecko_reg_status_t reg_status;
+        rv32_reg_value_t value;
+    } gecko_forwarded_t;
+
+    typedef struct packed {
         rv32_reg_value_t base_addr;
         rv32_reg_value_t relative_addr;
     } gecko_jump_command_t;
@@ -165,6 +172,19 @@ package gecko;
     /*************************************************************************
      * Internal Gecko Helper Functions                                       *
      *************************************************************************/
+
+    function automatic gecko_forwarded_t gecko_construct_forward(
+        input logic valid,
+        input gecko_operation_t op
+    );
+        return '{
+            addr: op.addr,
+            reg_status: op.reg_status,
+            valid: valid,
+            speculative: op.speculative,
+            value: op.value
+        };
+    endfunction
 
     // Adds or subtracts with a carry bit
     function automatic gecko_add_sub_result_t gecko_add_sub(
