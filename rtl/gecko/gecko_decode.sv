@@ -138,6 +138,7 @@ module gecko_decode
     } debug_signals_t;
 
     debug_signals_t debug_signals;
+    logic [31:0] debug_register_pending_counter;
 
     logic simulation_ecall;
     logic simulation_write_char;
@@ -148,12 +149,14 @@ module gecko_decode
     rv32_reg_value_t debug_full_counter;
 
     initial begin
+        debug_register_pending_counter = 'b0;
         file = $fopen("log.txt", "w");
         $display("Opened file");
         @ (posedge clk);
         while (1) begin
             debug_counter <= debug_counter + 1;
             debug_full_counter <= debug_full_counter + debug_signals.register_full;
+            debug_register_pending_counter <= debug_register_pending_counter + debug_signals.register_pending;
             if (simulation_write_char) begin
                 $fwrite(file, "%c", simulation_char);
             end
@@ -235,6 +238,7 @@ module gecko_decode
     always_comb begin
         automatic logic send_operation, enable_write_rd, reg_file_ready, reg_file_clear;
         automatic gecko_decode_operands_status_t operands_status;
+        automatic gecko_reg_status_t forwarded_status_plus;
         automatic rv32_reg_value_t rs1_value, rs2_value;
         automatic gecko_reg_status_t rd_status, rd_counter;
         automatic gecko_instruction_operation_t inst_cmd_in;
@@ -292,10 +296,13 @@ module gecko_decode
         for (int i = 0; i < NUM_FORWARDED; i++) begin
             if (forwarded_results[i].valid && (state == GECKO_DECODE_NORMAL || 
                     !forwarded_results[i].speculative)) begin
+
+                forwarded_status_plus = forwarded_results[i].reg_status + 'b1;
+
                 // Check forwarding for result of rs1
                 if (!operands_status.rs1_valid && 
                         forwarded_results[i].addr == instruction_fields.rs1 &&
-                        forwarded_results[i].reg_status + 1 == reg_file_counter[instruction_fields.rs1]) begin
+                        forwarded_status_plus == reg_file_counter[instruction_fields.rs1]) begin
                     rs1_value = forwarded_results[i].value;
                     operands_status.rs1_valid = 'b1;
                 end
@@ -303,7 +310,7 @@ module gecko_decode
                 // Check forwarding for result of rs2
                 if (!operands_status.rs2_valid && 
                         forwarded_results[i].addr == instruction_fields.rs2 &&
-                        forwarded_results[i].reg_status + 1 == reg_file_counter[instruction_fields.rs2]) begin
+                        forwarded_status_plus == reg_file_counter[instruction_fields.rs2]) begin
                     rs2_value = forwarded_results[i].value;
                     operands_status.rs2_valid = 'b1;
                 end
