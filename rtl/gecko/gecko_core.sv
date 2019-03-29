@@ -56,6 +56,17 @@ module gecko_core
 
     gecko_retired_count_t retired_instructions;
 
+    gecko_forwarded_t execute_forwarded;
+    gecko_forwarded_t writeback_forwarded;
+    gecko_forwarded_t memory_forwarded;
+
+    assign execute_forwarded = gecko_construct_forward(execute_result.valid, execute_result.payload);
+    assign writeback_forwarded = gecko_construct_forward(writeback_result.valid, writeback_result.payload);
+    assign memory_forwarded = gecko_construct_forward(
+        mem_command_out.valid && data_result.valid,
+        gecko_get_load_operation(mem_command_out.payload, data_result.data)
+    );
+
     gecko_fetch #(
         .START_ADDR(START_ADDR)
     ) gecko_fetch_inst (
@@ -76,8 +87,9 @@ module gecko_core
         .data_out(instruction_command_out)
     );
 
-    gecko_decode gecko_decode_inst
-    (
+    gecko_decode #(
+        .NUM_FORWARDED(3)
+    ) gecko_decode_inst (
         .clk, .rst,
 
         .instruction_command(instruction_command_out),
@@ -90,6 +102,9 @@ module gecko_core
 
         .branch_signal,
         .writeback_result,
+
+        // Forwarded results have to be ordered from first to last in the pipeline order
+        .forwarded_results('{execute_forwarded, memory_forwarded, writeback_forwarded}),
 
         .faulted_flag, .finished_flag, .retired_instructions
     );

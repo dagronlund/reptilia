@@ -74,6 +74,4 @@ module gecko_micro
         .faulted_flag, .finished_flag
     );
 
-
 endmodule
-

@@ -14,6 +14,7 @@ module gecko_micro_wrapper();
     logic clk, rst, faulted_flag, finished_flag;
 
     gecko_micro #(
+        .ADDR_SPACE_WIDTH(12),
         .START_ADDR('b0)
     )gecko_micro_inst(
         .clk(clk), 
