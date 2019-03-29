@@ -199,7 +199,7 @@ package gecko;
         return result;
     endfunction
 
-    // Performs all ALU operations except for shifting
+    // Performs all ALU operations
     function automatic gecko_math_result_t gecko_get_full_math_result(
         input rv32_reg_value_t a, b,
         input logic alt
@@ -274,6 +274,18 @@ package gecko;
         RV32I_FUNCT3_LS_HU: return {16'b0, hshifted_value[15:0]};
         default: return value; // RV32I_FUNCT3_LS_W
         endcase
+    endfunction
+
+    function automatic gecko_operation_t gecko_get_load_operation(
+        input gecko_mem_operation_t mem_op,
+        input rv32_reg_value_t mem_data
+    );
+        return '{
+            value: gecko_get_load_result(mem_data, mem_op.offset, mem_op.op),
+            addr: mem_op.addr,
+            reg_status: mem_op.reg_status,
+            speculative: 'b0
+        };
     endfunction
 
     /*************************************************************************

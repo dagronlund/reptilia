@@ -124,18 +124,10 @@ module gecko_writeback
     always_comb begin
         automatic logic execute_status_good, memory_status_good, system_status_good;
         automatic gecko_operation_t execute_operation, mem_operation, system_operation;
-        automatic gecko_mem_operation_t mem_operation_partial;
 
         execute_operation = gecko_operation_t'(execute_result.payload);
         system_operation = gecko_operation_t'(system_result.payload);
-
-        mem_operation_partial = gecko_mem_operation_t'(mem_command.payload);
-        mem_operation.value = gecko_get_load_result(mem_result.data, 
-                mem_operation_partial.offset,
-                mem_operation_partial.op);
-        mem_operation.addr = mem_operation_partial.addr;
-        mem_operation.reg_status = mem_operation_partial.reg_status;
-        mem_operation.speculative = 'b0;
+        mem_operation = gecko_get_load_operation(mem_command.payload, mem_result.data);
 
         // Read local register file status flags
         execute_status_read_addr = execute_operation.addr;
