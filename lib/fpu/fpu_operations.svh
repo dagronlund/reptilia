@@ -84,6 +84,8 @@ package fpu_operations;
             FPU_ROUND_MODE_ZERO: round = 1'b0;
         endcase
 
+        if (guard==3'd0) round = 1'b0;
+
         {carry, result} = mantissa + round;
 
         if(carry) begin

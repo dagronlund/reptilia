@@ -14,7 +14,7 @@ package fpu_reference;
 
         fpu_float_conditions_t c;
 
-        c.zero = (a.exponent == 0 || a.mantissa==0);
+        c.zero = (a.exponent == 0 && a.mantissa==0);
         c.norm = (a.exponent!=0);
         c.nan = (a==FPU_FLOAT_NAN);
         c.inf = (a==FPU_FLOAT_POS_INF || a==FPU_FLOAT_NEG_INF);
@@ -437,6 +437,45 @@ package fpu_reference;
 
     endfunction
 
+    function fpu_float_fields_t FPU(
+        input  logic [31:0] a, b,
+        input  logic [2:0] op,
+        input  logic [1:0] mode
+    );
+
+        fpu_float_fields_t fpu_a, fpu_b, y;
+
+        case(op)
+        3'd0: begin
+            fpu_a = fpu_encode_float(a);
+            fpu_b = fpu_encode_float(b);
+            y = fpu_reference_float_add(fpu_a, fpu_b, mode);
+            end
+        3'd1: begin
+            fpu_a = fpu_encode_float(a);
+            fpu_b = fpu_encode_float({~b[31], b[30:0]});
+            y = fpu_reference_float_add(fpu_a, fpu_b, mode);
+            end
+        3'd2: begin
+            fpu_a = fpu_encode_float(a);
+            fpu_b = fpu_encode_float(b);
+            y = fpu_reference_float_mult(fpu_a, fpu_b, mode);
+            end
+        3'd3: begin
+            fpu_a = fpu_encode_float(a);
+            fpu_b = fpu_encode_float(b);
+            y = fpu_reference_float_div(fpu_a, fpu_b, mode);
+            end
+        3'd4: begin
+            fpu_a = fpu_encode_float(a);
+            fpu_b = fpu_encode_float(b);
+            y = fpu_reference_float_sqrt(fpu_a, mode);
+            end
+    endcase
+  
+    return y;
+
+endfunction
 // <<<<<<< HEAD
 //     function automatic fpu_float_fields_t fpu_reference_float_round(
 //         input fpu_round_mode_t round_mode,
