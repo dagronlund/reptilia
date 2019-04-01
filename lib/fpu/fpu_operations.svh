@@ -89,9 +89,9 @@ package fpu_operations;
         {carry, result} = mantissa + round;
 
         if(carry) begin
-            sticky = get_sticky_bit_27(result, 5'd1);
+            //sticky = get_sticky_bit_27(result, 5'd1);
             result = result >> 1;
-            result[0] |= sticky;
+            //result[0] |= sticky;
             if(exp >= 254) exp = 255;
             else exp += 1;
         end
