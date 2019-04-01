@@ -546,8 +546,11 @@ module gecko_decode
 
         state_transition = get_state_transition(next_state, 
                 instruction_fields,
-                reset_counter, speculative_counter,
-                inst_cmd_in.jump_flag, jump_flag + update_jump_flag,
+                reset_counter,
+                // Early check for incoming speculative result
+                speculative_counter + (writeback_result.valid && writeback_result.ready && writeback_in.speculative),
+                inst_cmd_in.jump_flag, 
+                jump_flag + update_jump_flag,
                 reg_file_ready);
         opcode_status = get_opcode_status(instruction_fields);
 

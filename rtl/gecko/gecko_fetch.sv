@@ -17,7 +17,7 @@ module gecko_fetch
 #(
     parameter gecko_pc_t START_ADDR = 'b0,
     // How big is the branch-prediction table
-    parameter int BRANCH_ADDR_WIDTH = 7
+    parameter int BRANCH_ADDR_WIDTH = 5
 )(
     input logic clk, rst,
 
@@ -98,11 +98,9 @@ module gecko_fetch
 
     always_ff @(posedge clk) begin
         if (rst) begin
-            instruction_command.payload <= '{
-                pc: (START_ADDR-4),
-                next_pc: (START_ADDR),
-                default: 'b0
-            };
+            instruction_command.payload.pc <= (START_ADDR-4);
+            instruction_command.payload.jump_flag <= 'b0;
+            instruction_command.payload.prediction <= '{default: 'b0};
         end else begin
             instruction_command.payload.pc <= next_inst_cmd.pc;
             instruction_command.payload.jump_flag <= next_inst_cmd.jump_flag;
