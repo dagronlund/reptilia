@@ -212,6 +212,7 @@ package fpu_reference;
           sig_product = sig_product >> 1;
         end
 
+        if (sig_product[19:0]!=0) sig_product[20] = 1'd1;
         // TODO: make rounding function
         y = FPU_round(sig_product[46:23], expY_ex[7:0], sig_product[22:20], sign, mode);
 
@@ -250,7 +251,7 @@ package fpu_reference;
         //fpu_float_quotient_t div_result;
         fpu_float_fields_t y;
 
-        logic exp_neg, sign, overflow, underflow;
+        logic exp_neg, sign, overflow, underflow, sticky;
         logic [5:0] leading_zeros; 
         logic [8:0] exponent, diff;
         logic [50:0] div_result;
@@ -284,7 +285,9 @@ package fpu_reference;
         leading_zeros = get_leading_zeros_47(div_result[50:3]);
         diff = 23 - leading_zeros;
         if (leading_zeros < 24) begin
-          div_result = div_result >> diff;
+            sticky = get_sticky_bit_27(div_result[26:0], diff);
+            div_result = div_result >> diff;
+            div_result[0] |= sticky;
           if (diff >= 255-exponent && !exp_neg) overflow = 1;
           else begin
             if (exp_neg) exponent -= diff - 1; 
@@ -531,63 +534,6 @@ function logic [31:0] float2int(
     return result;
 endfunction
 
-
-
-
-// <<<<<<< HEAD
-//     function automatic fpu_float_fields_t fpu_reference_float_round(
-//         input fpu_round_mode_t round_mode,
-//         input fpu_guard_bits_t guard_bits,
-//         input fpu_float_fields_t number
-//     );
-//         logic enable_rounding, denormalized, rounded_carry;
-//         fpu_float_mantissa_complete_t full_mantissa, rounded_mantissa;
-
-//         // Find normalized/denormalized mantissa and try rounding up
-//         denormalized = (number.exponent == 8'h00);
-//         full_mantissa = {~denormalized, number.mantissa};
-//         {rounded_carry, rounded_mantissa} = full_mantissa + 'b1;
-
-//         // Decide to round up based on different rounding modes
-//         if (guard_bits == 3'b100) begin
-//             case (round_mode)
-//             FPU_ROUND_MODE_EVEN: enable_rounding = number.mantissa[0];
-//             FPU_ROUND_MODE_DOWN: enable_rounding = 'b0;
-//             FPU_ROUND_MODE_UP:   enable_rounding = 'b1;
-//             FPU_ROUND_MODE_ZERO: enable_rounding = number.sign;
-//             endcase
-//         end else if (guard_bits[2] == 1'b1) begin // Round up
-//             enable_rounding = 'b1;
-//         end else begin // Round down
-//             enable_rounding = 'b0;
-//         end
-
-//         // Modify results if rounding overflowed
-//         if (enable_rounding) begin
-//             if (denormalized) begin
-//                 number.mantissa = rounded_mantissa[22:0];
-//                 if (rounded_mantissa[23]) begin // Overflow
-//                     number.exponent += 1;
-//                 end
-//             end else begin
-//                 if (rounded_carry) begin // Overflow
-//                     number.exponent += 1;
-//                     if (number.exponent == 8'hFF) begin // Overflow into infinity
-//                         number.mantissa = 23'b0;
-//                     end else begin
-//                         number.mantissa = rounded_mantissa[23:1];
-//                     end
-//                 end else begin
-//                     number.mantissa = rounded_mantissa[22:0];
-//                 end
-//             end
-//         end
-
-//         return number;
-//     endfunction
-
-// =======
-// >>>>>>> 23eeb96fdf2141f096fe48256346e1faf14329b6
 endpackage
 
 `endif
