@@ -36,9 +36,9 @@ module gecko_core
     `STATIC_ASSERT($size(data_request.addr) == 32)
     `STATIC_ASSERT($size(data_result.data) == 32)
 
-    std_stream_intf #(.T(gecko_jump_command_t)) jump_command (.clk, .rst);
-    std_stream_intf #(.T(gecko_branch_signal_t)) branch_signal (.clk, .rst);
-    std_stream_intf #(.T(gecko_branch_command_t)) branch_command (.clk, .rst);
+    std_stream_intf #(.T(gecko_jump_operation_t)) jump_command (.clk, .rst);
+    // std_stream_intf #(.T(gecko_branch_signal_t)) branch_signal (.clk, .rst);
+    // std_stream_intf #(.T(gecko_branch_command_t)) branch_command (.clk, .rst);
 
     std_stream_intf #(.T(gecko_execute_operation_t)) execute_command (.clk, .rst);
     std_stream_intf #(.T(gecko_system_operation_t)) system_command (.clk, .rst);
@@ -73,7 +73,6 @@ module gecko_core
         .clk, .rst,
 
         .jump_command,
-        .branch_command,
 
         .instruction_command(instruction_command_in),
         .instruction_request(inst_request)
@@ -100,10 +99,8 @@ module gecko_core
 
         .jump_command,
 
-        .branch_signal,
         .writeback_result,
 
-        // Forwarded results have to be ordered from first to last in the pipeline order
         .forwarded_results('{execute_forwarded, memory_forwarded, writeback_forwarded}),
 
         .faulted_flag, .finished_flag, .retired_instructions
@@ -120,7 +117,7 @@ module gecko_core
 
         .execute_result,
 
-        .branch_command, .branch_signal
+        .jump_command
     );
 
     std_stream_stage #(

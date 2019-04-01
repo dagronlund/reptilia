@@ -21,55 +21,15 @@ package gecko;
     typedef logic [2:0] gecko_reg_status_t;
     typedef logic [3:0] gecko_speculative_count_t;
     typedef logic [4:0] gecko_retired_count_t;
+    typedef logic [7:0] gecko_prediction_history_t;
 
     parameter gecko_reg_status_t GECKO_REG_STATUS_VALID = 'b0;
     parameter gecko_reg_status_t GECKO_REG_STATUS_FULL = (-1);
-
-    typedef struct packed {
-        rv32_reg_value_t rs1_value;
-        rv32_reg_value_t rs2_value;
-        rv32_reg_addr_t rd_addr;
-    } gecko_reg_command_t;
-
-    typedef struct packed {
-        rv32_reg_value_t rd_value;
-        rv32_reg_addr_t rd_addr;
-        gecko_jump_flag_t jump_flag;
-    } gecko_reg_result_t;
-
-    typedef logic [4:0] gecko_shift_amount_t;
-
-    typedef enum logic [2:0] {
-        GECKO_SHIFT_STRIDE_1 = 'h0,
-        GECKO_SHIFT_STRIDE_2 = 'h1,
-        GECKO_SHIFT_STRIDE_4 = 'h2,
-        GECKO_SHIFT_STRIDE_8 = 'h3,
-        GECKO_SHIFT_STRIDE_16 = 'h4,
-        GECKO_SHIFT_STRIDE_UNDEF = 'hX
-    } gecko_shift_stride_t;
-
-    typedef enum logic [1:0] {
-        GECKO_SHIFT_LL = 'h0, // Left Logical
-        GECKO_SHIFT_RL = 'h1, // Right Logical
-        GECKO_SHIFT_RA = 'h2, // Right Arithmetic
-        GECKO_SHIFT_UNDEF = 'hX
-    } gecko_shift_type_t;
-
-    typedef struct packed {
-        gecko_shift_type_t shift_type;
-        gecko_shift_amount_t shift;
-        gecko_shift_stride_t stride;
-    } gecko_shift_command_t;
 
     typedef enum logic {
         GECKO_NORMAL = 'h0,
         GECKO_ALTERNATE = 'h1
     } gecko_alternate_t;
-
-    typedef struct packed {
-        rv32i_funct3_ir_t op;
-        gecko_alternate_t alt;
-    } gecko_math_command_t;
 
     typedef struct packed {
         rv32_reg_value_t add_sub_result;
@@ -93,6 +53,11 @@ package gecko;
         gecko_store_mask_t mask;
     } gecko_store_result_t;
 
+    typedef struct packed {
+        logic miss;
+        gecko_prediction_history_t history;
+    } gecko_prediction_t;
+
     /*************************************************************************
      * Internal Gecko Stream Datatypes                                       *
      *************************************************************************/
@@ -112,22 +77,14 @@ package gecko;
     } gecko_forwarded_t;
 
     typedef struct packed {
-        rv32_reg_value_t base_addr;
-        rv32_reg_value_t relative_addr;
-    } gecko_jump_command_t;
+        logic update_pc, branched, jumped;
+        gecko_pc_t current_pc, actual_next_pc;
+        gecko_prediction_t prediction;
+    } gecko_jump_operation_t;
 
     typedef struct packed {
-        logic branch;
-        rv32_reg_value_t base_addr;
-        rv32_reg_value_t relative_addr;
-    } gecko_branch_command_t;
-
-    typedef struct packed {
-        logic branch;
-    } gecko_branch_signal_t;
-
-    typedef struct packed {
-        gecko_pc_t pc;
+        gecko_pc_t pc, next_pc;
+        gecko_prediction_t prediction;
         gecko_jump_flag_t jump_flag;
     } gecko_instruction_operation_t;
 
@@ -147,11 +104,13 @@ package gecko;
         rv32_funct12_t csr;
     } gecko_system_operation_t;
 
-    typedef enum logic [1:0] {
-        GECKO_EXECUTE_TYPE_EXECUTE = 2'b00,
-        GECKO_EXECUTE_TYPE_LOAD = 2'b01,
-        GECKO_EXECUTE_TYPE_STORE = 2'b10,
-        GECKO_EXECUTE_TYPE_BRANCH = 2'b11
+    typedef enum logic [2:0] {
+        GECKO_EXECUTE_TYPE_EXECUTE = 3'b000,
+        GECKO_EXECUTE_TYPE_LOAD = 3'b001,
+        GECKO_EXECUTE_TYPE_STORE = 3'b010,
+        GECKO_EXECUTE_TYPE_BRANCH = 3'b011,
+        GECKO_EXECUTE_TYPE_JUMP = 3'b100,
+        GECKO_EXECUTE_TYPE_UNDEF = 3'bXXX
     } gecko_execute_type_t;
 
     typedef struct packed {
@@ -163,10 +122,11 @@ package gecko;
         rv32i_funct3_t op;
         gecko_alternate_t alu_alternate;
 
-        logic reuse_rs1, reuse_rs2, reuse_mem;
-        rv32_reg_value_t rs1_value, rs2_value, mem_value;
+        logic reuse_rs1, reuse_rs2, reuse_mem, reuse_jump;
+        rv32_reg_value_t rs1_value, rs2_value, mem_value, jump_value;
         rv32_reg_value_t immediate_value;
-        rv32_reg_value_t pc;
+        rv32_reg_value_t current_pc, next_pc;
+        gecko_prediction_t prediction;
     } gecko_execute_operation_t;
 
     /*************************************************************************
@@ -232,6 +192,21 @@ package gecko;
         return math_result;
     endfunction
 
+    function automatic logic gecko_evaluate_branch(
+            input gecko_math_result_t result,
+            input rv32i_funct3_t op
+    );
+        case (op.b)
+        RV32I_FUNCT3_B_BEQ: return result.eq;
+        RV32I_FUNCT3_B_BNE: return !result.eq;
+        RV32I_FUNCT3_B_BLT: return result.lt;
+        RV32I_FUNCT3_B_BGE: return !result.lt;
+        RV32I_FUNCT3_B_BLTU: return result.ltu;
+        RV32I_FUNCT3_B_BGEU: return !result.ltu;
+        default: return 'b0;
+        endcase
+    endfunction
+
     function automatic gecko_store_result_t gecko_get_store_result(
         input rv32_reg_value_t value,
         input gecko_byte_offset_t byte_offset,
@@ -291,6 +266,30 @@ package gecko;
     /*************************************************************************
      * Gecko Shift Helper Functions                                          *
      *************************************************************************/    
+
+    typedef logic [4:0] gecko_shift_amount_t;
+
+    typedef enum logic [2:0] {
+        GECKO_SHIFT_STRIDE_1 = 'h0,
+        GECKO_SHIFT_STRIDE_2 = 'h1,
+        GECKO_SHIFT_STRIDE_4 = 'h2,
+        GECKO_SHIFT_STRIDE_8 = 'h3,
+        GECKO_SHIFT_STRIDE_16 = 'h4,
+        GECKO_SHIFT_STRIDE_UNDEF = 'hX
+    } gecko_shift_stride_t;
+
+    typedef enum logic [1:0] {
+        GECKO_SHIFT_LL = 'h0, // Left Logical
+        GECKO_SHIFT_RL = 'h1, // Right Logical
+        GECKO_SHIFT_RA = 'h2, // Right Arithmetic
+        GECKO_SHIFT_UNDEF = 'hX
+    } gecko_shift_type_t;
+
+    typedef struct packed {
+        gecko_shift_type_t shift_type;
+        gecko_shift_amount_t shift;
+        gecko_shift_stride_t stride;
+    } gecko_shift_command_t;
 
     function automatic rv32_reg_value_t gecko_reverse_bits(
         input rv32_reg_value_t value

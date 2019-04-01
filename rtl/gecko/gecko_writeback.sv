@@ -90,7 +90,7 @@ module gecko_writeback
         .DATA_WIDTH(GECKO_REG_STATUS_WIDTH),
         .ADDR_WIDTH($size(rv32_reg_addr_t)),
         .READ_PORTS(3)
-    ) register_file_inst (
+    ) register_status_counters_inst (
         .clk, .rst,
 
         // Always write to all bits in register, gate with state clock enable
@@ -195,13 +195,13 @@ module gecko_writeback
         next_writeback_result = execute_operation;
         if (consume_execute) begin
             next_writeback_result = execute_operation;
-            next_state = GECKO_WRITEBACK_MEM; 
+            // next_state = GECKO_WRITEBACK_MEM; 
         end else if (consume_mem) begin
             next_writeback_result = mem_operation;
-            next_state = GECKO_WRITEBACK_SYSTEM;
+            // next_state = GECKO_WRITEBACK_SYSTEM;
         end else if (consume_system) begin
             next_writeback_result = system_operation;
-            next_state = GECKO_WRITEBACK_EXECUTE;
+            // next_state = GECKO_WRITEBACK_EXECUTE;
         end
 
         // Update local register file status

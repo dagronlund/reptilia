@@ -26,12 +26,6 @@
  *
  * Speculative Counter: (Configurable Width)
  *      A counter for how many instructions were issued while in the speculative state
- * 
- * Register File Flag: (2 bits per register)
- *      VALID - Register contents are valid
- *      INVALID - Register contents are invalid and exist 
- *      INVALID_EXECUTE(1-2) - Register contents are invalid, but one or two
- *          instructions were sent to execute that will write to this register
  *
  * While in the speculative state, the jump counter cannot be incremented until
  * the branch is indicated that it was resolved. Only instructions with
@@ -64,10 +58,8 @@ module gecko_decode
     std_stream_intf.out system_command, // gecko_system_operation_t
     std_stream_intf.out execute_command, // gecko_execute_operation_t
 
-    std_stream_intf.out jump_command, // gecko_jump_command_t
-
     // Non-flow Controlled
-    std_stream_intf.in branch_signal, // gecko_branch_signal_t
+    std_stream_intf.in jump_command, // gecko_jump_operation_t
     std_stream_intf.in writeback_result, // gecko_operation_t
 
     // Vivado does not like zero-width arrays
@@ -87,42 +79,133 @@ module gecko_decode
         GECKO_DECODE_UNDEF = 3'bXXX
     } gecko_decode_state_t;
 
+    typedef struct packed {
+        logic consume_instruction, flush_instruction;
+        gecko_decode_state_t next_state;
+    } gecko_decode_state_transition_t;
+
+    function automatic gecko_decode_state_transition_t get_state_transition(
+            input gecko_decode_state_t current_state,
+            input rv32_fields_t instruction_fields,
+            input rv32_reg_addr_t current_reset_counter,
+            input gecko_speculative_count_t current_speculative_counter,
+            input gecko_jump_flag_t instruction_jump_flag, current_jump_flag,
+            input logic reg_file_ready
+    );
+        gecko_decode_state_transition_t result = '{
+                next_state: current_state,
+                consume_instruction: 'b0,
+                flush_instruction: 'b0
+        };
+        case (current_state)
+        GECKO_DECODE_RESET: begin
+            if (current_reset_counter == 'd31) begin
+                result.next_state = GECKO_DECODE_NORMAL;
+            end
+        end
+        GECKO_DECODE_NORMAL, GECKO_DECODE_MISPREDICTED, GECKO_DECODE_SPECULATIVE: begin
+            if (instruction_jump_flag != current_jump_flag) begin
+                result.consume_instruction = 'b1;
+                result.flush_instruction = 'b1;
+            end else if (reg_file_ready) begin
+                // Make sure speculative counter still has room
+                if (current_state == GECKO_DECODE_SPECULATIVE && 
+                        (current_speculative_counter != -1)) begin
+                    result.consume_instruction = !is_opcode_side_effects(instruction_fields);
+                end else if (is_opcode_control_flow(instruction_fields)) begin
+                    // Would not be true if mispredicted
+                    if (current_speculative_counter == 'b0) begin
+                        result.consume_instruction = 'b1;
+                        result.next_state = GECKO_DECODE_SPECULATIVE;
+                    end
+                end else begin
+                    result.consume_instruction = 'b1;
+                end
+            end
+        end
+        GECKO_DECODE_UNDEF: begin
+            result.next_state = GECKO_DECODE_RESET;
+        end
+        endcase
+        return result;
+    endfunction
+
+    function automatic rv32_reg_addr_t update_execute_saved(
+            input rv32_fields_t instruction_fields,
+            input rv32_reg_addr_t current_execute_saved
+    );
+        case (rv32i_opcode_t'(instruction_fields.opcode))
+        RV32I_OPCODE_OP, RV32I_OPCODE_IMM, 
+        RV32I_OPCODE_LUI, RV32I_OPCODE_AUIPC,
+        RV32I_OPCODE_JAL, RV32I_OPCODE_JALR: begin
+            // Execute has new result
+            return instruction_fields.rd;
+        end
+        RV32I_OPCODE_LOAD: begin
+            // Execute result superceded
+            if (current_execute_saved == instruction_fields.rd) begin
+                return 'b0;
+            end
+        end
+        RV32I_OPCODE_SYSTEM: begin
+            case (rv32i_funct3_sys_t'(instruction_fields.funct3))
+            RV32I_FUNCT3_SYS_CSRRW, RV32I_FUNCT3_SYS_CSRRS, 
+            RV32I_FUNCT3_SYS_CSRRC, RV32I_FUNCT3_SYS_CSRRWI, 
+            RV32I_FUNCT3_SYS_CSRRSI, RV32I_FUNCT3_SYS_CSRRCI: begin
+                // Execute result superceded
+                if (current_execute_saved == instruction_fields.rd) begin
+                    return 'b0;
+                end
+            end
+            endcase
+        end
+        endcase
+        return current_execute_saved;
+    endfunction
+
     logic consume_instruction;
-    logic produce_jump, produce_system, produce_execute;
-    logic enable, enable_jump, enable_system, enable_execute;
+    logic produce_system, produce_execute;
+    logic enable, enable_system, enable_execute;
 
     // Flow Controller
     std_flow #(
         .NUM_INPUTS(2),
-        .NUM_OUTPUTS(3)
+        .NUM_OUTPUTS(2)
     ) std_flow_inst (
         .clk, .rst,
 
         .valid_input({instruction_result.valid, instruction_command.valid}),
         .ready_input({instruction_result.ready, instruction_command.ready}),
 
-        .valid_output({jump_command.valid, system_command.valid, execute_command.valid}),
-        .ready_output({jump_command.ready, system_command.ready, execute_command.ready}),
+        .valid_output({system_command.valid, execute_command.valid}),
+        .ready_output({system_command.ready, execute_command.ready}),
 
         .consume({consume_instruction, consume_instruction}),
-        .produce({produce_jump, produce_system, produce_execute}),
+        .produce({produce_system, produce_execute}),
 
         .enable,
-        .enable_output({enable_jump, enable_system, enable_execute})
+        .enable_output({enable_system, enable_execute})
     );
 
+    logic next_state_speculative_to_normal, 
+            next_state_speculative_to_mispredicted,
+            next_state_to_normal;
     gecko_decode_state_t state, next_state;
     rv32_reg_addr_t reset_counter, next_reset_counter;
-    gecko_jump_flag_t jump_flag, next_jump_flag;
+    logic update_jump_flag;
+    gecko_jump_flag_t jump_flag;
     gecko_speculative_count_t speculative_counter, next_speculative_counter;
+    logic clear_speculative_retired_counter;
     gecko_speculative_count_t speculative_retired_counter, next_speculative_retired_counter;
     gecko_decode_reg_file_status_t reg_file_status, next_reg_file_status;
     gecko_decode_reg_file_status_t reg_file_counter, next_reg_file_counter; // TODO: Replace with RAM
+    logic clear_execute_saved;
     rv32_reg_addr_t execute_saved, next_execute_saved;
 
     gecko_system_operation_t next_system_command; 
     gecko_execute_operation_t next_execute_command;
-    gecko_jump_command_t next_jump_command; 
+    logic normal_resolved_instruction;
+    gecko_speculative_count_t speculation_resolved_instructions;
 
 `ifdef __SIMULATION__
 
@@ -140,6 +223,9 @@ module gecko_decode
     debug_signals_t debug_signals;
     logic [31:0] debug_register_pending_counter;
 
+    logic flushing_inst;
+    logic [31:0] flushing_inst_counter;
+
     logic simulation_ecall;
     logic simulation_write_char;
     logic [7:0] simulation_char;
@@ -148,15 +234,27 @@ module gecko_decode
     rv32_reg_value_t debug_counter;
     rv32_reg_value_t debug_full_counter;
 
+    logic execute_stalled;
+    logic [31:0] execute_stalled_counter;
+
+    logic instruction_type_stalled;
+    logic [31:0] instruction_type_stalled_counter;
+
     initial begin
         debug_register_pending_counter = 'b0;
+        flushing_inst_counter = 'b0;
+        execute_stalled_counter = 'b0;
+        instruction_type_stalled_counter = 'b0;
         file = $fopen("log.txt", "w");
         $display("Opened file");
         @ (posedge clk);
         while (1) begin
             debug_counter <= debug_counter + 1;
+            flushing_inst_counter <= flushing_inst_counter + flushing_inst;
             debug_full_counter <= debug_full_counter + debug_signals.register_full;
             debug_register_pending_counter <= debug_register_pending_counter + debug_signals.register_pending;
+            execute_stalled_counter <= execute_stalled_counter + execute_stalled;
+            instruction_type_stalled_counter <= instruction_type_stalled_counter + instruction_type_stalled;
             if (simulation_write_char) begin
                 $fwrite(file, "%c", simulation_char);
             end
@@ -185,30 +283,53 @@ module gecko_decode
         if(rst) begin
             state <= GECKO_DECODE_RESET;
             reset_counter <= 'b0;
-            jump_flag <= 'b0;
             speculative_counter <= 'b0;
-            speculative_retired_counter <= 'b0;
             reg_file_status = '{32{GECKO_REG_STATUS_VALID}};
-            reg_file_counter = '{32{GECKO_REG_STATUS_VALID}};
-            execute_saved <= 'b0;
+            retired_instructions <= 'b0;
         end else begin
-            state <= next_state;
+            if (enable) begin
+                state <= next_state;
+            end else if (state == GECKO_DECODE_SPECULATIVE) begin
+                if (next_state_speculative_to_normal) state <= GECKO_DECODE_NORMAL;
+                if (next_state_speculative_to_mispredicted) state <= GECKO_DECODE_MISPREDICTED;
+            end
+            if (next_state_to_normal) state <= GECKO_DECODE_NORMAL;
             reset_counter <= next_reset_counter;
-            jump_flag <= next_jump_flag;
             speculative_counter <= next_speculative_counter;
-            speculative_retired_counter <= next_speculative_retired_counter;
             reg_file_status <= next_reg_file_status;
+            retired_instructions <= speculation_resolved_instructions + 
+                    (enable && normal_resolved_instruction);
+        end
+        
+        if (rst) begin
+            jump_flag <= 'b0;
+        end else if (update_jump_flag) begin
+            jump_flag <= jump_flag + 'b1;
+        end
+
+        if (rst || clear_speculative_retired_counter) begin
+            speculative_retired_counter <= 'b0;
+        end else if (enable) begin
+            speculative_retired_counter <= next_speculative_retired_counter;
+        end
+
+        if (rst) begin
+            reg_file_counter = '{32{GECKO_REG_STATUS_VALID}};
+        end else if (enable) begin
             reg_file_counter <= next_reg_file_counter;
+        end
+
+        if (rst || clear_execute_saved) begin
+            execute_saved <= 'b0;
+        end else if (enable) begin
             execute_saved <= next_execute_saved;
         end
+        
         if (enable_system) begin
             system_command.payload <= next_system_command;
         end
         if (enable_execute) begin
             execute_command.payload <= next_execute_command;
-        end
-        if (enable_jump) begin
-            jump_command.payload <= next_jump_command;
         end
     end
 
@@ -235,42 +356,89 @@ module gecko_decode
         .read_data_out('{register_read_value0, register_read_value1})
     );
 
+    gecko_decode_state_transition_t state_transition;
     always_comb begin
-        automatic logic send_operation, enable_write_rd, reg_file_ready, reg_file_clear;
+        automatic gecko_instruction_operation_t inst_cmd_in;
+        automatic gecko_jump_operation_t jump_cmd_in;
+        automatic gecko_operation_t writeback_in;
+
         automatic gecko_decode_operands_status_t operands_status;
         automatic gecko_reg_status_t forwarded_status_plus;
         automatic rv32_reg_value_t rs1_value, rs2_value;
         automatic gecko_reg_status_t rd_status, rd_counter;
-        automatic gecko_instruction_operation_t inst_cmd_in;
-        automatic gecko_operation_t writeback_in;
-        automatic gecko_branch_signal_t branch_cmd_in;
         automatic rv32_fields_t instruction_fields;
-        // automatic gecko_decode_require_t instruction_requirements;
 
-        branch_cmd_in = gecko_branch_signal_t'(branch_signal.payload);
+        automatic logic send_operation, reg_file_ready, reg_file_clear;
+        automatic logic decode_stop, decode_error;
+        // automatic gecko_decode_state_transition_t state_transition;
+        automatic gecko_decode_opcode_status_t opcode_status;
+
+        // Reassign payloads to typed values
+        jump_cmd_in = gecko_jump_operation_t'(jump_command.payload);
         inst_cmd_in = gecko_instruction_operation_t'(instruction_command.payload);
         writeback_in = gecko_operation_t'(writeback_result.payload);
         instruction_fields = rv32_get_fields(instruction_result.data);
 
-        branch_signal.ready = 'b1;
+        // Assign next values to defaults
+        next_state = state;
+        next_reset_counter = reset_counter + 'b1;
+        next_speculative_counter = speculative_counter;
+        next_speculative_retired_counter = speculative_retired_counter;
+        next_reg_file_status = reg_file_status;
+        next_reg_file_counter = reg_file_counter;
+        next_execute_saved = execute_saved;
+        // next_retired_instructions = 'b0;
 
-        faulted_flag = 'b0;
-        finished_flag = 'b0;
-        retired_instructions = 'b0;
+        // Assign internal flags to defaults
+        decode_error = 'b0;
+        decode_stop = 'b0;
+        normal_resolved_instruction = 'b0;
+        consume_instruction = 'b0;
+        produce_execute = 'b0;
+        produce_system = 'b0;
 
+        // Handle clearing register file by default
+        register_write_enable = (state == GECKO_DECODE_RESET);
+        register_write_addr = reset_counter;
+        register_write_value = 'b0;
+
+        // Determine various external flags
+        reg_file_clear = 'b1;
+        for (int i = 0; i < 32; i++) begin
+            reg_file_clear &= (reg_file_status[i[4:0]] == GECKO_REG_STATUS_VALID);
+        end
+        faulted_flag = (state == GECKO_DECODE_FAULT);
+        finished_flag = reg_file_clear && 
+                (state == GECKO_DECODE_HALT || state == GECKO_DECODE_FAULT);
+
+        // Handle incoming branch signals earlier than other logic
+        next_state_speculative_to_normal = 'b0;
+        next_state_speculative_to_mispredicted = 'b0;
+        clear_execute_saved = 'b0;
+        clear_speculative_retired_counter = 'b0;
+        speculation_resolved_instructions = 'b0;
+        update_jump_flag = 'b0;
+        if (jump_command.valid && jump_command.ready) begin
+            if (jump_cmd_in.update_pc) begin // Mispredicted
+                next_state_speculative_to_mispredicted = 'b1;
+                if (next_state == GECKO_DECODE_SPECULATIVE) next_state = GECKO_DECODE_MISPREDICTED;
+                update_jump_flag = 'b1;
+                clear_execute_saved = 'b1;
+                next_execute_saved = 'b0;
+            end else begin // Predicted Correctly
+                next_state_speculative_to_normal = 'b1;
+                if (next_state == GECKO_DECODE_SPECULATIVE) next_state = GECKO_DECODE_NORMAL;
+                speculation_resolved_instructions = next_speculative_retired_counter;
+            end
+            clear_speculative_retired_counter = 'b1;
+        end
+        
         // Halt incoming speculative writes until speculation resolved
-        if (state == GECKO_DECODE_SPECULATIVE) begin
-            writeback_result.ready = !writeback_in.speculative && writeback_result.valid;
+        if (next_state == GECKO_DECODE_SPECULATIVE) begin
+            writeback_result.ready = !writeback_in.speculative;
         end else begin
             writeback_result.ready = 'b1;
         end
-
-        send_operation = 'b0;
-
-        consume_instruction = 'b0;
-        produce_jump = 'b0;
-        produce_execute = 'b0;
-        produce_system = 'b0;
 
 `ifdef __SIMULATION__
         if (instruction_fields.opcode == RV32I_OPCODE_SYSTEM && 
@@ -283,7 +451,7 @@ module gecko_decode
 
         // Get the status of the current register file
         operands_status = gecko_decode_find_operand_status(instruction_fields, 
-                execute_saved, reg_file_status);
+                next_execute_saved, reg_file_status);
 
         // Set register file addresses
         register_read_addr0 = instruction_fields.rs1;
@@ -293,8 +461,9 @@ module gecko_decode
         rs1_value = register_read_value0;
         rs2_value = register_read_value1;
 
+        // Find forwarded results
         for (int i = 0; i < NUM_FORWARDED; i++) begin
-            if (forwarded_results[i].valid && (state == GECKO_DECODE_NORMAL || 
+            if (forwarded_results[i].valid && (next_state == GECKO_DECODE_NORMAL || 
                     !forwarded_results[i].speculative)) begin
 
                 forwarded_status_plus = forwarded_results[i].reg_status + 'b1;
@@ -317,28 +486,31 @@ module gecko_decode
             end
         end
 
-        reg_file_ready = operands_status.rs1_valid && operands_status.rs2_valid && 
+        reg_file_ready = operands_status.rs1_valid && 
+                operands_status.rs2_valid && 
                 operands_status.rd_valid;
 
         // Build commands
-        next_execute_command = create_execute_op(instruction_fields, execute_saved, 
+        next_execute_command = create_execute_op(instruction_fields, next_execute_saved, 
                                                  rs1_value, rs2_value, inst_cmd_in.pc);
-        next_system_command = create_system_op(instruction_fields, execute_saved, 
-                                               rs1_value, rs2_value);
-        next_jump_command = create_jump_op(instruction_fields, execute_saved, 
-                                           rs1_value, rs2_value, inst_cmd_in.pc);
         next_execute_command.reg_status = reg_file_counter[instruction_fields.rd];
-        next_system_command.reg_status = reg_file_counter[instruction_fields.rd];
+        next_execute_command.prediction = inst_cmd_in.prediction;
+        next_execute_command.next_pc = inst_cmd_in.next_pc;
+        next_execute_command.current_pc = inst_cmd_in.pc;
+        // Issue flag if command is speculative
+        next_execute_command.speculative = (next_state == GECKO_DECODE_SPECULATIVE);
 
-        reg_file_clear = 'b1;
-        for (int i = 0; i < 32; i++) begin
-            reg_file_clear &= (reg_file_status[i[4:0]] == GECKO_REG_STATUS_VALID);
-        end
+        next_system_command = create_system_op(instruction_fields, next_execute_saved, 
+                                               rs1_value, rs2_value);
+        next_system_command.reg_status = reg_file_counter[instruction_fields.rd];
 
 `ifdef __SIMULATION__
         simulation_ecall = 'b0;
         simulation_write_char = 'b0;
         simulation_char = 'b0;
+
+        flushing_inst = 'b0;
+        instruction_type_stalled = 'b0;
 
         debug_signals = '{default: 'b0};
         debug_signals.register_pending = !reg_file_ready;
@@ -372,204 +544,79 @@ module gecko_decode
         endcase
 `endif
 
-        register_write_enable = 'b0;
-        register_write_addr = reset_counter;
-        register_write_value = 'b0;
+        state_transition = get_state_transition(next_state, 
+                instruction_fields,
+                reset_counter, speculative_counter,
+                inst_cmd_in.jump_flag, jump_flag + update_jump_flag,
+                reg_file_ready);
+        opcode_status = get_opcode_status(instruction_fields);
 
-        next_state = state;
-        next_reset_counter = reset_counter + 'b1;
-        next_execute_saved = execute_saved;
-        next_jump_flag = jump_flag;
-        next_speculative_counter = speculative_counter;
-        next_speculative_retired_counter = speculative_retired_counter;
-        next_reg_file_status = reg_file_status;
-        next_reg_file_counter = reg_file_counter;
-
-        case (state)
-        GECKO_DECODE_RESET: begin
-            register_write_enable = 'b1;
-            if (reset_counter == 'd31) begin
-                next_state = GECKO_DECODE_NORMAL;
-            end
-        end
-        GECKO_DECODE_NORMAL: begin
-            if (inst_cmd_in.jump_flag != jump_flag) begin
-                consume_instruction = 'b1;
-            end else if (reg_file_ready) begin
-                case (rv32i_opcode_t'(instruction_fields.opcode))
-                RV32I_OPCODE_JAL, RV32I_OPCODE_JALR: begin
-                    consume_instruction = 'b1;
-                    send_operation = 'b1;
-                    next_jump_flag = next_jump_flag + 'b1;
-                end
-                RV32I_OPCODE_BRANCH: begin
-                    if (speculative_counter == 'b0) begin
-                        consume_instruction = 'b1;
-                        send_operation = 'b1;
-                        next_state = GECKO_DECODE_SPECULATIVE;
-                    end
-                end
-                default: begin
-                    consume_instruction = 'b1;
-                    send_operation = 'b1;
-                end
-                endcase
-            end
-        end
-        GECKO_DECODE_SPECULATIVE: begin
-            if (inst_cmd_in.jump_flag != jump_flag) begin
-                consume_instruction = 'b1;
-            end else if (reg_file_ready) begin
-                case (rv32i_opcode_t'(instruction_fields.opcode))
-                RV32I_OPCODE_LOAD, RV32I_OPCODE_STORE, RV32I_OPCODE_SYSTEM, RV32I_OPCODE_FENCE: begin // Side-Effects
-                end
-                RV32I_OPCODE_JAL, RV32I_OPCODE_JALR, RV32I_OPCODE_BRANCH: begin // Jumps
-                end
-                default: begin
-                    consume_instruction = 'b1;
-                    send_operation = 'b1;
-                    next_execute_command.speculative = 'b1;
-                end
-                endcase
-            end
-        end
-        GECKO_DECODE_MISPREDICTED: begin
-            if (inst_cmd_in.jump_flag != jump_flag) begin
-                consume_instruction = 'b1;
-            end else if (reg_file_ready) begin
-                case (rv32i_opcode_t'(instruction_fields.opcode))
-                RV32I_OPCODE_JAL, RV32I_OPCODE_JALR: begin
-                    consume_instruction = 'b1;
-                    send_operation = 'b1;
-                    next_jump_flag = next_jump_flag + 'b1;
-                end
-                RV32I_OPCODE_BRANCH: begin // Can't speculatively branch while cleaning up misprediction 
-                end
-                default: begin
-                    consume_instruction = 'b1;
-                    send_operation = 'b1;
-                end
-                endcase
-            end
-        end
-        GECKO_DECODE_FAULT: begin
-            faulted_flag = 'b1;
-            finished_flag = reg_file_clear;
-        end
-        GECKO_DECODE_HALT: begin
-            finished_flag = reg_file_clear;
-        end
-        GECKO_DECODE_UNDEF: begin
-            next_state = GECKO_DECODE_RESET;
-        end
-        endcase
-
-        enable_write_rd = 'b0;
+        consume_instruction = state_transition.consume_instruction;
+        send_operation = !state_transition.flush_instruction && consume_instruction;
 
         if (send_operation) begin
-            if (state == GECKO_DECODE_SPECULATIVE) begin
+            if (next_state == GECKO_DECODE_SPECULATIVE) begin
                 next_speculative_counter = 
                     next_speculative_counter + (instruction_fields.rd != 'b0);
                 next_speculative_retired_counter = 
                     next_speculative_retired_counter + 'b1;
             end else begin
-                retired_instructions = retired_instructions + 'b1;
+                normal_resolved_instruction = 'b1;
             end
-            
-            case (rv32i_opcode_t'(instruction_fields.opcode))
-            RV32I_OPCODE_OP, RV32I_OPCODE_IMM, RV32I_OPCODE_LUI, RV32I_OPCODE_AUIPC: begin
-                produce_execute = (instruction_fields.rd != 'b0);
-                enable_write_rd = (instruction_fields.rd != 'b0);
-                next_execute_saved = instruction_fields.rd;
-            end
-            RV32I_OPCODE_LOAD: begin // Issue load regardless of going to x0
-                produce_execute = 'b1;
-                enable_write_rd = 'b1;
-                if (execute_saved == instruction_fields.rd) begin
-                    next_execute_saved = 'b0;
-                end
-            end
-            RV32I_OPCODE_STORE: begin
-                produce_execute = 'b1;
-            end
-            RV32I_OPCODE_JAL, RV32I_OPCODE_JALR: begin
-                produce_jump = 'b1;
-                produce_execute = (instruction_fields.rd != 'b0);
-                enable_write_rd = (instruction_fields.rd != 'b0);
-                next_execute_saved = instruction_fields.rd;
-            end
-            RV32I_OPCODE_BRANCH: begin
-                produce_execute = 'b1;
-            end
-            RV32I_OPCODE_SYSTEM: begin
-                case (rv32i_funct3_sys_t'(instruction_fields.funct3))
-                RV32I_FUNCT3_SYS_ENV: begin
+
+            decode_error = opcode_status.error;
+
+            next_execute_saved = update_execute_saved(instruction_fields, next_execute_saved);
+
+            if (instruction_fields.opcode == RV32I_OPCODE_SYSTEM &&
+                    instruction_fields.funct3 == RV32I_FUNCT3_SYS_ENV) begin
 `ifdef __SIMULATION__
-                    case (instruction_fields.funct12)
-                    RV32I_CSR_EBREAK: begin // System Exit
-                        if (register_read_value0 == 0) begin
-                            next_state = GECKO_DECODE_HALT;
-                        end else begin
-                            next_state = GECKO_DECODE_FAULT;
-                        end
-                    end
-                    RV32I_CSR_ECALL: begin // System Call
-                        if (enable) begin
-                            simulation_ecall = 'b1;
-                            if (register_read_value0 == 0) begin
-                                simulation_write_char = 'b1;
-                                simulation_char = register_read_value1[7:0];
-                            end
-                        end
-                    end
-                    default: begin
-                        next_state = GECKO_DECODE_FAULT;
-                    end
-                    endcase
-`else
-                    next_state = GECKO_DECODE_HALT; // Halt if encountered
-`endif
-                end
-                RV32I_FUNCT3_SYS_CSRRW, RV32I_FUNCT3_SYS_CSRRS, 
-                RV32I_FUNCT3_SYS_CSRRC, RV32I_FUNCT3_SYS_CSRRWI, 
-                RV32I_FUNCT3_SYS_CSRRSI, RV32I_FUNCT3_SYS_CSRRCI: begin
-                    produce_system = 'b1;
-                    enable_write_rd = (instruction_fields.rd != 'b0);
-                    if (execute_saved == instruction_fields.rd) begin
-                        next_execute_saved = 'b0;
+                case (instruction_fields.funct12)
+                RV32I_CSR_EBREAK: begin // System Exit
+                    if (rs1_value == 0) begin
+                        decode_stop = 'b1;
+                    end else begin
+                        decode_error = 'b1;
                     end
                 end
-                default: begin
-                    next_state = GECKO_DECODE_FAULT;
+                RV32I_CSR_ECALL: begin // System Call
+                    if (enable) begin
+                        simulation_ecall = 'b1;
+                        if (rs1_value == 0) begin
+                            simulation_write_char = 'b1;
+                            simulation_char = rs2_value[7:0];
+                        end
+                    end
                 end
                 endcase
+`else
+                decode_stop = 'b1;
+`endif
             end
-            default: begin
-                next_state = GECKO_DECODE_FAULT;
-            end
-            endcase
 
-            if (instruction_fields.rd != 'b0 && enable_write_rd) begin
+            if (instruction_fields.rd != 'b0 && does_opcode_writeback(instruction_fields)) begin
                 next_reg_file_status[instruction_fields.rd] += 1;
                 next_reg_file_counter[instruction_fields.rd] += 1;
             end
         end
 
+        produce_execute = opcode_status.execute && send_operation;
+        produce_system = opcode_status.system && send_operation;
+
+        if (decode_stop) next_state = GECKO_DECODE_HALT;
+        else if (decode_error) next_state = GECKO_DECODE_FAULT;
+        else next_state = state_transition.next_state;
+
         // DANGER: Uses the enable signal to prevent state changes from earlier
-        //         which is only needed because of the following interrupts
+        //         which is only needed because of the following asynchronous
+        //         control flow signals
         if (!enable) begin
-            next_state = state;
-            next_reset_counter = reset_counter + 'b1;
-            next_execute_saved = execute_saved;
-            next_jump_flag = jump_flag;
             next_speculative_counter = speculative_counter;
-            next_speculative_retired_counter = speculative_retired_counter;
             next_reg_file_status = reg_file_status;
-            next_reg_file_counter = reg_file_counter;
-            retired_instructions = 'b0;
         end
 
         // Handle writing back to the register file
+        next_state_to_normal = 'b0;
         if (writeback_result.valid && writeback_result.ready) begin
             // Throw away writes to x0 and mispeculated results
             if (writeback_in.addr != 'b0 && !(state == GECKO_DECODE_MISPREDICTED && writeback_in.speculative)) begin
@@ -580,30 +627,14 @@ module gecko_decode
             // Countdown when speculative writeback occurs
             if (writeback_in.speculative) begin
                 next_speculative_counter = next_speculative_counter - 'b1;
-                if (next_speculative_counter == 0) begin
-                    next_state = (state == GECKO_DECODE_MISPREDICTED) ? GECKO_DECODE_NORMAL : next_state;
-                end
             end
             // Validate register regardless of speculative
             next_reg_file_status[writeback_in.addr] -= 1;
         end
 
-        // Handle incoming branch signals
-        if (branch_signal.valid && branch_signal.ready) begin
-            if (branch_cmd_in.branch) begin
-                // Return to normal immediately if no speculative instructions executed
-                if (next_speculative_counter == 0) begin
-                    next_state = (state == GECKO_DECODE_SPECULATIVE) ? GECKO_DECODE_NORMAL : next_state;
-                end else begin
-                    next_state = (state == GECKO_DECODE_SPECULATIVE) ? GECKO_DECODE_MISPREDICTED : next_state;
-                end
-                next_jump_flag = next_jump_flag + 'b1;
-                next_execute_saved = 'b0;
-            end else begin
-                next_state = (state == GECKO_DECODE_SPECULATIVE) ? GECKO_DECODE_NORMAL : next_state;
-                retired_instructions = retired_instructions + next_speculative_retired_counter;
-            end
-            next_speculative_retired_counter = 'b0;
+        // Handle moving out of misprediction on the next_cycle
+        if (state == GECKO_DECODE_MISPREDICTED && next_state == GECKO_DECODE_MISPREDICTED) begin
+            next_state_to_normal = (speculative_counter == 0);
         end
     end
 

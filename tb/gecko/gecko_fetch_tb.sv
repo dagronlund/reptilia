@@ -19,8 +19,7 @@ module gecko_fetch_tb
     logic clk, rst;
     clk_rst_gen clk_rst_gen_inst(.clk, .rst);
 
-    std_stream_intf #(.T(gecko_jump_command_t)) jump_command (.clk, .rst);
-    std_stream_intf #(.T(gecko_branch_command_t)) branch_command (.clk, .rst);
+    std_stream_intf #(.T(gecko_jump_operation_t)) jump_command (.clk, .rst);
     std_stream_intf #(.T(gecko_instruction_operation_t)) instruction_command (.clk, .rst);
 
     std_mem_intf #(
@@ -29,11 +28,14 @@ module gecko_fetch_tb
         .ADDR_BYTE_SHIFTED(1)
     ) instruction_request (.clk, .rst);
 
-    gecko_fetch gecko_fetch_inst(
+    gecko_fetch #(
+        .START_ADDR('b0),
+        .BRANCH_ADDR_WIDTH(5)
+    ) gecko_fetch_inst (
         .clk, .rst,
 
         .jump_command,
-        .branch_command,
+
         .instruction_command,
         .instruction_request
     );
@@ -45,20 +47,39 @@ module gecko_fetch_tb
 
     initial begin
         jump_command.valid = 'b0;
-        branch_command.valid = 'b0;
         instruction_command.ready = 'b0;
         instruction_request.ready = 'b0;
         while (rst) @ (posedge clk);
 
         fork
         begin
-            branch_command.send('{branch: 'b0, relative_addr: 'hFF});
             @ (posedge clk);
-            branch_command.send('{branch: 'b1, relative_addr: 'hFF});
             @ (posedge clk);
-            jump_command.send('{absolute_jump: 'b0, absolute_addr: 'h200, relative_addr: 'hF});
             @ (posedge clk);
-            jump_command.send('{absolute_jump: 'b1, absolute_addr: 'h200, relative_addr: 'hF});
+            @ (posedge clk);
+            jump_command.send('{
+                update_pc: 'b0,
+                branched: 'b1,
+                jumped: 'b0,
+                current_pc: 'b0,
+                actual_next_pc: 'd4,
+                prediction: '{
+                    miss: 'b1,
+                    history: 'd5
+                }
+            });
+            @ (posedge clk);
+            jump_command.send('{
+                update_pc: 'b1,
+                branched: 'b1,
+                jumped: 'b0,
+                current_pc: 'b0,
+                actual_next_pc: 'd4,
+                prediction: '{
+                    miss: 'b0,
+                    history: 'd5
+                }
+            });
         end
         begin
             while (1'b1) begin

@@ -24,7 +24,6 @@ module gecko_system
 );
 
     // Clock counter works for RDCYCLE and RDTIME
-    gecko_retired_count_t retired_instructions_buf;
     logic clock_counter_carry, instruction_counter_carry;
     logic [31:0] clock_counter_partial, instruction_counter_partial;
     logic [63:0] clock_counter, instruction_counter;
@@ -60,12 +59,10 @@ module gecko_system
             instruction_counter_partial <= 'b0;
             clock_counter <= 'b0;
             instruction_counter <= 'b0;
-            retired_instructions_buf <= 'b0;
         end else begin
-            retired_instructions_buf <= retired_instructions;
             // Lower half of addition
             {clock_counter_carry, clock_counter_partial} <= clock_counter_partial + 'b1;
-            {instruction_counter_carry, instruction_counter_partial} <= instruction_counter_partial + retired_instructions_buf;
+            {instruction_counter_carry, instruction_counter_partial} <= instruction_counter_partial + retired_instructions;
             // Upper half of addition (passthrough)
             clock_counter[31:0] <= clock_counter_partial;
             instruction_counter[31:0] <= instruction_counter_partial;

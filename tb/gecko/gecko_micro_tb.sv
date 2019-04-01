@@ -21,7 +21,10 @@ module gecko_micro_tb
 
     logic faulted_flag, finished_flag;
 
-    gecko_micro gecko_micro_inst(
+    gecko_micro #(
+        .INST_LATENCY(1),
+        .DATA_LATENCY(1)
+    ) gecko_micro_inst (
         .clk, .rst,
         .faulted_flag, .finished_flag
     );

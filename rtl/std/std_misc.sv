@@ -270,6 +270,12 @@ module std_distributed_ram #(
     (* ram_style="distributed" *)
     logic [DATA_WIDTH-1:0] data [DATA_LENGTH];
 
+    initial begin
+        for (int i = 0; i < DATA_LENGTH; i++) begin
+            data[i] = 'b0;
+        end
+    end
+
     generate
         genvar k;
         for (k = 0; k < DATA_WIDTH; k++) begin
