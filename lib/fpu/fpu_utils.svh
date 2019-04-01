@@ -3,7 +3,7 @@
 
 package fpu_utils;
 
-    function automatic logic get_sticky_27(
+    function automatic logic get_sticky_bit_27(
         input logic [26:0] num,
         input logic [4:0] shift_amount
     );
