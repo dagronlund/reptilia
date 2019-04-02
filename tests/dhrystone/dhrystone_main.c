@@ -78,7 +78,7 @@ int dhrystone_main()
   REG   int             Number_Of_Runs;
 
   /* Arguments */
-  Number_Of_Runs = 5; // NUMBER_OF_RUNS;
+  Number_Of_Runs = NUMBER_OF_RUNS;
 
   /* Initializations */
 
@@ -115,7 +115,7 @@ int dhrystone_main()
   {
     debug_printf("Program compiled without 'register' attribute\n");
   }
-  debug_printf("Using %s, HZ=%d for default of %d runs\n", CLOCK_TYPE, HZ, 5);
+  debug_printf("Using %s, HZ=%d for default of %d runs\n", CLOCK_TYPE, HZ, Number_Of_Runs);
   debug_printf("\n");
 
   Done = false;
@@ -192,7 +192,6 @@ int dhrystone_main()
 
     debug_printf("User time: %u, User Inst: %u\n", 
       User_Time, User_Inst);
-    return 0;
 
     if (User_Time < Too_Small_Time)
     {

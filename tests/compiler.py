@@ -16,7 +16,7 @@ call(["C:/gnu_riscv/bin/riscv-none-embed-gcc.exe",
       "-T", "linker_script.lds",
       "-march=rv32i",
       "-mabi=ilp32",
-      # "-O3",
+      "-O3", "-fno-inline",
       # Files to include
       name_c, "crt0.s", "libmem.c", "libio.c", "dhrystone/dhrystone.c", "dhrystone/dhrystone_main.c",
       # "-S",

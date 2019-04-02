@@ -4,12 +4,6 @@ from subprocess import call
 
 base_name = sys.argv[1]
 
-name_s = base_name + ".S"
-name_o = base_name + ".o"
-name_so = base_name + ".so"
-name_bin = base_name + ".bin"
-name_mem = base_name + ".mem"
-
 input_file = sys.argv[1]
 directory, filename = os.path.split(input_file)
 filename_base, filename_ext = filename, ''
