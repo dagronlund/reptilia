@@ -85,6 +85,7 @@ module gecko_system
         next_system_result.addr = command_in.reg_addr;
         next_system_result.speculative = 'b0;
         next_system_result.reg_status = command_in.reg_status;
+        next_system_result.jump_flag = command_in.jump_flag;
         next_system_result.value = 'b0;
 
         case (command_in.csr)

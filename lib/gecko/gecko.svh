@@ -19,12 +19,14 @@ package gecko;
     // Configurable Types
     typedef logic gecko_jump_flag_t;
     typedef logic [2:0] gecko_reg_status_t;
-    typedef logic [3:0] gecko_speculative_count_t;
+    typedef logic [2:0] gecko_speculative_count_t;
     typedef logic [4:0] gecko_retired_count_t;
     typedef logic [7:0] gecko_prediction_history_t;
 
     parameter gecko_reg_status_t GECKO_REG_STATUS_VALID = 'b0;
     parameter gecko_reg_status_t GECKO_REG_STATUS_FULL = (-1);
+
+    parameter gecko_speculative_count_t GECKO_SPECULATIVE_FULL = (-1);
 
     typedef enum logic {
         GECKO_NORMAL = 'h0,
@@ -65,6 +67,7 @@ package gecko;
     typedef struct packed {
         rv32_reg_addr_t addr;
         gecko_reg_status_t reg_status;
+        gecko_jump_flag_t jump_flag;
         logic speculative;
         rv32_reg_value_t value;
     } gecko_operation_t;
@@ -72,6 +75,7 @@ package gecko;
     typedef struct packed {
         rv32_reg_addr_t addr;
         logic valid, speculative;
+        gecko_jump_flag_t jump_flag;
         gecko_reg_status_t reg_status;
         rv32_reg_value_t value;
     } gecko_forwarded_t;
@@ -91,6 +95,7 @@ package gecko;
     typedef struct packed {
         rv32_reg_addr_t addr;
         gecko_reg_status_t reg_status;
+        gecko_jump_flag_t jump_flag;
         rv32i_funct3_ls_t op;
         gecko_byte_offset_t offset;
     } gecko_mem_operation_t;
@@ -98,6 +103,7 @@ package gecko;
     typedef struct packed {
         rv32_reg_addr_t reg_addr;
         gecko_reg_status_t reg_status;
+        gecko_jump_flag_t jump_flag;
         rv32_reg_addr_t imm_value;
         rv32_reg_value_t rs1_value;
         rv32i_funct3_sys_t sys_op;
@@ -116,6 +122,7 @@ package gecko;
     typedef struct packed {
         rv32_reg_addr_t reg_addr;
         gecko_reg_status_t reg_status;
+        gecko_jump_flag_t jump_flag;
         logic speculative;
 
         gecko_execute_type_t op_type;
@@ -140,6 +147,7 @@ package gecko;
         return '{
             addr: op.addr,
             reg_status: op.reg_status,
+            jump_flag: op.jump_flag,
             valid: valid,
             speculative: op.speculative,
             value: op.value
@@ -259,6 +267,7 @@ package gecko;
             value: gecko_get_load_result(mem_data, mem_op.offset, mem_op.op),
             addr: mem_op.addr,
             reg_status: mem_op.reg_status,
+            jump_flag: mem_op.jump_flag,
             speculative: 'b0
         };
     endfunction

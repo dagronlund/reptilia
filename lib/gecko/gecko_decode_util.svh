@@ -25,6 +25,39 @@ package gecko_decode_util;
         logic execute, system, error;
     } gecko_decode_opcode_status_t;
 
+    function automatic rv32_reg_addr_t update_execute_saved(
+            input rv32_fields_t instruction_fields,
+            input rv32_reg_addr_t current_execute_saved
+    );
+        case (rv32i_opcode_t'(instruction_fields.opcode))
+        RV32I_OPCODE_OP, RV32I_OPCODE_IMM, 
+        RV32I_OPCODE_LUI, RV32I_OPCODE_AUIPC,
+        RV32I_OPCODE_JAL, RV32I_OPCODE_JALR: begin
+            // Execute has new result
+            return instruction_fields.rd;
+        end
+        RV32I_OPCODE_LOAD: begin
+            // Execute result superceded
+            if (current_execute_saved == instruction_fields.rd) begin
+                return 'b0;
+            end
+        end
+        RV32I_OPCODE_SYSTEM: begin
+            case (rv32i_funct3_sys_t'(instruction_fields.funct3))
+            RV32I_FUNCT3_SYS_CSRRW, RV32I_FUNCT3_SYS_CSRRS, 
+            RV32I_FUNCT3_SYS_CSRRC, RV32I_FUNCT3_SYS_CSRRWI, 
+            RV32I_FUNCT3_SYS_CSRRSI, RV32I_FUNCT3_SYS_CSRRCI: begin
+                // Execute result superceded
+                if (current_execute_saved == instruction_fields.rd) begin
+                    return 'b0;
+                end
+            end
+            endcase
+        end
+        endcase
+        return current_execute_saved;
+    endfunction
+
     function automatic gecko_decode_opcode_status_t get_opcode_status(
             input rv32_fields_t instruction_fields
     );

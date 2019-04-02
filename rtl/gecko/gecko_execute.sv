@@ -105,11 +105,13 @@ module gecko_execute
         next_execute_result.addr = cmd_in.reg_addr;
         next_execute_result.speculative = cmd_in.speculative;
         next_execute_result.reg_status = cmd_in.reg_status;
+        next_execute_result.jump_flag = cmd_in.jump_flag;
 
         next_mem_command.addr = cmd_in.reg_addr;
         next_mem_command.op = cmd_in.op.ls;
         next_mem_command.offset = 'b0;
         next_mem_command.reg_status = cmd_in.reg_status;
+        next_mem_command.jump_flag = cmd_in.jump_flag;
 
         next_jump_command = '{default: 'b0};
         next_jump_command.current_pc = cmd_in.current_pc;

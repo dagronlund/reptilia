@@ -52,7 +52,7 @@ package rv32i;
         RV32I_FUNCT3_LS_W = 'h2,
         RV32I_FUNCT3_LS_BU = 'h4,
         RV32I_FUNCT3_LS_HU = 'h5,
-        RV32I_FUNCT3_LS_UNDEF = 3'hX
+        RV32I_FUNCT3_LS_UNDEF = 3'bXXX
     } rv32i_funct3_ls_t;
 
     typedef enum rv32_funct3_t {
@@ -62,7 +62,7 @@ package rv32i;
         RV32I_FUNCT3_B_BGE = 'h5,
         RV32I_FUNCT3_B_BLTU = 'h6,
         RV32I_FUNCT3_B_BGEU = 'h7,
-        RV32I_FUNCT3_B_UNDEF = 3'hX
+        RV32I_FUNCT3_B_UNDEF = 3'bXXX
     } rv32i_funct3_b_t;
 
     typedef enum rv32_funct3_t {
@@ -73,7 +73,7 @@ package rv32i;
         RV32I_FUNCT3_SYS_CSRRWI = 'h5,
         RV32I_FUNCT3_SYS_CSRRSI = 'h6,
         RV32I_FUNCT3_SYS_CSRRCI = 'h7,
-        RV32I_FUNCT3_SYS_UNDEF = 3'hX
+        RV32I_FUNCT3_SYS_UNDEF = 3'bXXX
     } rv32i_funct3_sys_t;
 
     typedef union packed {
