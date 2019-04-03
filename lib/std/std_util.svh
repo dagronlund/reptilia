@@ -29,6 +29,11 @@ endfunction
     end \
     endgenerate
 
+`define PROCEDURAL_ASSERT(condition) \
+    initial begin \
+        assert (condition) else $error("FAILED ASSERTION: %s:%d, %s", `__FILE__, `__LINE__, `STRINGIFY(condition)); \
+    end
+
 `define BUILD_STREAM_INTF_EXPLICIT(FULL_NAME, PREFIX, DATA_TYPE) \
     `ifndef __``FULL_NAME``_STREAM_INTF__ \
     interface ``FULL_NAME``_stream_intf(input logic clk = 'b0, rst = 'b0); \
