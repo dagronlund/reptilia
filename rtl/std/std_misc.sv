@@ -119,10 +119,10 @@ module std_block_ram_single #(
     logic [DATA_WIDTH-1:0] data [DATA_LENGTH];
 
     initial begin
+        for (int i = 0; i < DATA_LENGTH; i++) begin
+            data[i] = 'b0;
+        end
         if (HEX_FILE != "") begin
-            for (int i = 0; i < DATA_LENGTH; i++) begin
-                data[i] = 'b0;
-            end
             $readmemh(HEX_FILE, data);
         end
     end
@@ -186,10 +186,10 @@ module std_block_ram_double #(
     logic [DATA_WIDTH-1:0] data [DATA_LENGTH];
 
     initial begin
+        for (int i = 0; i < DATA_LENGTH; i++) begin
+            data[i] = 'b0;
+        end
         if (HEX_FILE != "") begin
-            for (int i = 0; i < DATA_LENGTH; i++) begin
-                data[i] = 'b0;
-            end
             $readmemh(HEX_FILE, data);
         end
     end
