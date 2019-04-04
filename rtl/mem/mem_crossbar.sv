@@ -113,7 +113,7 @@ module mem_crossbar #(
     always_ff @(posedge clk) begin
         if(rst) begin
             current_priority <= 'b0;
-        end else begin
+        end else if (enable) begin
             current_priority <= next_priority;
         end
 
@@ -142,15 +142,18 @@ module mem_crossbar #(
             slave_index = get_next_priority(current_priority, incr);
             // Go through all masters in order
             for (master_index = 'b0; master_index < MASTER_PORTS; master_index++) begin
-                // Slave request is in address range
-                if (slaves_payload[slave_index].addr >= ADDR_MAP_BEGIN[master_index] &&
-                        slaves_payload[slave_index].addr <= ADDR_MAP_END[master_index]) begin
-                    // Master has not been written to
-                    if (!produce[master_index]) begin
-                        consume[slave_index] = 'b1;
-                        produce[master_index] = 'b1;
-                        masters_payload_next[master_index] = slaves_payload[slave_index];
-                        next_priority = get_next_priority(slave_index, 'b1);
+                // Process slave only if it is valid
+                if (slaves_valid[slave_index]) begin
+                    // Slave request is in address range
+                    if (slaves_payload[slave_index].addr >= ADDR_MAP_BEGIN[master_index] &&
+                            slaves_payload[slave_index].addr <= ADDR_MAP_END[master_index]) begin
+                        // Master has not been written to
+                        if (!produce[master_index]) begin
+                            consume[slave_index] = 'b1;
+                            produce[master_index] = 'b1;
+                            masters_payload_next[master_index] = slaves_payload[slave_index];
+                            next_priority = get_next_priority(slave_index, 'b1);
+                        end
                     end
                 end
             end
