@@ -27,6 +27,7 @@ module std_mem_double #(
     `STATIC_ASSERT((ADDR_BYTE_SHIFTED == 0) || ($bits(command0.data) > 8))
 
     localparam DATA_WIDTH = $bits(command0.data);
+    localparam ID_WIDTH = $bits(command0.id);
     localparam MASK_WIDTH = DATA_WIDTH / 8;
     localparam ADDR_CORRECTION = (ADDR_BYTE_SHIFTED == 0) ? 0 : $clog2(MASK_WIDTH);
     localparam ADDR_DEFAULT = (MANUAL_ADDR_WIDTH == 0) ?
@@ -69,6 +70,7 @@ module std_mem_double #(
     if (ENABLE_OUTPUT_REG0) begin
 
         logic internal_valid, internal_ready;
+        logic [ID_WIDTH-1:0] internal_id;
 
         always_ff @ (posedge clk) begin
             if (rst) begin
@@ -102,6 +104,15 @@ module std_mem_double #(
             .enable(enable_output0), .enable_output(enable_output_null)
         );
 
+        always_ff @ (posedge clk) begin
+            if (enable0) begin
+                internal_id <= command0.id;
+            end
+            if (enable_output0) begin
+                result0.id <= internal_id;
+            end
+        end
+
     end else begin
         assign enable_output0 = 'b1;
     
@@ -119,6 +130,12 @@ module std_mem_double #(
             command0.ready = result0.ready || !result0.valid;
             enable0 = command0.valid && command0.ready;
         end
+
+        always_ff @ (posedge clk) begin
+            if (enable0) begin
+                result0.id <= command0.id;
+            end
+        end
     end
     endgenerate
 
@@ -126,6 +143,7 @@ module std_mem_double #(
     if (ENABLE_OUTPUT_REG1) begin
 
         logic internal_valid, internal_ready;
+        logic [ID_WIDTH-1:0] internal_id;
 
         always_ff @ (posedge clk) begin
             if (rst) begin
@@ -159,6 +177,15 @@ module std_mem_double #(
             .enable(enable_output1), .enable_output(enable_output_null)
         );
 
+        always_ff @ (posedge clk) begin
+            if (enable1) begin
+                internal_id <= command1.id;
+            end
+            if (enable_output1) begin
+                result1.id <= internal_id;
+            end
+        end
+
     end else begin
         assign enable_output1 = 'b1;
     
@@ -175,6 +202,12 @@ module std_mem_double #(
         always_comb begin
             command1.ready = result1.ready || !result1.valid;
             enable1 = command1.valid && command1.ready;
+        end
+
+        always_ff @ (posedge clk) begin
+            if (enable1) begin
+                result1.id <= command1.id;
+            end
         end
     end
     endgenerate

@@ -24,6 +24,7 @@ module std_mem_single #(
     `STATIC_ASSERT((ADDR_BYTE_SHIFTED == 0) || ($bits(command.data) > 8))
 
     localparam DATA_WIDTH = $bits(command.data);
+    localparam ID_WIDTH = $bits(command.id);
     localparam MASK_WIDTH = DATA_WIDTH / 8;
     localparam ADDR_CORRECTION = (ADDR_BYTE_SHIFTED == 0) ? 0 : $clog2(MASK_WIDTH);
     localparam ADDR_DEFAULT = (MANUAL_ADDR_WIDTH == 0) ? 
@@ -57,6 +58,7 @@ module std_mem_single #(
     if (ENABLE_OUTPUT_REG) begin
 
         logic internal_valid, internal_ready;
+        logic [ID_WIDTH-1:0] internal_id;
 
         always_ff @ (posedge clk) begin
             if (rst) begin
@@ -90,6 +92,15 @@ module std_mem_single #(
             .enable(enable_output), .enable_output(enable_output_null)
         );
 
+        always_ff @ (posedge clk) begin
+            if (enable) begin
+                internal_id <= command.id;
+            end
+            if (enable_output) begin
+                result.id <= internal_id;
+            end
+        end
+
     end else begin
         assign enable_output = 'b1;
     
@@ -106,6 +117,12 @@ module std_mem_single #(
         always_comb begin
             command.ready = result.ready || !result.valid;
             enable = command.valid && command.ready;
+        end
+
+        always_ff @ (posedge clk) begin
+            if (enable) begin
+                result.id <= command.id;
+            end
         end
     end
     endgenerate
