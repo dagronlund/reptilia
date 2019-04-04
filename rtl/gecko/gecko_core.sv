@@ -17,7 +17,8 @@ module gecko_core
 #(
     parameter int INST_LATENCY = 1,
     parameter int DATA_LATENCY = 1,
-    parameter gecko_pc_t START_ADDR = 'b0
+    parameter gecko_pc_t START_ADDR = 'b0,
+    parameter int ENABLE_PERFORMANCE_COUNTERS = 1
 )(
     input logic clk, rst,
 
@@ -37,8 +38,6 @@ module gecko_core
     `STATIC_ASSERT($size(data_result.data) == 32)
 
     std_stream_intf #(.T(gecko_jump_operation_t)) jump_command (.clk, .rst);
-    // std_stream_intf #(.T(gecko_branch_signal_t)) branch_signal (.clk, .rst);
-    // std_stream_intf #(.T(gecko_branch_command_t)) branch_command (.clk, .rst);
 
     std_stream_intf #(.T(gecko_execute_operation_t)) execute_command (.clk, .rst);
     std_stream_intf #(.T(gecko_system_operation_t)) system_command (.clk, .rst);
@@ -128,8 +127,9 @@ module gecko_core
         .data_out(mem_command_out)
     );
 
-    gecko_system gecko_system_inst
-    (
+    gecko_system #(
+        .ENABLE_PERFORMANCE_COUNTERS(ENABLE_PERFORMANCE_COUNTERS)
+    ) gecko_system_inst (
         .clk, .rst,
 
         .retired_instructions,

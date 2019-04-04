@@ -15,7 +15,8 @@ module gecko_micro_wrapper();
 
     gecko_micro #(
         .ADDR_SPACE_WIDTH(12),
-        .START_ADDR('b0)
+        .START_ADDR('b0),
+        .ENABLE_PERFORMANCE_COUNTERS(0)
     )gecko_micro_inst(
         .clk(clk), 
         .rst(rst), 

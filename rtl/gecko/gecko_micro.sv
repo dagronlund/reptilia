@@ -18,7 +18,8 @@ module gecko_micro
     parameter ADDR_SPACE_WIDTH = 16,
     parameter INST_LATENCY = 2,
     parameter DATA_LATENCY = 2,
-    parameter gecko_pc_t START_ADDR = 'h0
+    parameter gecko_pc_t START_ADDR = 'h0,
+    parameter int ENABLE_PERFORMANCE_COUNTERS = 1
 )(
     input logic clk, rst,
 
@@ -66,7 +67,8 @@ module gecko_micro
     gecko_core #(
         .INST_LATENCY(INST_LATENCY),
         .DATA_LATENCY(DATA_LATENCY),
-        .START_ADDR(START_ADDR)
+        .START_ADDR(START_ADDR),
+        .ENABLE_PERFORMANCE_COUNTERS(ENABLE_PERFORMANCE_COUNTERS)
     ) gecko_core_inst (
         .clk, .rst,
         .inst_request, .inst_result(inst_result_registered),

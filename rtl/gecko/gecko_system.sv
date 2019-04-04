@@ -14,7 +14,9 @@ module gecko_system
     import rv32::*;
     import rv32i::*;
     import gecko::*;
-(
+#(
+    parameter int ENABLE_PERFORMANCE_COUNTERS = 1
+)(
     input logic clk, rst,
 
     input gecko_retired_count_t retired_instructions,
@@ -88,14 +90,16 @@ module gecko_system
         next_system_result.jump_flag = command_in.jump_flag;
         next_system_result.value = 'b0;
 
-        case (command_in.csr)
-        RV32I_CSR_CYCLE: next_system_result.value = clock_counter[31:0];
-        RV32I_CSR_TIME: next_system_result.value = clock_counter[31:0];
-        RV32I_CSR_INSTRET: next_system_result.value = instruction_counter[31:0];
-        RV32I_CSR_CYCLEH: next_system_result.value = clock_counter[63:32];
-        RV32I_CSR_TIMEH: next_system_result.value = clock_counter[63:32];
-        RV32I_CSR_INSTRETH: next_system_result.value = instruction_counter[63:32];
-        endcase
+        if (ENABLE_PERFORMANCE_COUNTERS) begin
+            case (command_in.csr)
+            RV32I_CSR_CYCLE: next_system_result.value = clock_counter[31:0];
+            RV32I_CSR_TIME: next_system_result.value = clock_counter[31:0];
+            RV32I_CSR_INSTRET: next_system_result.value = instruction_counter[31:0];
+            RV32I_CSR_CYCLEH: next_system_result.value = clock_counter[63:32];
+            RV32I_CSR_TIMEH: next_system_result.value = clock_counter[63:32];
+            RV32I_CSR_INSTRETH: next_system_result.value = instruction_counter[63:32];
+            endcase
+        end
 
         case (command_in.sys_op)
         RV32I_FUNCT3_SYS_ENV: begin // System Op
