@@ -36,6 +36,7 @@ module mem_crossbar_tb
     logic re;
     logic [3:0] we; 
     logic [31:0] data, addr;
+    logic id;
 
     initial begin
         slave0.valid = 'b0;
