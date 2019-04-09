@@ -8,7 +8,8 @@ module mem_merge #(
     parameter int DATA_WIDTH = 32,
     parameter int MASK_WIDTH = DATA_WIDTH / 8,
     parameter int ID_WIDTH = 1,
-    parameter int PORTS = 2
+    parameter int PORTS = 2,
+    parameter int PIPELINE_MODE = 1
 )(
     input logic clk, rst,
 
@@ -75,7 +76,8 @@ module mem_merge #(
 
     stream_merge #(
         .PORTS(PORTS),
-        .ID_WIDTH(ID_WIDTH)
+        .ID_WIDTH(ID_WIDTH),
+        .PIPELINE_MODE(PIPELINE_MODE)
     ) stream_merge_inst (
         .clk, .rst,
 

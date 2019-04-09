@@ -4,7 +4,8 @@
 
 module stream_split #(
     parameter int PORTS = 2,
-    parameter int ID_WIDTH = $clog2(PORTS)
+    parameter int ID_WIDTH = $clog2(PORTS),
+    parameter int PIPELINE_MODE = 1
 )(
     input logic clk, rst,
 
@@ -30,22 +31,34 @@ module stream_split #(
 
         `PROCEDURAL_ASSERT(PAYLOAD_WIDTH == $bits(stream_out[k].payload))
 
+        std_stream_intf #(.T(payload_t)) stream_mid (.clk, .rst);
+
         always_comb begin
-            stream_out[k].valid = stream_out_valid[k];
-            stream_out[k].payload = stream_out_payload[k];
-            stream_out_ready[k] = stream_out[k].ready;
+            stream_mid.valid = stream_out_valid[k];
+            stream_mid.payload = stream_in.payload;
+            stream_out_ready[k] = stream_mid.ready;
         end
+
+        std_flow_stage #(
+            .T(payload_t),
+            .MODE(PIPELINE_MODE)
+        ) std_flow_output_inst (
+            .clk, .rst,
+
+            .stream_in(stream_mid),
+            .stream_out(stream_out[k])
+        );
     end
     endgenerate
 
     logic enable;
     logic consume;
-    logic [PORTS-1:0] produce, enable_output;
-    
-    std_flow #(
+    logic [PORTS-1:0] produce;
+
+    std_flow_lite #(
         .NUM_INPUTS(1),
         .NUM_OUTPUTS(PORTS)
-    ) std_flow_inst (
+    ) std_flow_lite_inst (
         .clk, .rst,
 
         .valid_input(stream_in.valid),
@@ -54,17 +67,8 @@ module stream_split #(
         .valid_output(stream_out_valid),
         .ready_output(stream_out_ready),
 
-        .consume, .produce,
-        .enable, .enable_output
+        .consume, .produce, .enable
     );
-
-    always_ff @(posedge clk) begin
-        for (int i = 0; i < PORTS; i++) begin
-            if (enable_output[i]) begin
-                stream_out_payload[i] <= stream_in.payload;
-            end
-        end
-    end
 
     always_comb begin
         consume = 'b1;
