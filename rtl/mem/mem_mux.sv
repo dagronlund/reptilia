@@ -8,7 +8,9 @@ module mem_mux #(
     parameter int DATA_WIDTH = 32,
     parameter int MASK_WIDTH = DATA_WIDTH / 8,
     parameter int ID_WIDTH = 1,
-    parameter int SLAVE_PORTS = 2
+    parameter int SLAVE_PORTS = 2,
+    parameter int MERGE_PIPELINE_MODE = 1,
+    parameter int SPLIT_PIPELINE_MODE = 1
 )(
     input logic clk, rst,
 
@@ -25,7 +27,8 @@ module mem_mux #(
         .ADDR_WIDTH(ADDR_WIDTH),
         .DATA_WIDTH(DATA_WIDTH),
         .ID_WIDTH(ID_WIDTH),
-        .PORTS(SLAVE_PORTS)
+        .PORTS(SLAVE_PORTS),
+        .PIPELINE_MODE(MERGE_PIPELINE_MODE)
     ) mem_merge_inst (
         .clk, .rst,
 
@@ -37,7 +40,8 @@ module mem_mux #(
         .ADDR_WIDTH(ADDR_WIDTH),
         .DATA_WIDTH(DATA_WIDTH),
         .ID_WIDTH(ID_WIDTH),
-        .PORTS(SLAVE_PORTS)
+        .PORTS(SLAVE_PORTS),
+        .PIPELINE_MODE(SPLIT_PIPELINE_MODE)
     ) mem_split_inst (
         .clk, .rst,
 

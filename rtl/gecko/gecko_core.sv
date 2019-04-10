@@ -78,6 +78,7 @@ module gecko_core
     );
 
     std_stream_stage #(
+        .T(gecko_instruction_operation_t),
         .LATENCY(INST_LATENCY)
     ) gecko_inst_stage_inst (
         .clk, .rst,
@@ -120,6 +121,7 @@ module gecko_core
     );
 
     std_stream_stage #(
+        .T(gecko_mem_operation_t),
         .LATENCY(DATA_LATENCY)
     ) gecko_data_stage_inst (
         .clk, .rst,

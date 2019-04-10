@@ -25,7 +25,7 @@ module mem_split_merge_tb
 
     mem_merge #(
         .PORTS(PORTS),
-        .PIPELINE_MODE(1)
+        .PIPELINE_MODE(0)
     ) mem_merge_inst (
         .clk, .rst,
         .mem_in('{mem_in0, mem_in1}),

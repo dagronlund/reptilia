@@ -6,6 +6,7 @@
  * Implements a variable length pipeline stage
  */
 module std_stream_stage #(
+    parameter type T = logic,
     parameter int LATENCY = 1
 )(
     input logic clk, rst,
@@ -13,9 +14,8 @@ module std_stream_stage #(
     std_stream_intf.out data_out
 );
 
-    `STATIC_ASSERT($size(data_in.payload) == $size(data_out.payload))
-    localparam WIDTH = $bits(data_in.payload);
-    typedef logic [WIDTH-1:0] data_t;
+    `STATIC_ASSERT($bits(data_in.payload) == $bits(T))
+    `STATIC_ASSERT($bits(data_in.payload) == $bits(data_out.payload))
 
     genvar k;
     generate
@@ -26,11 +26,11 @@ module std_stream_stage #(
     end else begin
         logic data_in_valid [LATENCY];
         logic data_in_ready [LATENCY];
-        data_t data_in_payload [LATENCY];
+        T data_in_payload [LATENCY];
 
         logic data_out_valid [LATENCY];
         logic data_out_ready [LATENCY];
-        data_t data_out_payload [LATENCY];
+        T data_out_payload [LATENCY];
         
         for (k = 0; k < LATENCY; k++) begin
             if (k == 0) begin

@@ -24,12 +24,13 @@ module std_flow_lite #(
     always_comb begin
         
         // Create seperate enables for each channel, avoid valid/ready dependence
-        automatic logic output_enable, input_enable;
+        automatic logic output_enable = 'b1, input_enable = 'b1;
         automatic logic [NUM_OUTPUTS-1:0] output_enables = {NUM_OUTPUTS{1'b1}};
         automatic logic [NUM_INPUTS-1:0] input_enables = {NUM_INPUTS{1'b1}};
 
-        // Enable if all outputs are either not being produced, not valid, or being consumed
+        // Enable if all outputs are either not being produced or ready
         for (int i = 0; i < NUM_OUTPUTS; i++) begin
+            output_enable &= (!produce[i]) || (ready_output[i]);
             for (int j = 0; j < NUM_OUTPUTS; j++) begin
                 if (i != j) begin
                     output_enables[j] &= (!produce[i]) || (ready_output[i]);
@@ -37,18 +38,15 @@ module std_flow_lite #(
             end
         end
 
-        // Enable if all inputs are either consumed and present, or not being consumed
+        // Enable if all inputs are either not being consumed or valid
         for (int i = 0; i < NUM_INPUTS; i++) begin
+            input_enable &= (!consume[i]) || (valid_input[i]);
             for (int j = 0; j < NUM_INPUTS; j++) begin
                 if (i != j) begin
                     input_enables[j] &= (!consume[i]) || (valid_input[i]);
                 end
             end
         end
-
-        // Collapse input and output enables 
-        output_enable = &output_enables;
-        input_enable = &input_enables;
 
         // Set output valid signals if enabled and being produced
         for (int i = 0; i < NUM_OUTPUTS; i++) begin
