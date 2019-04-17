@@ -209,7 +209,7 @@ interface axi4_b_intf
 );
 
     logic                bvalid, bready;
-    axi4_resp            bresp;
+    axi4_resp_t          bresp;
     logic [ID_WIDTH-1:0] bid;
 
     modport out(
@@ -269,7 +269,7 @@ interface axi4_r_intf
     logic                  rvalid, rready;
     logic [DATA_WIDTH-1:0] rdata;
     logic                  rlast;
-    axi4_resp              rresp;
+    axi4_resp_t            rresp;
     logic [ID_WIDTH-1:0]   rid;
 
     modport out(
@@ -290,9 +290,13 @@ interface axi4_r_intf
     );
 
     task send(
+        input logic [DATA_WIDTH-1:0] rdata_in,
+        input logic                  rlast_in,
         input axi4_resp_t            rresp_in,
         input logic [ID_WIDTH-1:0]   rid_in
     );
+        rdata <= rdata_in;
+        rlast <= rlast_in;
         rresp <= rresp_in;
         rid <= rid_in;
 
@@ -303,6 +307,8 @@ interface axi4_r_intf
     endtask
 
     task recv(
+        output logic [DATA_WIDTH-1:0] rdata_out,
+        output logic                  rlast_out,
         output axi4_resp_t            rresp_out,
         output logic [ID_WIDTH-1:0]   rid_out
     );
@@ -311,6 +317,8 @@ interface axi4_r_intf
         while (!rvalid) @ (posedge clk);
         rready <= 1'b0;
 
+        rdata_out = rdata;
+        rlast_out = rlast;
         rresp_out = rresp;
         rid_out = rid;
     endtask

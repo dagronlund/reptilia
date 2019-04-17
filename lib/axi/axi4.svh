@@ -69,6 +69,21 @@ package axi4;
         axi4_privilege_t privilege;
     } axi4_prot_t;
 
+    function automatic axi4_len_t axi4_len_from_size(
+            input axi4_size_t size
+    );
+        case (size)
+        'b000: return 'd1;
+        'b001: return 'd2;
+        'b010: return 'd4;
+        'b011: return 'd8;
+        'b100: return 'd16;
+        'b101: return 'd32;
+        'b110: return 'd64;
+        'b111: return 'd128;
+        endcase
+    endfunction
+
 endpackage
 
 `endif
