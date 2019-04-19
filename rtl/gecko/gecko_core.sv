@@ -154,13 +154,18 @@ module gecko_core
         .system_result
     );
 
-    gecko_writeback gecko_writeback_inst
-    (
+    std_stream_intf #(.T(gecko_operation_t)) writeback_results_in [3] (.clk, .rst);
+
+    stream_tie stream_tie_inst0(.stream_in(execute_result), .stream_out(writeback_results_in[0]));
+    stream_tie stream_tie_inst1(.stream_in(memory_result), .stream_out(writeback_results_in[1]));
+    stream_tie stream_tie_inst2(.stream_in(system_result), .stream_out(writeback_results_in[2]));
+
+    gecko_writeback #(
+        .PORTS(3)
+    ) gecko_writeback_inst (
         .clk, .rst,
 
-        .execute_result, .memory_result, .system_result,
-
-        .writeback_result
+        .writeback_results_in, .writeback_result
     );
 
 endmodule
