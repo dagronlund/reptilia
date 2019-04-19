@@ -55,6 +55,7 @@ module gecko_core
 
     std_stream_intf #(.T(gecko_operation_t)) execute_result (.clk, .rst);
     std_stream_intf #(.T(gecko_operation_t)) system_result (.clk, .rst);
+    std_stream_intf #(.T(gecko_operation_t)) memory_result (.clk, .rst);
 
     std_stream_intf #(.T(gecko_operation_t)) writeback_result (.clk, .rst);
 
@@ -66,16 +67,18 @@ module gecko_core
 
     gecko_retired_count_t retired_instructions;
 
+    assign memory_result.valid = mem_command_out.valid && data_result.valid;
+    assign memory_result.payload = gecko_get_load_operation(mem_command_out.payload, data_result.data);
+    assign mem_command_out.ready = memory_result.ready;
+    assign data_result.ready = memory_result.ready;
+
     gecko_forwarded_t execute_forwarded;
     gecko_forwarded_t writeback_forwarded;
     gecko_forwarded_t memory_forwarded;
 
     assign execute_forwarded = gecko_construct_forward(execute_result.valid, execute_result.payload);
     assign writeback_forwarded = gecko_construct_forward(writeback_result.valid, writeback_result.payload);
-    assign memory_forwarded = gecko_construct_forward(
-        mem_command_out.valid && data_result.valid,
-        gecko_get_load_operation(mem_command_out.payload, data_result.data)
-    );
+    assign memory_forwarded = gecko_construct_forward(memory_result.valid, memory_result.payload);
 
     gecko_fetch #(
         .START_ADDR(START_ADDR)
@@ -155,12 +158,7 @@ module gecko_core
     (
         .clk, .rst,
 
-        .execute_result,
-
-        .mem_command(mem_command_out),
-        .mem_result(data_result),
-
-        .system_result,
+        .execute_result, .memory_result, .system_result,
 
         .writeback_result
     );

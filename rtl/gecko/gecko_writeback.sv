@@ -41,10 +41,7 @@ module gecko_writeback
     input logic clk, rst,
 
     std_stream_intf.in execute_result, // gecko_operation_t
-
-    std_stream_intf.in mem_command, // gecko_mem_operation_t
-    std_mem_intf.in mem_result,
-
+    std_stream_intf.in memory_result, // gecko_operation_t
     std_stream_intf.in system_result, // gecko_operation_t
 
     std_stream_intf.out writeback_result // gecko_operation_t
@@ -66,24 +63,22 @@ module gecko_writeback
 
     // Flow Controller
     std_flow #(
-        .NUM_INPUTS(4),
+        .NUM_INPUTS(3),
         .NUM_OUTPUTS(1)
     ) std_flow_inst (
         .clk, .rst,
 
         .valid_input({execute_result.valid, 
-                mem_command.valid, 
-                mem_result.valid, 
+                memory_result.valid,
                 system_result.valid}),
         .ready_input({execute_result.ready, 
-                mem_command.ready, 
-                mem_result.ready, 
+                memory_result.ready,
                 system_result.ready}),
         
         .valid_output({writeback_result.valid}),
         .ready_output({writeback_result.ready}),
 
-        .consume({consume_execute, consume_mem, consume_mem, consume_system}),
+        .consume({consume_execute, consume_mem, consume_system}),
         .produce({produce}),
 
         .enable
@@ -139,7 +134,7 @@ module gecko_writeback
 
         execute_operation = gecko_operation_t'(execute_result.payload);
         system_operation = gecko_operation_t'(system_result.payload);
-        mem_operation = gecko_get_load_operation(mem_command.payload, mem_result.data);
+        mem_operation = gecko_operation_t'(memory_result.payload);
 
         // Read local register file status flags
         execute_status_read_addr = execute_operation.addr;
@@ -175,14 +170,14 @@ module gecko_writeback
         GECKO_WRITEBACK_EXECUTE: begin
             if (execute_result.valid && execute_status_good) begin
                 consume_execute = 'b1;
-            end else if (mem_command.valid && mem_result.valid && memory_status_good) begin
+            end else if (memory_result.valid && memory_status_good) begin
                 consume_mem = 'b1;
             end else if (system_result.valid && system_status_good) begin
                 consume_system = 'b1;
             end
         end
         GECKO_WRITEBACK_MEM: begin
-            if (mem_command.valid && mem_result.valid && memory_status_good) begin
+            if (memory_result.valid && memory_status_good) begin
                 consume_mem = 'b1;
             end else if (system_result.valid && system_status_good) begin
                 consume_system = 'b1;
@@ -195,7 +190,7 @@ module gecko_writeback
                 consume_system = 'b1;
             end else if (execute_result.valid && execute_status_good) begin
                 consume_execute = 'b1;
-            end else if (mem_command.valid && mem_result.valid && memory_status_good) begin
+            end else if (memory_result.valid && memory_status_good) begin
                 consume_mem = 'b1;
             end
         end
