@@ -115,23 +115,22 @@ package gecko_decode_util;
     function automatic logic is_register_readable(
             input rv32_reg_addr_t reg_addr,
             input rv32_reg_addr_t execute_saved_reg,
-            input gecko_decode_reg_file_status_t reg_file_status
+            input gecko_reg_status_t reg_status
     );
-        return (reg_addr == execute_saved_reg || 
-                reg_file_status[reg_addr] == GECKO_REG_STATUS_VALID);
+        return (reg_addr == execute_saved_reg || reg_status == GECKO_REG_STATUS_VALID);
     endfunction
 
     function automatic logic is_register_writeable(
-            input rv32_reg_addr_t reg_addr,
-            input gecko_decode_reg_file_status_t reg_file_status
+            input gecko_reg_status_t reg_status
     );
-        return reg_file_status[reg_addr] != GECKO_REG_STATUS_FULL;
+        return reg_status != GECKO_REG_STATUS_FULL;
     endfunction
 
     function automatic gecko_decode_operands_status_t gecko_decode_find_operand_status(
             input rv32_fields_t instruction_fields,
             input rv32_reg_addr_t ex_saved,
-            input gecko_decode_reg_file_status_t rf_status
+            input gecko_reg_status_t rd_status, rs1_status, rs2_status
+            // input gecko_decode_reg_file_status_t rf_status
     );
         rv32_reg_addr_t rd, rs1, rs2;
         rd = instruction_fields.rd;
@@ -141,29 +140,29 @@ package gecko_decode_util;
         case (rv32i_opcode_t'(instruction_fields.opcode))
         RV32I_OPCODE_OP: begin // rd, rs1, rs2
             return '{
-                rs1_valid: is_register_readable(rs1, ex_saved, rf_status), 
-                rs2_valid: is_register_readable(rs2, ex_saved, rf_status),
-                rd_valid: is_register_writeable(rd, rf_status)
+                rs1_valid: is_register_readable(rs1, ex_saved, rs1_status), 
+                rs2_valid: is_register_readable(rs2, ex_saved, rs2_status),
+                rd_valid: is_register_writeable(rd_status)
             };
         end
         RV32I_OPCODE_IMM: begin // rd, rs1
             return '{
-                rs1_valid: is_register_readable(rs1, ex_saved, rf_status), 
+                rs1_valid: is_register_readable(rs1, ex_saved, rs1_status), 
                 rs2_valid: 'b1,
-                rd_valid: is_register_writeable(rd, rf_status)
+                rd_valid: is_register_writeable(rd_status)
             };
         end
         RV32I_OPCODE_LOAD, RV32I_OPCODE_JALR: begin // rd, rs1
             return '{
-                rs1_valid: is_register_readable(rs1, ex_saved, rf_status), 
+                rs1_valid: is_register_readable(rs1, ex_saved, rs1_status), 
                 rs2_valid: 'b1,
-                rd_valid: is_register_writeable(rd, rf_status)
+                rd_valid: is_register_writeable(rd_status)
             };
         end
         RV32I_OPCODE_STORE, RV32I_OPCODE_BRANCH: begin // rs1, rs2
             return '{
-                rs1_valid: is_register_readable(rs1, ex_saved, rf_status), 
-                rs2_valid: is_register_readable(rs2, ex_saved, rf_status),
+                rs1_valid: is_register_readable(rs1, ex_saved, rs1_status), 
+                rs2_valid: is_register_readable(rs2, ex_saved, rs2_status),
                 rd_valid: 'b1
             };
         end
@@ -171,23 +170,23 @@ package gecko_decode_util;
             return '{
                 rs1_valid: 'b1, 
                 rs2_valid: 'b1,
-                rd_valid: is_register_writeable(rd, rf_status)
+                rd_valid: is_register_writeable(rd_status)
             };
         end
         RV32I_OPCODE_SYSTEM: begin // rd, rs1
             case (rv32i_funct3_sys_t'(instruction_fields.funct3))
             RV32I_FUNCT3_SYS_ENV: begin // a0, a1 (not from execute)
                 return '{
-                    rs1_valid: is_register_readable(rs1, 'b0, rf_status), 
-                    rs2_valid: is_register_readable(rs2, 'b0, rf_status),
+                    rs1_valid: is_register_readable(rs1, 'b0, rs1_status), 
+                    rs2_valid: is_register_readable(rs2, 'b0, rs2_status),
                     rd_valid: 'b1
                 };
             end
             default: begin
                 return '{
-                    rs1_valid: is_register_readable(rs1, 'b0, rf_status), 
+                    rs1_valid: is_register_readable(rs1, 'b0, rs1_status), 
                     rs2_valid: 'b1,
-                    rd_valid: is_register_writeable(rd, rf_status)
+                    rd_valid: is_register_writeable(rd_status)
                 };
             end
             endcase
