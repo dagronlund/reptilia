@@ -1,14 +1,26 @@
 `timescale 1ns/1ps
 
+`ifdef __LINTER__
+
 `include "../../lib/std/std_util.svh"
 `include "../../lib/std/std_mem.svh"
-
 `include "../../lib/isa/rv.svh"
 `include "../../lib/isa/rv32.svh"
 `include "../../lib/isa/rv32i.svh"
-
 `include "../../lib/gecko/gecko.svh"
 `include "../../lib/gecko/gecko_decode_util.svh"
+
+`else
+
+`include "std_util.svh"
+`include "std_mem.svh"
+`include "rv.svh"
+`include "rv32.svh"
+`include "rv32i.svh"
+`include "gecko.svh"
+`include "gecko_decode_util.svh"
+
+`endif
 
 /*
  * Decode State:
@@ -175,6 +187,7 @@ module gecko_decode
         .enable_output({enable_system, enable_execute})
     );
 
+    logic faulted, fault_flag;
     logic next_state_speculative_to_normal;
     gecko_decode_state_t state, next_state;
     rv32_reg_addr_t reset_counter, next_reset_counter;
@@ -278,6 +291,7 @@ module gecko_decode
             reg_file_status = '{32{GECKO_REG_STATUS_VALID}};
             retired_instructions <= 'b0;
             speculative_flag <= 'b0;
+            faulted <= 'b0;
         end else begin
             if (enable) begin
                 state <= next_state;
@@ -289,6 +303,7 @@ module gecko_decode
             retired_instructions <= speculation_resolved_instructions + 
                     (enable && normal_resolved_instruction);
             speculative_flag <= next_speculative_flag;
+            if (fault_flag) faulted <= 'b1;
         end
         
         if (rst) begin
@@ -404,6 +419,7 @@ module gecko_decode
         consume_instruction = 'b0;
         produce_execute = 'b0;
         produce_system = 'b0;
+        fault_flag = 'b0;
 
         // Handle clearing register file by default
         register_write_enable = (state == GECKO_DECODE_RESET);

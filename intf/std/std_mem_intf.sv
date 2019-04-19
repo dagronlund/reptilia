@@ -1,6 +1,14 @@
 `timescale 1ns/1ps
 
+`ifdef __LINTER__
+
 `include "../../lib/std/std_mem.svh"
+
+`else 
+
+`include "std_mem.svh"
+
+`endif
 
 interface std_mem_intf #(
     parameter int DATA_WIDTH = 32,

@@ -1,7 +1,16 @@
 `timescale 1ns/1ps
 
+`ifdef __LINTER__
+
 `include "../../lib/std/std_util.svh"
 `include "../../lib/std/std_mem.svh"
+
+`else
+
+`include "std_util.svh"
+`include "std_mem.svh"
+
+`endif
 
 /*
  * Implements a variable length pipeline stage
@@ -35,6 +44,7 @@ module std_mem_stage #(
     std_stream_intf #(.T(mem_t)) stream_out (.clk, .rst);
 
     std_stream_stage #(
+        .T(mem_t),
         .LATENCY(LATENCY)
     ) stream_stage_inst (
         .clk, .rst,

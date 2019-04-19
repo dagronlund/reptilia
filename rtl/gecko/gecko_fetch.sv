@@ -1,13 +1,24 @@
 `timescale 1ns/1ps
 
+`ifdef __LINTER__
+
 `include "../../lib/std/std_util.svh"
 `include "../../lib/std/std_mem.svh"
-
 `include "../../lib/isa/rv.svh"
 `include "../../lib/isa/rv32.svh"
 `include "../../lib/isa/rv32i.svh"
-
 `include "../../lib/gecko/gecko.svh"
+
+`else
+
+`include "std_util.svh"
+`include "std_mem.svh"
+`include "rv.svh"
+`include "rv32.svh"
+`include "rv32i.svh"
+`include "gecko.svh"
+
+`endif
 
 module gecko_fetch
     import rv::*;
@@ -65,8 +76,8 @@ module gecko_fetch
     );
         case (history[1:0])
         STRONG_TAKEN: return branched ? STRONG_TAKEN : TAKEN;
-        TAKEN: return branched ? STRONG_TAKEN : NOT_TAKEN;
-        NOT_TAKEN: return branched ? TAKEN : STRONG_NOT_TAKEN;
+        TAKEN: return branched ? STRONG_TAKEN : STRONG_NOT_TAKEN;
+        NOT_TAKEN: return branched ? STRONG_TAKEN : STRONG_NOT_TAKEN;
         STRONG_NOT_TAKEN: return branched ? NOT_TAKEN : STRONG_NOT_TAKEN;
         endcase
     endfunction

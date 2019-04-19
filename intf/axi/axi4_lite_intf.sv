@@ -1,6 +1,14 @@
 `timescale 1ns/1ps
 
+`ifdef __LINTER__
+
 `include "../../lib/axi/axi4_lite.svh"
+
+`else 
+
+`include "axi4_lite.svh"
+
+`endif
 
 interface axi4_lite_ar_intf 
     import axi4_lite::*;
@@ -12,7 +20,7 @@ interface axi4_lite_ar_intf
 
     logic                  arvalid, arready;
     logic [ADDR_WIDTH-1:0] araddr;
-    rv_axi4_lite_prot_t    arprot;
+    axi4_lite_prot_t    arprot;
 
     modport out(
         output arvalid, 
@@ -33,7 +41,7 @@ interface axi4_lite_ar_intf
 
     task send(
         input logic [ADDR_WIDTH-1:0] araddr_in, 
-        input rv_axi4_lite_prot_t arprot_in
+        input axi4_lite_prot_t arprot_in
     );
         araddr <= araddr_in;
         arprot <= arprot_in;
@@ -46,7 +54,7 @@ interface axi4_lite_ar_intf
 
     task recv(
         output logic [ADDR_WIDTH-1:0] araddr_out, 
-        output rv_axi4_lite_prot_t arprot_out
+        output axi4_lite_prot_t arprot_out
     );
         arready <= 1'b1; 
         @ (posedge clk); 
@@ -59,7 +67,7 @@ interface axi4_lite_ar_intf
 
 endinterface
 
-interface rv_axi4_lite_aw_intf 
+interface axi4_lite_aw_intf 
     import axi4_lite::*;
 #(
     parameter ADDR_WIDTH = 32
@@ -69,7 +77,7 @@ interface rv_axi4_lite_aw_intf
 
     logic                  awvalid, awready;
     logic [ADDR_WIDTH-1:0] awaddr;
-    rv_axi4_lite_prot_t    awprot;
+    axi4_lite_prot_t    awprot;
 
     modport out(
         output awvalid,
@@ -90,7 +98,7 @@ interface rv_axi4_lite_aw_intf
 
     task send(
         input logic [ADDR_WIDTH-1:0] awaddr_in, 
-        input rv_axi4_lite_prot_t awprot_in
+        input axi4_lite_prot_t awprot_in
     );
         awaddr <= awaddr_in;
         awprot <= awprot_in; 
@@ -103,7 +111,7 @@ interface rv_axi4_lite_aw_intf
 
     task recv(
         output logic [ADDR_WIDTH-1:0] awaddr_out,
-        output rv_axi4_lite_prot_t awprot_out
+        output axi4_lite_prot_t awprot_out
     );
         awready <= 1'b1; 
         @ (posedge clk); 
@@ -116,15 +124,14 @@ interface rv_axi4_lite_aw_intf
 
 endinterface
 
-interface rv_axi4_lite_b_intf #(
-)(
+interface axi4_lite_b_intf 
+    import axi4_lite::*;
+#()(
     input logic clk = 'b0, rst = 'b0
-);
-
-    import rv_axi4_lite::*;
+);    
 
     logic               bvalid, bready;
-    rv_axi4_lite_resp_t bresp;
+    axi4_lite_resp_t bresp;
 
     modport out(
         output bvalid,
@@ -144,7 +151,7 @@ interface rv_axi4_lite_b_intf #(
     );
 
     task send(
-        input rv_axi4_lite_resp_t bresp_in
+        input axi4_lite_resp_t bresp_in
     );
         bresp <= bresp_in;
 
@@ -155,7 +162,7 @@ interface rv_axi4_lite_b_intf #(
     endtask
 
     task recv(
-        output rv_axi4_lite_resp_t bresp_out
+        output axi4_lite_resp_t bresp_out
     );
         bready <= 1'b1; 
         @ (posedge clk); 
@@ -167,17 +174,17 @@ interface rv_axi4_lite_b_intf #(
 
 endinterface
 
-interface rv_axi4_lite_r_intf #(
+interface axi4_lite_r_intf 
+    import axi4_lite::*;
+#(
     parameter DATA_WIDTH = 32
 )(
     input logic clk = 'b0, rst = 'b0
 );
 
-    import rv_axi4_lite::*;
-
     logic                  rvalid, rready;
     logic [DATA_WIDTH-1:0] rdata;
-    rv_axi4_lite_resp_t    rresp;
+    axi4_lite_resp_t    rresp;
 
     modport out(
         output rvalid,
@@ -198,7 +205,7 @@ interface rv_axi4_lite_r_intf #(
 
     task send(
         input logic [DATA_WIDTH-1:0] rdata_in, 
-        input rv_axi4_lite_resp_t rresp_in
+        input axi4_lite_resp_t rresp_in
     );
         rdata <= rdata_in;
         rresp <= rresp_in; 
@@ -211,7 +218,7 @@ interface rv_axi4_lite_r_intf #(
 
     task recv(
         output logic [DATA_WIDTH-1:0] rdata_out, 
-        output rv_axi4_lite_resp_t rresp_out
+        output axi4_lite_resp_t rresp_out
     );
         rready <= 1'b1; 
         @ (posedge clk); 
@@ -224,14 +231,14 @@ interface rv_axi4_lite_r_intf #(
 
 endinterface
 
-interface rv_axi4_lite_w_intf #(
+interface axi4_lite_w_intf 
+    import axi4_lite::*;
+#(
     parameter DATA_WIDTH = 32,
     parameter STROBE_WIDTH = DATA_WIDTH / 8
 )(
     input logic clk = 'b0, rst = 'b0
 );
-
-    import rv_axi4_lite::*;
 
     logic                    wvalid, wready;
     logic [DATA_WIDTH-1:0]   wdata;

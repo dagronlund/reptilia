@@ -1,13 +1,24 @@
 `timescale 1ns/1ps
 
+`ifdef __LINTER__
+
 `include "../../lib/std/std_util.svh"
 `include "../../lib/std/std_mem.svh"
-
 `include "../../lib/isa/rv.svh"
 `include "../../lib/isa/rv32.svh"
 `include "../../lib/isa/rv32i.svh"
-
 `include "../../lib/gecko/gecko.svh"
+
+`else
+
+`include "std_util.svh"
+`include "std_mem.svh"
+`include "rv.svh"
+`include "rv32.svh"
+`include "rv32i.svh"
+`include "gecko.svh"
+
+`endif
 
 module gecko_micro
     import rv::*;
@@ -42,6 +53,14 @@ module gecko_micro
     std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) mem_request0 (.clk, .rst);
     std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) mem_response0 (.clk, .rst);
 
+    std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) master_requests [2] (.clk, .rst);
+    std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) master_responses [2] (.clk, .rst);
+
+    mem_tie tie_inst0(.mem_in(inst_request), .mem_out(master_requests[0]));
+    mem_tie tie_inst1(.mem_in(supervisor_request), .mem_out(master_requests[1]));
+    mem_tie tie_inst2(.mem_in(master_responses[0]), .mem_out(inst_result));
+    mem_tie tie_inst3(.mem_in(master_responses[1]), .mem_out(supervisor_response));
+
     mem_mux #(
         .ADDR_WIDTH(32),
         .DATA_WIDTH(32),
@@ -52,8 +71,8 @@ module gecko_micro
     ) super_inst_mux (
         .clk, .rst,
 
-        .slave_command('{inst_request, supervisor_request}),
-        .slave_result('{inst_result, supervisor_response}),
+        .slave_command(master_requests),
+        .slave_result(master_responses),
 
         .master_command(mem_request0),
         .master_result(mem_response0)

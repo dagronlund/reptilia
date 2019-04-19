@@ -1,7 +1,16 @@
 `timescale 1ns/1ps
 
+`ifdef __LINTER__
+
 `include "../../lib/std/std_util.svh"
 `include "../../lib/std/std_mem.svh"
+
+`else
+
+`include "std_util.svh"
+`include "std_mem.svh"
+
+`endif
 
 module mem_crossbar #(
     parameter int SLAVE_PORTS = 1,

@@ -1,6 +1,14 @@
 `timescale 1ns/1ps
 
+`ifdef __LINTER__
+
 `include "../../lib/std/std_util.svh"
+
+`else
+
+`include "std_util.svh"
+
+`endif
 
 /*
  * Implements a variable length pipeline stage

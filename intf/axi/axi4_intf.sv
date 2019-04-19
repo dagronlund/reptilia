@@ -1,6 +1,14 @@
 `timescale 1ns/1ps
 
+`ifdef __LINTER__
+
 `include "../../lib/axi/axi4.svh"
+
+`else 
+
+`include "axi4.svh"
+
+`endif
 
 interface axi4_ar_intf 
     import axi4::*;

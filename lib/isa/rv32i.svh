@@ -32,7 +32,7 @@ package rv32i;
         RV32I_OPCODE_BRANCH = 'h63, // Branch (B-Type)
         RV32I_OPCODE_SYSTEM = 'h73, // System (I-Type)
         RV32I_OPCODE_FENCE = 'h0F, // Fence (I-Type)
-        RV32I_OPCODE_UNDEF = 7'hXX
+        RV32I_OPCODE_UNDEF
     } rv32i_opcode_t;
 
     typedef enum rv32_funct3_t {
@@ -52,7 +52,7 @@ package rv32i;
         RV32I_FUNCT3_LS_W = 'h2,
         RV32I_FUNCT3_LS_BU = 'h4,
         RV32I_FUNCT3_LS_HU = 'h5,
-        RV32I_FUNCT3_LS_UNDEF = 3'bXXX
+        RV32I_FUNCT3_LS_UNDEF = 'h6
     } rv32i_funct3_ls_t;
 
     typedef enum rv32_funct3_t {
@@ -62,7 +62,7 @@ package rv32i;
         RV32I_FUNCT3_B_BGE = 'h5,
         RV32I_FUNCT3_B_BLTU = 'h6,
         RV32I_FUNCT3_B_BGEU = 'h7,
-        RV32I_FUNCT3_B_UNDEF = 3'bXXX
+        RV32I_FUNCT3_B_UNDEF = 'h2
     } rv32i_funct3_b_t;
 
     typedef enum rv32_funct3_t {
@@ -73,7 +73,7 @@ package rv32i;
         RV32I_FUNCT3_SYS_CSRRWI = 'h5,
         RV32I_FUNCT3_SYS_CSRRSI = 'h6,
         RV32I_FUNCT3_SYS_CSRRCI = 'h7,
-        RV32I_FUNCT3_SYS_UNDEF = 3'bXXX
+        RV32I_FUNCT3_SYS_UNDEF = 'h4
     } rv32i_funct3_sys_t;
 
     typedef union packed {
@@ -86,13 +86,13 @@ package rv32i;
     typedef enum rv32_funct7_t {
         RV32I_FUNCT7_INT = 'h00,
         RV32I_FUNCT7_ALT_INT = 'h20,
-        RV32I_FUNCT7_UNDEF = 7'hXX
+        RV32I_FUNCT7_UNDEF
     } rv32i_funct7_t;
 
     typedef enum rv32_funct12_t {
         RV32I_FUNCT12_ECALL = 'h0,
         RV32I_FUNCT12_EBREAK = 'h1,
-        RV32I_FUNCT12_UNDEF = 12'hX
+        RV32I_FUNCT12_UNDEF
     } rv32i_funct12_t;
 
     function automatic rv32_fields_t rv32_get_fields(

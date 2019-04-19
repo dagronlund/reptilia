@@ -1,9 +1,18 @@
 `timescale 1ns/1ps
 
+`ifdef __LINTER__
+
 `include "../../lib/std/std_util.svh"
 `include "../../lib/std/std_mem.svh"
-
 `include "../../lib/axi/axi4.svh"
+
+`else 
+
+`include "std_util.svh"
+`include "std_mem.svh"
+`include "axi4.svh"
+
+`endif
 
 /*
  * Implements a bridge from an AXI4 bus to a lighter-weight memory bus.
