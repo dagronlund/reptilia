@@ -4,8 +4,8 @@
  * 👾🌌 You have no idea how cool this module is. 🔭🇺🇸
  */
 module std_flow #(
-    parameter NUM_INPUTS = 1, 
-    parameter NUM_OUTPUTS = 1
+    parameter int NUM_INPUTS = 1, 
+    parameter int NUM_OUTPUTS = 1
 )(
     input logic clk, rst,
 

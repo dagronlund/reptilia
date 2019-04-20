@@ -1,8 +1,20 @@
+`timescale 1ns/1ps
+
+`ifdef __LINTER__
+
 `include "../lib/isa/rv.svh"
 `include "../lib/isa/rv32.svh"
 `include "../lib/isa/rv32i.svh"
-
 `include "../lib/gecko/gecko.svh"
+
+`else
+
+`include "rv.svh"
+`include "rv32.svh"
+`include "rv32i.svh"
+`include "gecko.svh"
+
+`endif
 
 module gecko_micro_wrapper();
 

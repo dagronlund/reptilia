@@ -1,10 +1,19 @@
 `timescale 1ns/1ps
 
+`ifdef __LINTER__
+
 `include "../../lib/std/std_util.svh"
+
+`else
+
+`include "std_util.svh"
+
+`endif
 
 module stream_merge #(
     parameter int PORTS = 2,
-    parameter int ID_WIDTH = $clog2(PORTS)
+    parameter int ID_WIDTH = $clog2(PORTS),
+    parameter int PIPELINE_MODE = 1
 )(
     input logic clk, rst,
 
@@ -51,27 +60,44 @@ module stream_merge #(
 
     logic enable;
     logic [PORTS-1:0] consume;
-    logic produce, enable_output;
-    
-    std_flow #(
+    logic produce;
+
+    typedef struct packed {
+        payload_t payload;
+        index_t id;
+    } payload_id_t;
+
+    std_stream_intf #(.T(payload_id_t)) stream_mid (.clk, .rst);
+    std_stream_intf #(.T(payload_id_t)) stream_out_packed (.clk, .rst);
+
+    std_flow_lite #(
         .NUM_INPUTS(PORTS),
         .NUM_OUTPUTS(1)
-    ) std_flow_inst (
+    ) std_flow_lite_inst (
         .clk, .rst,
 
         .valid_input(stream_in_valid),
         .ready_input(stream_in_ready),
 
-        .valid_output(stream_out.valid),
-        .ready_output(stream_out.ready),
+        .valid_output({stream_mid.valid}),
+        .ready_output({stream_mid.ready}),
 
-        .consume, .produce,
-        .enable, .enable_output
+        .consume, .produce, .enable
     );
 
     payload_t stream_out_payload_next;
     index_t stream_out_id_next;
     index_t current_priority, next_priority;
+
+    std_flow_stage #(
+        .T(payload_id_t),
+        .MODE(PIPELINE_MODE)
+    ) std_flow_output_inst (
+        .clk, .rst,
+
+        .stream_in(stream_mid),
+        .stream_out(stream_out_packed)
+    );
 
     always_ff @(posedge clk) begin
         if(rst) begin
@@ -79,14 +105,10 @@ module stream_merge #(
         end else if (enable) begin
             current_priority <= next_priority;
         end
-
-        if (enable_output) begin
-            stream_out.payload <= stream_out_payload_next;
-            stream_out_id <= stream_out_id_next;
-        end
     end
 
     always_comb begin
+        automatic payload_id_t next_output;
         automatic index_t stream_in_index;
         automatic int incr;
 
@@ -95,8 +117,8 @@ module stream_merge #(
         next_priority = current_priority;
 
         // Set default master payloads, better than just zeros
-        stream_out_payload_next = stream_in_payload[0];
-        stream_out_id_next = 'b0;
+        next_output.payload = stream_in_payload[0];
+        next_output.id = 'b0;
 
         // Go through input streams starting at current priority
         for (incr = 'b0; incr < PORTS; incr++) begin
@@ -106,11 +128,19 @@ module stream_merge #(
             if (stream_in_valid[stream_in_index] && !produce) begin
                 consume[stream_in_index] = 'b1;
                 produce = 'b1;
-                stream_out_payload_next = stream_in_payload[stream_in_index];
+                next_output.payload = stream_in_payload[stream_in_index];
                 next_priority = get_next_priority(stream_in_index, 'b1);
-                stream_out_id_next = stream_in_index;
+                next_output.id = stream_in_index;
             end
         end
+
+        stream_mid.payload = next_output;
+
+        // Connect stream_out_id to stream_out
+        stream_out.valid = stream_out_packed.valid;
+        stream_out.payload = stream_out_packed.payload.payload;
+        stream_out_id = stream_out_packed.payload.id;
+        stream_out_packed.ready = stream_out.ready;
     end
 
 endmodule

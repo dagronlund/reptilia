@@ -24,7 +24,8 @@ module mem_split_merge_tb
 
 
     mem_merge #(
-        .PORTS(PORTS)
+        .PORTS(PORTS),
+        .PIPELINE_MODE(0)
     ) mem_merge_inst (
         .clk, .rst,
         .mem_in('{mem_in0, mem_in1}),
@@ -33,7 +34,8 @@ module mem_split_merge_tb
     );
 
     mem_split #(
-        .PORTS(PORTS)
+        .PORTS(PORTS),
+        .PIPELINE_MODE(0)
     ) mem_split_inst(
         .clk, .rst,
         .mem_in(mem_mid),
@@ -64,8 +66,12 @@ module mem_split_merge_tb
         end
         begin
             mem_out0.recv(re, we, data, addr, id);
-            mem_out1.recv(re, we, data, addr, id);
+            // mem_out1.recv(re, we, data, addr, id);
             mem_out0.recv(re, we, data, addr, id);
+            // mem_out1.recv(re, we, data, addr, id);
+        end
+        begin
+            mem_out1.recv(re, we, data, addr, id);
             mem_out1.recv(re, we, data, addr, id);
         end
         join

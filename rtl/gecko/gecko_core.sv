@@ -1,13 +1,24 @@
 `timescale 1ns/1ps
 
+`ifdef __LINTER__
+
 `include "../../lib/std/std_util.svh"
 `include "../../lib/std/std_mem.svh"
-
 `include "../../lib/isa/rv.svh"
 `include "../../lib/isa/rv32.svh"
 `include "../../lib/isa/rv32i.svh"
-
 `include "../../lib/gecko/gecko.svh"
+
+`else
+
+`include "std_util.svh"
+`include "std_mem.svh"
+`include "rv.svh"
+`include "rv32.svh"
+`include "rv32i.svh"
+`include "gecko.svh"
+
+`endif
 
 module gecko_core
     import rv::*;
@@ -44,6 +55,7 @@ module gecko_core
 
     std_stream_intf #(.T(gecko_operation_t)) execute_result (.clk, .rst);
     std_stream_intf #(.T(gecko_operation_t)) system_result (.clk, .rst);
+    std_stream_intf #(.T(gecko_operation_t)) memory_result (.clk, .rst);
 
     std_stream_intf #(.T(gecko_operation_t)) writeback_result (.clk, .rst);
 
@@ -55,16 +67,18 @@ module gecko_core
 
     gecko_retired_count_t retired_instructions;
 
+    assign memory_result.valid = mem_command_out.valid && data_result.valid;
+    assign memory_result.payload = gecko_get_load_operation(mem_command_out.payload, data_result.data);
+    assign mem_command_out.ready = memory_result.ready;
+    assign data_result.ready = memory_result.ready;
+
     gecko_forwarded_t execute_forwarded;
     gecko_forwarded_t writeback_forwarded;
     gecko_forwarded_t memory_forwarded;
 
     assign execute_forwarded = gecko_construct_forward(execute_result.valid, execute_result.payload);
     assign writeback_forwarded = gecko_construct_forward(writeback_result.valid, writeback_result.payload);
-    assign memory_forwarded = gecko_construct_forward(
-        mem_command_out.valid && data_result.valid,
-        gecko_get_load_operation(mem_command_out.payload, data_result.data)
-    );
+    assign memory_forwarded = gecko_construct_forward(memory_result.valid, memory_result.payload);
 
     gecko_fetch #(
         .START_ADDR(START_ADDR)
@@ -78,6 +92,7 @@ module gecko_core
     );
 
     std_stream_stage #(
+        .T(gecko_instruction_operation_t),
         .LATENCY(INST_LATENCY)
     ) gecko_inst_stage_inst (
         .clk, .rst,
@@ -120,6 +135,7 @@ module gecko_core
     );
 
     std_stream_stage #(
+        .T(gecko_mem_operation_t),
         .LATENCY(DATA_LATENCY)
     ) gecko_data_stage_inst (
         .clk, .rst,
@@ -138,18 +154,18 @@ module gecko_core
         .system_result
     );
 
-    gecko_writeback gecko_writeback_inst
-    (
+    std_stream_intf #(.T(gecko_operation_t)) writeback_results_in [3] (.clk, .rst);
+
+    stream_tie stream_tie_inst0(.stream_in(execute_result), .stream_out(writeback_results_in[0]));
+    stream_tie stream_tie_inst1(.stream_in(memory_result), .stream_out(writeback_results_in[1]));
+    stream_tie stream_tie_inst2(.stream_in(system_result), .stream_out(writeback_results_in[2]));
+
+    gecko_writeback #(
+        .PORTS(3)
+    ) gecko_writeback_inst (
         .clk, .rst,
 
-        .execute_result,
-
-        .mem_command(mem_command_out),
-        .mem_result(data_result),
-
-        .system_result,
-
-        .writeback_result
+        .writeback_results_in, .writeback_result
     );
 
 endmodule

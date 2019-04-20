@@ -116,7 +116,7 @@ package gecko;
         GECKO_EXECUTE_TYPE_STORE = 3'b010,
         GECKO_EXECUTE_TYPE_BRANCH = 3'b011,
         GECKO_EXECUTE_TYPE_JUMP = 3'b100,
-        GECKO_EXECUTE_TYPE_UNDEF = 3'bXXX
+        GECKO_EXECUTE_TYPE_UNDEF // = 3'bXXX
     } gecko_execute_type_t;
 
     typedef struct packed {
@@ -284,14 +284,14 @@ package gecko;
         GECKO_SHIFT_STRIDE_4 = 'h2,
         GECKO_SHIFT_STRIDE_8 = 'h3,
         GECKO_SHIFT_STRIDE_16 = 'h4,
-        GECKO_SHIFT_STRIDE_UNDEF = 'hX
+        GECKO_SHIFT_STRIDE_UNDEF
     } gecko_shift_stride_t;
 
     typedef enum logic [1:0] {
         GECKO_SHIFT_LL = 'h0, // Left Logical
         GECKO_SHIFT_RL = 'h1, // Right Logical
         GECKO_SHIFT_RA = 'h2, // Right Arithmetic
-        GECKO_SHIFT_UNDEF = 'hX
+        GECKO_SHIFT_UNDEF
     } gecko_shift_type_t;
 
     typedef struct packed {

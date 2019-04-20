@@ -1,17 +1,29 @@
 `timescale 1ns/1ps
 
+`ifdef __LINTER__
+
 `include "../../lib/std/std_util.svh"
 `include "../../lib/std/std_mem.svh"
-
 `include "../../lib/isa/rv.svh"
 `include "../../lib/isa/rv32.svh"
 `include "../../lib/isa/rv32i.svh"
-
 `include "../../lib/gecko/gecko.svh"
 `include "../../lib/gecko/gecko_decode_util.svh"
 
+`else
+
+`include "std_util.svh"
+`include "std_mem.svh"
+`include "rv.svh"
+`include "rv32.svh"
+`include "rv32i.svh"
+`include "gecko.svh"
+`include "gecko_decode_util.svh"
+
+`endif
+
 /*
- * A round-robin scheduler for producing commands to write back to the
+ * A round-robin (maybe?) scheduler for producing commands to write back to the
  * register file, one result at a time. The writeback stage also implements
  * the logic necessary to align a value read from memory according to halfword
  * or byte boundaries.
@@ -25,15 +37,12 @@ module gecko_writeback
     import rv32i::*;
     import gecko::*;
     import gecko_decode_util::*;
-#()(
+#(
+    parameter int PORTS = 1
+)(
     input logic clk, rst,
 
-    std_stream_intf.in execute_result, // gecko_operation_t
-
-    std_stream_intf.in mem_command, // gecko_mem_operation_t
-    std_mem_intf.in mem_result,
-
-    std_stream_intf.in system_result, // gecko_operation_t
+    std_stream_intf.in writeback_results_in [PORTS],
 
     std_stream_intf.out writeback_result // gecko_operation_t
 );
@@ -42,54 +51,58 @@ module gecko_writeback
     // of independent input streams to the writeback module
     `STATIC_ASSERT($pow(2, $size(gecko_reg_status_t)) >= 3)
 
-    typedef enum logic [1:0] {
-        GECKO_WRITEBACK_RESET = 2'b00,
-        GECKO_WRITEBACK_EXECUTE = 2'b01,
-        GECKO_WRITEBACK_MEM = 2'b10,
-        GECKO_WRITEBACK_SYSTEM = 2'b11
+    typedef enum logic {
+        GECKO_WRITEBACK_RESET = 1'b0,
+        GECKO_WRITEBACK_NORMAL = 1'b1
     } gecko_writeback_state_t;
 
+    logic [PORTS-1:0] results_in_valid, results_in_ready;
+    gecko_operation_t results_in_operation [PORTS];
+
+    generate
+    genvar k;
+    for (k = 0; k < PORTS; k++) begin
+        always_comb begin
+            results_in_valid[k] = writeback_results_in[k].valid;
+            results_in_operation[k] = writeback_results_in[k].payload;
+            writeback_results_in[k].ready = results_in_ready[k];
+        end
+    end
+    endgenerate
+
     logic enable;
-    logic produce, consume_execute, consume_mem, consume_system;
+    logic [PORTS-1:0] consume;
+    logic produce;
 
     // Flow Controller
     std_flow #(
-        .NUM_INPUTS(4),
+        .NUM_INPUTS(PORTS),
         .NUM_OUTPUTS(1)
     ) std_flow_inst (
         .clk, .rst,
 
-        .valid_input({execute_result.valid, 
-                mem_command.valid, 
-                mem_result.valid, 
-                system_result.valid}),
-        .ready_input({execute_result.ready, 
-                mem_command.ready, 
-                mem_result.ready, 
-                system_result.ready}),
-        
+        .valid_input(results_in_valid),
+        .ready_input(results_in_ready),
+
         .valid_output({writeback_result.valid}),
         .ready_output({writeback_result.ready}),
 
-        .consume({consume_execute, consume_mem, consume_mem, consume_system}),
-        .produce({produce}),
-
-        .enable
+        .produce, .consume, .enable
     );
 
     logic status_write_enable;
     rv32_reg_addr_t status_write_addr;
     gecko_reg_status_t status_write_value;
 
-    rv32_reg_addr_t execute_status_read_addr, memory_status_read_addr, system_status_read_addr;
-    gecko_reg_status_t execute_reg_status, mem_reg_status, system_reg_status;
+    rv32_reg_addr_t status_read_addr [PORTS];
+    gecko_reg_status_t reg_status [PORTS];
 
     // Local Register File Status
     localparam GECKO_REG_STATUS_WIDTH = $size(gecko_reg_status_t);
     std_distributed_ram #(
         .DATA_WIDTH(GECKO_REG_STATUS_WIDTH),
         .ADDR_WIDTH($size(rv32_reg_addr_t)),
-        .READ_PORTS(3)
+        .READ_PORTS(PORTS)
     ) register_status_counters_inst (
         .clk, .rst,
 
@@ -98,8 +111,8 @@ module gecko_writeback
         .write_addr(status_write_addr),
         .write_data_in(status_write_value),
 
-        .read_addr('{execute_status_read_addr, memory_status_read_addr, system_status_read_addr}),
-        .read_data_out('{execute_reg_status, mem_reg_status, system_reg_status})
+        .read_addr(status_read_addr),
+        .read_data_out(reg_status)
     );
 
     gecko_writeback_state_t current_state, next_state;
@@ -122,22 +135,17 @@ module gecko_writeback
     end
 
     always_comb begin
-        automatic logic execute_status_good, memory_status_good, system_status_good;
-        automatic gecko_operation_t execute_operation, mem_operation, system_operation;
-
-        execute_operation = gecko_operation_t'(execute_result.payload);
-        system_operation = gecko_operation_t'(system_result.payload);
-        mem_operation = gecko_get_load_operation(mem_command.payload, mem_result.data);
+        automatic logic [PORTS-1:0] status_good;
 
         // Read local register file status flags
-        execute_status_read_addr = execute_operation.addr;
-        memory_status_read_addr = mem_operation.addr;
-        system_status_read_addr = system_operation.addr;
+        for (int i = 0; i < PORTS; i++) begin
+            status_read_addr[i] = results_in_operation[i].addr;
+        end
 
         // Find if input matches current ordering to accept it
-        execute_status_good = (execute_reg_status == execute_operation.reg_status); 
-        memory_status_good = (mem_reg_status == mem_operation.reg_status);
-        system_status_good = (system_reg_status == system_operation.reg_status);
+        for (int i = 0; i < PORTS; i++) begin
+            status_good[i] = (reg_status[i] == results_in_operation[i].reg_status);
+        end
 
         next_state = current_state;
         next_counter = current_counter + 'b1;
@@ -146,63 +154,32 @@ module gecko_writeback
         status_write_addr = current_counter;
         status_write_value = 'b0;
 
-        consume_execute = 'b0;
-        consume_mem = 'b0;
-        consume_system = 'b0;
+        consume = 'b0;
+
+        next_writeback_result = '{default: 'b0};
 
         // Round-Robin input selection
         case (current_state)
         GECKO_WRITEBACK_RESET: begin
             status_write_enable = 'b1;
             if (next_counter == 'b0) begin
-                next_state = GECKO_WRITEBACK_EXECUTE;
+                next_state = GECKO_WRITEBACK_NORMAL;
             end else begin
                 next_state = GECKO_WRITEBACK_RESET;
             end
         end
-        GECKO_WRITEBACK_EXECUTE: begin
-            if (execute_result.valid && execute_status_good) begin
-                consume_execute = 'b1;
-            end else if (mem_command.valid && mem_result.valid && memory_status_good) begin
-                consume_mem = 'b1;
-            end else if (system_result.valid && system_status_good) begin
-                consume_system = 'b1;
-            end
-        end
-        GECKO_WRITEBACK_MEM: begin
-            if (mem_command.valid && mem_result.valid && memory_status_good) begin
-                consume_mem = 'b1;
-            end else if (system_result.valid && system_status_good) begin
-                consume_system = 'b1;
-            end else if (execute_result.valid && execute_status_good) begin
-                consume_execute = 'b1;
-            end
-        end
-        GECKO_WRITEBACK_SYSTEM: begin
-            if (system_result.valid && system_status_good) begin
-                consume_system = 'b1;
-            end else if (execute_result.valid && execute_status_good) begin
-                consume_execute = 'b1;
-            end else if (mem_command.valid && mem_result.valid && memory_status_good) begin
-                consume_mem = 'b1;
+        GECKO_WRITEBACK_NORMAL: begin
+            for (int i = 0; i < PORTS; i++) begin
+                if (results_in_valid[i] && status_good[i]) begin
+                    consume[i] = 'b1;
+                    next_writeback_result = results_in_operation[i];
+                    break;
+                end
             end
         end
         endcase
 
-        produce = consume_execute || consume_mem || consume_system;
-
-        // Copy selected input to output
-        next_writeback_result = execute_operation;
-        if (consume_execute) begin
-            next_writeback_result = execute_operation;
-            // next_state = GECKO_WRITEBACK_MEM; 
-        end else if (consume_mem) begin
-            next_writeback_result = mem_operation;
-            // next_state = GECKO_WRITEBACK_SYSTEM;
-        end else if (consume_system) begin
-            next_writeback_result = system_operation;
-            // next_state = GECKO_WRITEBACK_EXECUTE;
-        end
+        produce = (|consume);
 
         // Update local register file status
         if (produce) begin

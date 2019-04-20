@@ -1,14 +1,26 @@
 `timescale 1ns/1ps
 
+`ifdef __LINTER__
+
 `include "../../lib/std/std_util.svh"
 `include "../../lib/std/std_mem.svh"
-
 `include "../../lib/isa/rv.svh"
 `include "../../lib/isa/rv32.svh"
 `include "../../lib/isa/rv32i.svh"
-
 `include "../../lib/gecko/gecko.svh"
 `include "../../lib/gecko/gecko_decode_util.svh"
+
+`else
+
+`include "std_util.svh"
+`include "std_mem.svh"
+`include "rv.svh"
+`include "rv32.svh"
+`include "rv32i.svh"
+`include "gecko.svh"
+`include "gecko_decode_util.svh"
+
+`endif
 
 /*
  * Decode State:
@@ -69,13 +81,14 @@ module gecko_decode
     output gecko_retired_count_t retired_instructions
 );
 
+    localparam GECKO_REG_STATUS_WIDTH = $size(gecko_reg_status_t);
+
     typedef enum logic [2:0] {
         GECKO_DECODE_RESET = 3'b000,
         GECKO_DECODE_NORMAL = 3'b001,
         GECKO_DECODE_SPECULATIVE = 3'b010,
         GECKO_DECODE_HALT = 3'b100,
-        GECKO_DECODE_FAULT = 3'b101,
-        GECKO_DECODE_UNDEF = 3'bXXX
+        GECKO_DECODE_FAULT = 3'b101
     } gecko_decode_state_t;
 
     localparam NUM_SPECULATIVE_COUNTERS = 2**$bits(gecko_jump_flag_t);
@@ -175,6 +188,7 @@ module gecko_decode
         .enable_output({enable_system, enable_execute})
     );
 
+    logic faulted, fault_flag;
     logic next_state_speculative_to_normal;
     gecko_decode_state_t state, next_state;
     rv32_reg_addr_t reset_counter, next_reset_counter;
@@ -182,8 +196,6 @@ module gecko_decode
     gecko_jump_flag_t jump_flag;
     logic clear_speculative_retired_counter;
     gecko_speculative_count_t speculative_retired_counter, next_speculative_retired_counter;
-    gecko_decode_reg_file_status_t reg_file_status, next_reg_file_status;
-    gecko_decode_reg_file_status_t reg_file_counter, next_reg_file_counter; // TODO: Replace with RAM
     logic clear_execute_saved;
     rv32_reg_addr_t execute_saved, next_execute_saved;
 
@@ -275,9 +287,9 @@ module gecko_decode
         if(rst) begin
             state <= GECKO_DECODE_RESET;
             reset_counter <= 'b0;
-            reg_file_status = '{32{GECKO_REG_STATUS_VALID}};
             retired_instructions <= 'b0;
             speculative_flag <= 'b0;
+            faulted <= 'b0;
         end else begin
             if (enable) begin
                 state <= next_state;
@@ -285,10 +297,10 @@ module gecko_decode
                 if (next_state_speculative_to_normal) state <= GECKO_DECODE_NORMAL;
             end
             reset_counter <= next_reset_counter;
-            reg_file_status <= next_reg_file_status;
             retired_instructions <= speculation_resolved_instructions + 
                     (enable && normal_resolved_instruction);
             speculative_flag <= next_speculative_flag;
+            if (fault_flag) faulted <= 'b1;
         end
         
         if (rst) begin
@@ -318,12 +330,6 @@ module gecko_decode
             speculative_retired_counter <= 'b0;
         end else if (enable) begin
             speculative_retired_counter <= next_speculative_retired_counter;
-        end
-
-        if (rst) begin
-            reg_file_counter = '{32{GECKO_REG_STATUS_VALID}};
-        end else if (enable) begin
-            reg_file_counter <= next_reg_file_counter;
         end
 
         if (rst || clear_execute_saved) begin
@@ -363,6 +369,53 @@ module gecko_decode
         .read_data_out('{register_read_value0, register_read_value1})
     );
 
+    logic front_status_rd_write_enable, rear_status_writeback_enable;
+
+    rv32_reg_addr_t reg_status_rd_addr, reg_status_rs1_addr, reg_status_rs2_addr;
+    gecko_reg_status_t front_status_rd, front_status_rs1, front_status_rs2;
+    gecko_reg_status_t rear_status_rd, rear_status_rs1, rear_status_rs2;
+
+    // Register file status from decode alone
+    std_distributed_ram #(
+        .DATA_WIDTH(GECKO_REG_STATUS_WIDTH),
+        .ADDR_WIDTH($size(rv32_reg_addr_t)),
+        .READ_PORTS(2)
+    ) register_status_front_inst (
+        .clk, .rst,
+
+        // Always write to all bits in register, gate with state clock enable
+        .write_enable({GECKO_REG_STATUS_WIDTH{front_status_rd_write_enable && enable}}),
+        .write_addr(reg_status_rd_addr),
+        // Simply increment the status when written to
+        .write_data_in((state == GECKO_DECODE_RESET) ? 'b0 : (front_status_rd + 'b1)),
+        .write_data_out(front_status_rd),
+
+        .read_addr('{reg_status_rs1_addr, reg_status_rs2_addr}),
+        .read_data_out('{front_status_rs1, front_status_rs2})
+    );
+
+    rv32_reg_addr_t rear_status_writeback_addr;
+    gecko_reg_status_t rear_status_writeback;
+
+    // Register file status from writebacks
+    std_distributed_ram #(
+        .DATA_WIDTH(GECKO_REG_STATUS_WIDTH),
+        .ADDR_WIDTH($size(rv32_reg_addr_t)),
+        .READ_PORTS(3)
+    ) register_status_rear_inst (
+        .clk, .rst,
+
+        // Always write to all bits in register, gate with state clock enable
+        .write_enable({GECKO_REG_STATUS_WIDTH{rear_status_writeback_enable}}),
+        .write_addr(rear_status_writeback_addr),
+        // Simply increment the status when written to
+        .write_data_in((state == GECKO_DECODE_RESET) ? 'b0 : (rear_status_writeback + 'b1)),
+        .write_data_out(rear_status_writeback),
+
+        .read_addr('{reg_status_rd_addr, reg_status_rs1_addr, reg_status_rs2_addr}),
+        .read_data_out('{rear_status_rd, rear_status_rs1, rear_status_rs2})
+    );
+
     gecko_decode_state_transition_t state_transition;
     always_comb begin
         automatic gecko_instruction_operation_t inst_cmd_in;
@@ -381,6 +434,8 @@ module gecko_decode
         automatic gecko_decode_opcode_status_t opcode_status;
         automatic gecko_jump_flag_t next_jump_flag;
 
+        automatic gecko_reg_status_t rd_status_calc, rs1_status_calc, rs2_status_calc;
+
         // Reassign payloads to typed values
         jump_cmd_in = gecko_jump_operation_t'(jump_command.payload);
         inst_cmd_in = gecko_instruction_operation_t'(instruction_command.payload);
@@ -391,8 +446,6 @@ module gecko_decode
         next_state = state;
         next_reset_counter = reset_counter + 'b1;
         next_speculative_retired_counter = speculative_retired_counter;
-        next_reg_file_status = reg_file_status;
-        next_reg_file_counter = reg_file_counter;
         next_execute_saved = execute_saved;
         next_speculative_status = speculative_status;
         next_speculative_flag = speculative_flag;
@@ -404,20 +457,37 @@ module gecko_decode
         consume_instruction = 'b0;
         produce_execute = 'b0;
         produce_system = 'b0;
+        fault_flag = 'b0;
 
         // Handle clearing register file by default
         register_write_enable = (state == GECKO_DECODE_RESET);
         register_write_addr = reset_counter;
         register_write_value = 'b0;
 
-        // Determine various external flags
-        reg_file_clear = 'b1;
-        for (int i = 0; i < 32; i++) begin
-            reg_file_clear &= (reg_file_status[i[4:0]] == GECKO_REG_STATUS_VALID);
+        // Read specific registers if calling the operating environment
+        if (instruction_fields.opcode == RV32I_OPCODE_SYSTEM && 
+                instruction_fields.funct3 == RV32I_FUNCT3_SYS_ENV) begin
+            instruction_fields.rs1 = 'd10;
+            instruction_fields.rs2 = 'd11;
         end
+
+        // Clear register file status by default
+        front_status_rd_write_enable = (state == GECKO_DECODE_RESET);
+        rear_status_writeback_enable = (state == GECKO_DECODE_RESET);
+        rear_status_writeback_addr = reset_counter;
+
+        // Determine register status
+        reg_status_rd_addr = (state == GECKO_DECODE_RESET) ? reset_counter : instruction_fields.rd;
+        reg_status_rs1_addr = instruction_fields.rs1;
+        reg_status_rs2_addr = instruction_fields.rs2;
+        rd_status_calc = front_status_rd - rear_status_rd;
+        rs1_status_calc = front_status_rs1 - rear_status_rs1;
+        rs2_status_calc = front_status_rs2 - rear_status_rs2;
+
+        // Determine various external flags
+        reg_file_clear = 'b1; // TODO: Fix register file status for distributed-RAM
         faulted_flag = (state == GECKO_DECODE_FAULT);
-        finished_flag = reg_file_clear && 
-                (state == GECKO_DECODE_HALT || state == GECKO_DECODE_FAULT);
+        finished_flag = (state == GECKO_DECODE_HALT);
 
         // Handle incoming branch signals earlier than other logic
         speculative_status_mispredicted_enable = 'b0;
@@ -464,18 +534,9 @@ module gecko_decode
             writeback_result.ready = 'b1;
         end
 
-`ifdef __SIMULATION__
-        if (instruction_fields.opcode == RV32I_OPCODE_SYSTEM && 
-                instruction_fields.funct3 == RV32I_FUNCT3_SYS_ENV) begin
-            // Read out a0 and a1 registers, SIMULATION ONLY
-            instruction_fields.rs1 = 'd10;
-            instruction_fields.rs2 = 'd11;
-        end
-`endif
-
         // Get the status of the current register file
-        operands_status = gecko_decode_find_operand_status(instruction_fields, 
-                next_execute_saved, reg_file_status);
+        operands_status = gecko_decode_find_operand_status(instruction_fields, next_execute_saved, 
+                rd_status_calc, rs1_status_calc, rs2_status_calc);
 
         // Set register file addresses
         register_read_addr0 = instruction_fields.rs1;
@@ -497,7 +558,7 @@ module gecko_decode
                 // Check forwarding for result of rs1
                 if (!operands_status.rs1_valid && 
                         forwarded_results[i].addr == instruction_fields.rs1 &&
-                        forwarded_status_plus == reg_file_counter[instruction_fields.rs1]) begin
+                        forwarded_status_plus == front_status_rs1) begin
                     rs1_value = forwarded_results[i].value;
                     operands_status.rs1_valid = 'b1;
                 end
@@ -505,7 +566,7 @@ module gecko_decode
                 // Check forwarding for result of rs2
                 if (!operands_status.rs2_valid && 
                         forwarded_results[i].addr == instruction_fields.rs2 &&
-                        forwarded_status_plus == reg_file_counter[instruction_fields.rs2]) begin
+                        forwarded_status_plus == front_status_rs2) begin
                     rs2_value = forwarded_results[i].value;
                     operands_status.rs2_valid = 'b1;
                 end
@@ -519,7 +580,7 @@ module gecko_decode
         // Build commands
         next_execute_command = create_execute_op(instruction_fields, next_execute_saved, 
                                                  rs1_value, rs2_value, inst_cmd_in.pc);
-        next_execute_command.reg_status = reg_file_counter[instruction_fields.rd];
+        next_execute_command.reg_status = front_status_rd;
         next_execute_command.prediction = inst_cmd_in.prediction;
         next_execute_command.next_pc = inst_cmd_in.next_pc;
         next_execute_command.current_pc = inst_cmd_in.pc;
@@ -529,7 +590,7 @@ module gecko_decode
 
         next_system_command = create_system_op(instruction_fields, next_execute_saved, 
                                                rs1_value, rs2_value);
-        next_system_command.reg_status = reg_file_counter[instruction_fields.rd];
+        next_system_command.reg_status = front_status_rd;
         next_system_command.jump_flag = next_speculative_flag;
 
 `ifdef __SIMULATION__
@@ -542,8 +603,7 @@ module gecko_decode
 
         debug_signals = '{default: 'b0};
         debug_signals.register_pending = !reg_file_ready;
-        debug_signals.register_full = (reg_file_status[instruction_fields.rd] == 
-            GECKO_REG_STATUS_FULL);
+        debug_signals.register_full = (rd_status_calc == GECKO_REG_STATUS_FULL);
 
         case (rv32i_opcode_t'(instruction_fields.opcode))
         RV32I_OPCODE_OP, RV32I_OPCODE_IMM, RV32I_OPCODE_LUI, RV32I_OPCODE_AUIPC: begin
@@ -625,8 +685,7 @@ module gecko_decode
             end
 
             if (instruction_fields.rd != 'b0 && does_opcode_writeback(instruction_fields)) begin
-                next_reg_file_status[instruction_fields.rd] += 1;
-                next_reg_file_counter[instruction_fields.rd] += 1;
+                front_status_rd_write_enable = 'b1;
             end
         end
 
@@ -636,13 +695,6 @@ module gecko_decode
         if (decode_stop) next_state = GECKO_DECODE_HALT;
         else if (decode_error) next_state = GECKO_DECODE_FAULT;
         else next_state = state_transition.next_state;
-
-        // DANGER: Uses the enable signal to prevent state changes from earlier
-        //         which is only needed because of the following asynchronous
-        //         control flow signals
-        if (!enable) begin
-            next_reg_file_status = reg_file_status;
-        end
 
         // Handle writing back to the register file
         if (writeback_result.valid && writeback_result.ready) begin
@@ -656,7 +708,8 @@ module gecko_decode
                 end
             end
             // Validate register regardless of speculative
-            next_reg_file_status[writeback_in.addr] -= 'b1;
+            rear_status_writeback_enable = 'b1;
+            rear_status_writeback_addr = writeback_in.addr;
         end
     end
 
