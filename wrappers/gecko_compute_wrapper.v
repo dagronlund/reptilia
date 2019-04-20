@@ -11,7 +11,8 @@ module gecko_compute_wrapper #(
     parameter INST_LATENCY = 2,
     parameter DATA_LATENCY = 2,
     parameter [31:0] START_ADDR = 'h0,
-    parameter ENABLE_PERFORMANCE_COUNTERS = 1
+    parameter ENABLE_PERFORMANCE_COUNTERS = 1,
+    parameter ENABLE_PRINT = 1
 )(
     input wire clk, rst,
     
@@ -55,6 +56,10 @@ module gecko_compute_wrapper #(
     output wire [1:0]             axi_rresp,
     output wire [ID_WIDTH-1:0]    axi_rid,
 
+    output wire print_valid,
+    input wire print_ready,
+    output wire [7:0] print_data,
+
     output wire faulted_flag, finished_flag
 );
 
@@ -69,7 +74,8 @@ module gecko_compute_wrapper #(
         .INST_LATENCY(INST_LATENCY),
         .DATA_LATENCY(DATA_LATENCY),
         .START_ADDR(START_ADDR),
-        .ENABLE_PERFORMANCE_COUNTERS(ENABLE_PERFORMANCE_COUNTERS)
+        .ENABLE_PERFORMANCE_COUNTERS(ENABLE_PERFORMANCE_COUNTERS),
+        .ENABLE_PRINT(ENABLE_PRINT)
     ) gecko_compute_wrapper_sv_inst (
         .clk(clk), .rst(rst),
 
@@ -118,7 +124,11 @@ module gecko_compute_wrapper #(
         .axi_rid(axi_rid),
 
         .faulted_flag(faulted_flag),
-        .finished_flag(finished_flag)
+        .finished_flag(finished_flag),
+
+        .print_valid(print_valid),
+        .print_ready(print_ready),
+        .print_data(print_data)
     );
 
 endmodule

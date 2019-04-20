@@ -29,7 +29,8 @@ module gecko_core
     parameter int INST_LATENCY = 1,
     parameter int DATA_LATENCY = 1,
     parameter gecko_pc_t START_ADDR = 'b0,
-    parameter int ENABLE_PERFORMANCE_COUNTERS = 1
+    parameter int ENABLE_PERFORMANCE_COUNTERS = 1,
+    parameter int ENABLE_PRINT = 1
 )(
     input logic clk, rst,
 
@@ -38,6 +39,8 @@ module gecko_core
 
     std_mem_intf.out data_request,
     std_mem_intf.in data_result,
+
+    std_stream_intf.out print_out,
 
     output logic faulted_flag, finished_flag
 );
@@ -101,7 +104,8 @@ module gecko_core
     );
 
     gecko_decode #(
-        .NUM_FORWARDED(3)
+        .NUM_FORWARDED(3),
+        .ENABLE_PRINT(ENABLE_PRINT)
     ) gecko_decode_inst (
         .clk, .rst,
 
@@ -110,6 +114,8 @@ module gecko_core
 
         .system_command,
         .execute_command,
+
+        .print_out,
 
         .jump_command,
 
@@ -167,5 +173,34 @@ module gecko_core
 
         .writeback_results_in, .writeback_result
     );
+
+`ifdef __SIMULATION__
+    initial begin
+        automatic integer file = $fopen("log.txt", "w");
+        $display("Opened file");
+        @ (posedge clk);
+        while (1) begin
+            if (print_out.valid && print_out.ready) begin
+                $fwrite(file, "%c", print_out.payload);
+            end
+            if (faulted_flag || finished_flag) begin
+                $display("Closed file");
+                $fclose(file);
+                break;
+            end
+            @ (posedge clk);
+        end
+        file = $fopen("status.txt", "w");
+        if (faulted_flag) begin
+            $display("Exit Error!!!");
+            $fwrite(file, "Failure");
+        end else begin
+            $display("Exit Success!!!");
+            $fwrite(file, "Success");
+        end
+        $fclose(file);
+        $finish();
+    end
+`endif
 
 endmodule

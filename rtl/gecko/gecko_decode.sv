@@ -60,7 +60,8 @@ module gecko_decode
     import gecko::*;
     import gecko_decode_util::*;
 #(
-    parameter int NUM_FORWARDED = 0
+    parameter int NUM_FORWARDED = 0,
+    parameter int ENABLE_PRINT = 1
 )(
     input logic clk, rst,
 
@@ -69,6 +70,8 @@ module gecko_decode
 
     std_stream_intf.out system_command, // gecko_system_operation_t
     std_stream_intf.out execute_command, // gecko_execute_operation_t
+
+    std_stream_intf.out print_out, // logic [7:0]
 
     // Non-flow Controlled
     std_stream_intf.in jump_command, // gecko_jump_operation_t
@@ -165,27 +168,27 @@ module gecko_decode
     endfunction
 
     logic consume_instruction;
-    logic produce_system, produce_execute;
-    logic enable, enable_system, enable_execute;
+    logic produce_system, produce_execute, produce_print;
+    logic enable, enable_system, enable_execute, enable_print;
 
     // Flow Controller
     std_flow #(
         .NUM_INPUTS(2),
-        .NUM_OUTPUTS(2)
+        .NUM_OUTPUTS(3)
     ) std_flow_inst (
         .clk, .rst,
 
         .valid_input({instruction_result.valid, instruction_command.valid}),
         .ready_input({instruction_result.ready, instruction_command.ready}),
 
-        .valid_output({system_command.valid, execute_command.valid}),
-        .ready_output({system_command.ready, execute_command.ready}),
+        .valid_output({system_command.valid, execute_command.valid, print_out.valid}),
+        .ready_output({system_command.ready, execute_command.ready, print_out.ready}),
 
         .consume({consume_instruction, consume_instruction}),
-        .produce({produce_system, produce_execute}),
+        .produce({produce_system, produce_execute, produce_print}),
 
         .enable,
-        .enable_output({enable_system, enable_execute})
+        .enable_output({enable_system, enable_execute, enable_print})
     );
 
     logic faulted, fault_flag;
@@ -211,8 +214,9 @@ module gecko_decode
     logic normal_resolved_instruction;
     gecko_speculative_count_t speculation_resolved_instructions;
 
-`ifdef __SIMULATION__
+    logic [7:0] next_print_out;
 
+`ifdef __SIMULATION__
     typedef struct packed {
         logic register_pending;
         logic register_full;
@@ -230,11 +234,6 @@ module gecko_decode
     logic flushing_inst;
     logic [31:0] flushing_inst_counter;
 
-    logic simulation_ecall;
-    logic simulation_write_char;
-    logic [7:0] simulation_char;
-    integer file;
-
     rv32_reg_value_t debug_counter;
     rv32_reg_value_t debug_full_counter;
 
@@ -243,44 +242,6 @@ module gecko_decode
 
     logic instruction_type_stalled;
     logic [31:0] instruction_type_stalled_counter;
-
-    initial begin
-        debug_register_pending_counter = 'b0;
-        flushing_inst_counter = 'b0;
-        execute_stalled_counter = 'b0;
-        instruction_type_stalled_counter = 'b0;
-        file = $fopen("log.txt", "w");
-        $display("Opened file");
-        @ (posedge clk);
-        while (1) begin
-            debug_counter <= debug_counter + 1;
-            flushing_inst_counter <= flushing_inst_counter + flushing_inst;
-            debug_full_counter <= debug_full_counter + debug_signals.register_full;
-            debug_register_pending_counter <= debug_register_pending_counter + debug_signals.register_pending;
-            execute_stalled_counter <= execute_stalled_counter + execute_stalled;
-            instruction_type_stalled_counter <= instruction_type_stalled_counter + instruction_type_stalled;
-            if (simulation_write_char) begin
-                $fwrite(file, "%c", simulation_char);
-            end
-            if (state == GECKO_DECODE_HALT || state == GECKO_DECODE_FAULT) begin
-                $display("Closed file");
-                $fclose(file);
-                break;
-            end
-            @ (posedge clk);
-        end
-        while (!finished_flag) @ (posedge clk);
-        file = $fopen("status.txt", "w");
-        if (faulted_flag) begin
-            $display("Exit Error!!!");
-            $fwrite(file, "Failure");
-        end else begin
-            $display("Exit Success!!!");
-            $fwrite(file, "Success");
-        end
-        $fclose(file);
-        $finish();
-    end
 `endif
 
     always_ff @(posedge clk) begin
@@ -343,6 +304,9 @@ module gecko_decode
         end
         if (enable_execute) begin
             execute_command.payload <= next_execute_command;
+        end
+        if (enable_print) begin
+            print_out.payload <= next_print_out;
         end
     end
 
@@ -457,6 +421,8 @@ module gecko_decode
         consume_instruction = 'b0;
         produce_execute = 'b0;
         produce_system = 'b0;
+        produce_print = 'b0;
+        next_print_out = 'b0;
         fault_flag = 'b0;
 
         // Handle clearing register file by default
@@ -594,10 +560,6 @@ module gecko_decode
         next_system_command.jump_flag = next_speculative_flag;
 
 `ifdef __SIMULATION__
-        simulation_ecall = 'b0;
-        simulation_write_char = 'b0;
-        simulation_char = 'b0;
-
         flushing_inst = 'b0;
         instruction_type_stalled = 'b0;
 
@@ -660,7 +622,6 @@ module gecko_decode
 
             if (instruction_fields.opcode == RV32I_OPCODE_SYSTEM &&
                     instruction_fields.funct3 == RV32I_FUNCT3_SYS_ENV) begin
-`ifdef __SIMULATION__
                 case (instruction_fields.funct12)
                 RV32I_CSR_EBREAK: begin // System Exit
                     if (rs1_value == 0) begin
@@ -670,18 +631,12 @@ module gecko_decode
                     end
                 end
                 RV32I_CSR_ECALL: begin // System Call
-                    if (enable) begin
-                        simulation_ecall = 'b1;
-                        if (rs1_value == 0) begin
-                            simulation_write_char = 'b1;
-                            simulation_char = rs2_value[7:0];
-                        end
+                    if (ENABLE_PRINT && rs1_value == 0) begin
+                        produce_print = 'b1;
+                        next_print_out = rs2_value[7:0];
                     end
                 end
                 endcase
-`else
-                decode_stop = 'b1;
-`endif
             end
 
             if (instruction_fields.rd != 'b0 && does_opcode_writeback(instruction_fields)) begin

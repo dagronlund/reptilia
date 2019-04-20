@@ -29,7 +29,8 @@ module gecko_compute_wrapper_sv #(
     parameter int INST_LATENCY = 2,
     parameter int DATA_LATENCY = 2,
     parameter logic [31:0] START_ADDR = 'h0,
-    parameter int ENABLE_PERFORMANCE_COUNTERS = 1
+    parameter int ENABLE_PERFORMANCE_COUNTERS = 1,
+    parameter int ENABLE_PRINT = 1
 )(
     input logic clk, rst,
     
@@ -76,6 +77,10 @@ module gecko_compute_wrapper_sv #(
     output logic [1:0]             axi_rresp,
     output logic [ID_WIDTH-1:0]    axi_rid,
 
+    output logic print_valid,
+    input logic print_ready,
+    output logic [7:0] print_data,
+
     output logic faulted_flag, finished_flag
 );
 
@@ -90,19 +95,24 @@ module gecko_compute_wrapper_sv #(
     axi4_w_intf axi_w(.clk, .rst);
     axi4_r_intf axi_r(.clk, .rst);
     axi4_b_intf axi_b(.clk, .rst);
+
+    std_stream_intf #(.T(logic [7:0])) print_out(.clk, .rst);
     
     gecko_compute #(
         .ADDR_SPACE_WIDTH(ADDR_SPACE_WIDTH),
         .INST_LATENCY(INST_LATENCY),
         .DATA_LATENCY(DATA_LATENCY),
         .START_ADDR(START_ADDR),
-        .ENABLE_PERFORMANCE_COUNTERS(ENABLE_PERFORMANCE_COUNTERS)
+        .ENABLE_PERFORMANCE_COUNTERS(ENABLE_PERFORMANCE_COUNTERS),
+        .ENABLE_PRINT(ENABLE_PRINT)
     ) gecko_compute_inst (
         .clk, .rst,
 
         .axi_ar, .axi_aw, .axi_w, .axi_r, .axi_b,
 
-        .faulted_flag, .finished_flag
+        .faulted_flag, .finished_flag,
+
+        .print_out
     );
 
     always_comb begin
@@ -151,6 +161,9 @@ module gecko_compute_wrapper_sv #(
         axi_rresp = axi_r.rresp;
         axi_rid = axi_r.rid;
 
+        print_valid = print_out.valid;
+        print_out.ready = print_ready;
+        print_data = print_out.payload;
     end
 
 endmodule

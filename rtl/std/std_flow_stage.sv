@@ -81,11 +81,11 @@ module std_flow_stage #(
             end else begin
                 if (!valid_buffer[input_index] && stream_in.valid) begin
                     valid_buffer[input_index] <= 'b1;
-                    input_index <= !input_index;
+                    input_index <= input_index + 'b1;
                 end
                 if (valid_buffer[output_index] && stream_out.ready) begin
                     valid_buffer[output_index] <= 'b0;
-                    output_index <= !output_index;
+                    output_index <= output_index + 'b1;
                 end
             end
 

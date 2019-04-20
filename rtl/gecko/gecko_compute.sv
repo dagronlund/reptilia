@@ -33,7 +33,8 @@ module gecko_compute
     parameter INST_LATENCY = 2,
     parameter DATA_LATENCY = 2,
     parameter gecko_pc_t START_ADDR = 'h0,
-    parameter int ENABLE_PERFORMANCE_COUNTERS = 1
+    parameter int ENABLE_PERFORMANCE_COUNTERS = 1,
+    parameter int ENABLE_PRINT = 1
 )(
     input logic clk, rst,
 
@@ -42,6 +43,8 @@ module gecko_compute
     axi4_w_intf.in axi_w,
     axi4_r_intf.out axi_r,
     axi4_b_intf.out axi_b,
+
+    std_stream_intf.out print_out,
 
     output logic faulted_flag, finished_flag
 );
@@ -73,12 +76,14 @@ module gecko_compute
         .INST_LATENCY(INST_LATENCY),
         .DATA_LATENCY(DATA_LATENCY),
         .START_ADDR(START_ADDR),
-        .ENABLE_PERFORMANCE_COUNTERS(ENABLE_PERFORMANCE_COUNTERS)
+        .ENABLE_PERFORMANCE_COUNTERS(ENABLE_PERFORMANCE_COUNTERS),
+        .ENABLE_PRINT(ENABLE_PRINT)
     ) gecko_micro_inst (
         .clk, .rst,
 
         .supervisor_request, .supervisor_response,
-        .faulted_flag, .finished_flag
+        .faulted_flag, .finished_flag,
+        .print_out
     );
 
 endmodule
