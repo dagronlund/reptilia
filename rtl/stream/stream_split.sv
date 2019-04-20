@@ -13,7 +13,7 @@
 module stream_split #(
     parameter int PORTS = 2,
     parameter int ID_WIDTH = $clog2(PORTS),
-    parameter int PIPELINE_MODE = 1
+    parameter int PIPELINE_MODE [PORTS] = '{1, 1}
 )(
     input logic clk, rst,
 
@@ -49,7 +49,7 @@ module stream_split #(
 
         std_flow_stage #(
             .T(payload_t),
-            .MODE(PIPELINE_MODE)
+            .MODE(PIPELINE_MODE[k])
         ) std_flow_output_inst (
             .clk, .rst,
 
