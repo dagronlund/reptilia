@@ -30,7 +30,7 @@ package rv32f;
         RV32F_FUNCT7_FSQRT_S = 7'b0101100,
         RV32F_FUNCT7_FSGNJ_S = 7'b0010000. // 3 funct3 options
         RV32F_FUNCT7_FMIN_MAX_S = 7'b0010100, // 2 funct3
-        RV32F_FUNCT7_FCVT_S = 7'b1100000, // 2 funct5
+        RV32F_FUNCT7_FCVT_W_S = 7'b1100000, // 2 funct5
         RV32F_FUNCT7_FMV_X_W = 7'b1110000, // 2 funct3s
         RV32F_FUNCT7_FCMP_S = 7'b1010000, // 3 funct3
         RV32F_FUNCT7_FCVT_S_W = 7'b1101000, // 2 funct5s
@@ -51,8 +51,8 @@ package rv32f;
     } rv32f_funct3_min_max_t
 
     typedef enum rv32_funct5_t {
-        RV32F_FUNCT5_FCVT_W_S = 5'b00000,
-        RV32F_FUNCT5_FCVT_WU_S = 5'b00001,
+        RV32F_FUNCT5_FCVT_W = 5'b00000,
+        RV32F_FUNCT5_FCVT_WU = 5'b00001,
         RV32F_FUNCT5_UNDEF = 5'bXXXXX
     } rv32f_funct5_fcvt_t
 
