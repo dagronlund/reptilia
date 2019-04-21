@@ -1,3 +1,9 @@
+`ifndef __FPU_ADD__
+`define __FPU_ADD__
+
+`include "fpu.svh"
+`include "fpu_utils.svh"
+`include "fpu_operations.svh"
 
 package fpu_add;
     import fpu::*;
@@ -159,4 +165,6 @@ package fpu_add;
         return result;
     endfunction
 
-endpackage : fpu_add
+endpackage
+
+`endif

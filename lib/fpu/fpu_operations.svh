@@ -1,11 +1,12 @@
-`ifndef __FPU_OPS__ 
-`define __FPU_OPS__
+`ifndef __FPU_OPERATIONS__
+`define __FPU_OPERATIONS__
 
+`include "fpu.svh"
+`include "fpu_utils.svh"
 
 package fpu_operations;
 
     import fpu::*;
-    import fpu_ultrascale_native::*;
     import fpu_utils::*;
 
     function automatic logic[47:0] fpu_operations_multiply(

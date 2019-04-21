@@ -1,11 +1,20 @@
 `ifndef __GECKO_DECODE_UTIL__
 `define __GECKO_DECODE_UTIL__
 
-`ifdef __SIMULATION__
+`ifdef __LINTER__
+
 `include "../isa/rv.svh"
 `include "../isa/rv32.svh"
 `include "../isa/rv32i.svh"
 `include "gecko.svh"
+
+`else
+
+`include "rv.svh"
+`include "rv32.svh"
+`include "rv32i.svh"
+`include "gecko.svh"
+
 `endif
 
 package gecko_decode_util;

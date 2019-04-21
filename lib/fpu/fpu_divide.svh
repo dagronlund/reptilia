@@ -1,3 +1,9 @@
+`ifndef __FPU_DIVIDE__
+`define __FPU_DIVIDE__
+
+`include "fpu.svh"
+`include "fpu_utils.svh"
+
 package fpu_divide;
     import fpu::*;
     import fpu_utils::*;
@@ -160,4 +166,6 @@ package fpu_divide;
         return result;
     endfunction
 
-endpackage : fpu_divide
+endpackage
+
+`endif
