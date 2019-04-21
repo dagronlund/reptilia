@@ -24,5 +24,3 @@ module basilisk_input
 );
 
 endmodule
-
-`endif

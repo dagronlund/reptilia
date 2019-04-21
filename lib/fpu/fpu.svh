@@ -20,6 +20,18 @@ package fpu;
     parameter fpu_float_t FPU_FLOAT_POS_INF = 32'h7F80_0000;
     parameter fpu_float_t FPU_FLOAT_NEG_INF = 32'hFF80_0000;
 
+    // typedef struct packed {
+    //     fpu_instr_t instr_info;
+    //     logic add_en, mult_en, div_en, sqrt_en, encoder_en, decoder_en;
+    //     logic rd_we;
+    //     logic round_en;
+    //     logic invert_sign;
+    //     logic compare;
+    //     logic max;
+    //     logic int_signed;
+    //     logic move;
+    // }
+
     typedef struct packed {
         fpu_float_sign_t sign;
         fpu_float_exponent_t exponent;
@@ -40,11 +52,6 @@ package fpu;
     } fpu_float_conditions_t;
 
     typedef struct packed {
-        logic [47:0] quotient;
-        logic [2:0] guard;
-    } fpu_division_result_t;
-
-    typedef struct packed {
         logic [1:0] guard;
         logic       sticky;
     } fpu_guard_bits_t;
@@ -55,6 +62,16 @@ package fpu;
         FPU_ROUND_MODE_UP = 2'd2,
         FPU_ROUND_MODE_ZERO = 2'd3
     } fpu_round_mode_t;
+
+    typedef struct packed {
+        logic sign;
+        logic nan, inf, zero;
+        logic [2:0] guard;
+        logic [7:0] exponent;
+        logic [23:0] mantissa;
+        logic valid;
+        fpu_round_mode_t mode;
+    } fpu_result_t;
 
     typedef struct packed {
         fpu_float_mantissa_t mantissa;
