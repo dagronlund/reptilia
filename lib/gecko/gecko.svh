@@ -1,9 +1,18 @@
 `ifndef __GECKO__
 `define __GECKO__
 
-`ifdef __SIMULATION__
+`ifdef __LINTER__
+
+`include "../isa/rv.svh"
 `include "../isa/rv32.svh"
 `include "../isa/rv32i.svh"
+
+`else
+
+`include "rv.svh"
+`include "rv32.svh"
+`include "rv32i.svh"
+
 `endif
 
 package gecko;

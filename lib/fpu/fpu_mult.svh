@@ -1,3 +1,9 @@
+`ifndef __FPU_MULT__
+`define __FPU_MULT__
+
+`include "fpu.svh"
+`include "fpu_utils.svh"
+`include "fpu_operations.svh"
 
 package fpu_mult;
     import fpu::*;
@@ -156,4 +162,6 @@ package fpu_mult;
 
     endfunction
 
-endpackage : fpu_mult
+endpackage
+
+`endif

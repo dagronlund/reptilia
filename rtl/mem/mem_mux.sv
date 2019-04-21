@@ -19,7 +19,7 @@ module mem_mux #(
     parameter int ID_WIDTH = 1,
     parameter int SLAVE_PORTS = 2,
     parameter int MERGE_PIPELINE_MODE = 1,
-    parameter int SPLIT_PIPELINE_MODE = 1
+    parameter int SPLIT_PIPELINE_MODE [SLAVE_PORTS] = '{1, 1}
 )(
     input logic clk, rst,
 

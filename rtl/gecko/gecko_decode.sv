@@ -61,7 +61,8 @@ module gecko_decode
     import gecko_decode_util::*;
 #(
     parameter int NUM_FORWARDED = 0,
-    parameter int ENABLE_PRINT = 1
+    parameter int ENABLE_PRINT = 1,
+    parameter int OUTPUT_REGISTER_MODE = 2
 )(
     input logic clk, rst,
 
@@ -70,7 +71,6 @@ module gecko_decode
 
     std_stream_intf.out system_command, // gecko_system_operation_t
     std_stream_intf.out execute_command, // gecko_execute_operation_t
-
     std_stream_intf.out print_out, // logic [7:0]
 
     // Non-flow Controlled
@@ -169,27 +169,72 @@ module gecko_decode
 
     logic consume_instruction;
     logic produce_system, produce_execute, produce_print;
-    logic enable, enable_system, enable_execute, enable_print;
+    logic enable; //, enable_system, enable_execute, enable_print;
 
-    // Flow Controller
-    std_flow #(
+    std_stream_intf #(.T(gecko_system_operation_t)) next_system_command (.clk, .rst);
+    std_stream_intf #(.T(gecko_execute_operation_t)) next_execute_command (.clk, .rst);
+    std_stream_intf #(.T(logic [7:0])) next_print_out (.clk, .rst);
+
+    std_flow_lite #(
         .NUM_INPUTS(2),
         .NUM_OUTPUTS(3)
-    ) std_flow_inst (
+    ) std_flow_lite_inst (
         .clk, .rst,
 
         .valid_input({instruction_result.valid, instruction_command.valid}),
         .ready_input({instruction_result.ready, instruction_command.ready}),
 
-        .valid_output({system_command.valid, execute_command.valid, print_out.valid}),
-        .ready_output({system_command.ready, execute_command.ready, print_out.ready}),
+        .valid_output({next_system_command.valid, next_execute_command.valid, next_print_out.valid}),
+        .ready_output({next_system_command.ready, next_execute_command.ready, next_print_out.ready}),
 
-        .consume({consume_instruction, consume_instruction}),
+        .consume({consume_instruction, consume_instruction}), 
         .produce({produce_system, produce_execute, produce_print}),
-
-        .enable,
-        .enable_output({enable_system, enable_execute, enable_print})
+        .enable
     );
+
+    std_flow_stage #(
+        .T(gecko_system_operation_t),
+        .MODE(OUTPUT_REGISTER_MODE)
+    ) system_operation_output_stage (
+        .clk, .rst,
+        .stream_in(next_system_command), .stream_out(system_command)
+    );
+
+    std_flow_stage #(
+        .T(gecko_execute_operation_t),
+        .MODE(OUTPUT_REGISTER_MODE)
+    ) execute_operation_output_stage (
+        .clk, .rst,
+        .stream_in(next_execute_command), .stream_out(execute_command)
+    );
+
+    std_flow_stage #(
+        .T(logic [7:0]),
+        .MODE(OUTPUT_REGISTER_MODE)
+    ) print_out_output_stage (
+        .clk, .rst,
+        .stream_in(next_print_out), .stream_out(print_out)
+    );
+
+    // // Flow Controller
+    // std_flow #(
+    //     .NUM_INPUTS(2),
+    //     .NUM_OUTPUTS(3)
+    // ) std_flow_inst (
+    //     .clk, .rst,
+
+    //     .valid_input({instruction_result.valid, instruction_command.valid}),
+    //     .ready_input({instruction_result.ready, instruction_command.ready}),
+
+    //     .valid_output({system_command.valid, execute_command.valid, print_out.valid}),
+    //     .ready_output({system_command.ready, execute_command.ready, print_out.ready}),
+
+    //     .consume({consume_instruction, consume_instruction}),
+    //     .produce({produce_system, produce_execute, produce_print}),
+
+    //     .enable,
+    //     .enable_output({enable_system, enable_execute, enable_print})
+    // );
 
     logic faulted, fault_flag;
     logic next_state_speculative_to_normal;
@@ -209,12 +254,12 @@ module gecko_decode
     gecko_speculative_status_t speculative_status, next_speculative_status;
     gecko_jump_flag_t speculative_flag, next_speculative_flag;
 
-    gecko_system_operation_t next_system_command; 
-    gecko_execute_operation_t next_execute_command;
+    // gecko_system_operation_t next_system_command; 
+    // gecko_execute_operation_t next_execute_command;
     logic normal_resolved_instruction;
     gecko_speculative_count_t speculation_resolved_instructions;
 
-    logic [7:0] next_print_out;
+    // logic [7:0] next_print_out;
 
 `ifdef __SIMULATION__
     typedef struct packed {
@@ -299,15 +344,15 @@ module gecko_decode
             execute_saved <= next_execute_saved;
         end
         
-        if (enable_system) begin
-            system_command.payload <= next_system_command;
-        end
-        if (enable_execute) begin
-            execute_command.payload <= next_execute_command;
-        end
-        if (enable_print) begin
-            print_out.payload <= next_print_out;
-        end
+        // if (enable_system) begin
+        //     system_command.payload <= next_system_command;
+        // end
+        // if (enable_execute) begin
+        //     execute_command.payload <= next_execute_command;
+        // end
+        // if (enable_print) begin
+        //     print_out.payload <= next_print_out;
+        // end
     end
 
     logic register_write_enable;
@@ -422,7 +467,7 @@ module gecko_decode
         produce_execute = 'b0;
         produce_system = 'b0;
         produce_print = 'b0;
-        next_print_out = 'b0;
+        next_print_out.payload = 'b0;
         fault_flag = 'b0;
 
         // Handle clearing register file by default
@@ -544,20 +589,20 @@ module gecko_decode
                 operands_status.rd_valid;
 
         // Build commands
-        next_execute_command = create_execute_op(instruction_fields, next_execute_saved, 
+        next_execute_command.payload = create_execute_op(instruction_fields, next_execute_saved, 
                                                  rs1_value, rs2_value, inst_cmd_in.pc);
-        next_execute_command.reg_status = front_status_rd;
-        next_execute_command.prediction = inst_cmd_in.prediction;
-        next_execute_command.next_pc = inst_cmd_in.next_pc;
-        next_execute_command.current_pc = inst_cmd_in.pc;
+        next_execute_command.payload.reg_status = front_status_rd;
+        next_execute_command.payload.prediction = inst_cmd_in.prediction;
+        next_execute_command.payload.next_pc = inst_cmd_in.next_pc;
+        next_execute_command.payload.current_pc = inst_cmd_in.pc;
         // Issue flag if command is speculative
-        next_execute_command.speculative = (next_state == GECKO_DECODE_SPECULATIVE);
-        next_execute_command.jump_flag = next_speculative_flag;
+        next_execute_command.payload.speculative = (next_state == GECKO_DECODE_SPECULATIVE);
+        next_execute_command.payload.jump_flag = next_speculative_flag;
 
-        next_system_command = create_system_op(instruction_fields, next_execute_saved, 
+        next_system_command.payload = create_system_op(instruction_fields, next_execute_saved, 
                                                rs1_value, rs2_value);
-        next_system_command.reg_status = front_status_rd;
-        next_system_command.jump_flag = next_speculative_flag;
+        next_system_command.payload.reg_status = front_status_rd;
+        next_system_command.payload.jump_flag = next_speculative_flag;
 
 `ifdef __SIMULATION__
         flushing_inst = 'b0;
@@ -633,7 +678,7 @@ module gecko_decode
                 RV32I_CSR_ECALL: begin // System Call
                     if (ENABLE_PRINT && rs1_value == 0) begin
                         produce_print = 'b1;
-                        next_print_out = rs2_value[7:0];
+                        next_print_out.payload = rs2_value[7:0];
                     end
                 end
                 endcase

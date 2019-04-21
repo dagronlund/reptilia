@@ -1,3 +1,10 @@
+`ifndef __FPU_SQRT__
+`define __FPU_SQRT__
+
+`include "fpu.svh"
+`include "fpu_utils.svh"
+`include "fpu_operations.svh"
+
 package fpu_sqrt;
     import fpu::*;
     import fpu_utils::*;
@@ -171,4 +178,6 @@ package fpu_sqrt;
         return result;
     endfunction
 
-endpackage : fpu_sqrt
+endpackage
+
+`endif

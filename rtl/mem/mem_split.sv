@@ -18,7 +18,7 @@ module mem_split #(
     parameter int MASK_WIDTH = DATA_WIDTH / 8,
     parameter int ID_WIDTH = 1,
     parameter int PORTS = 2,
-    parameter int PIPELINE_MODE = 1
+    parameter int PIPELINE_MODE [PORTS] = '{1, 1}
 )(
     input logic clk, rst,
 

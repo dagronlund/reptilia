@@ -70,7 +70,7 @@ module gecko_micro
         .ID_WIDTH(1),
         .SLAVE_PORTS(2),
         .MERGE_PIPELINE_MODE(0),
-        .SPLIT_PIPELINE_MODE(0)
+        .SPLIT_PIPELINE_MODE('{0, 2})
     ) super_inst_mux (
         .clk, .rst,
 
