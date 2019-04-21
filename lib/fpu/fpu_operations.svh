@@ -47,6 +47,8 @@ package fpu_operations;
             result[2-i] = 0;
             end
         end 
+
+        if (A2 != 0) result[0] |= 1'b1;
         
         return result;
     endfunction
