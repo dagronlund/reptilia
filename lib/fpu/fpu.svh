@@ -122,6 +122,17 @@ package fpu;
         return {~denormalized, fields.mantissa};
     endfunction
 
+    function automatic fpu_float_conditions_t fpu_get_conditions(
+        input fpu_float_fields_t a
+    );
+        return '{
+            zero: (a.exponent == 0 && a.mantissa == 0),
+            norm: (a.exponent != 0),
+            nan: (a == FPU_FLOAT_NAN),
+            inf: (a == FPU_FLOAT_POS_INF || a == FPU_FLOAT_NEG_INF)
+        };
+    endfunction
+
 endpackage
 
 `endif

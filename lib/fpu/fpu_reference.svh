@@ -9,24 +9,10 @@ package fpu_reference;
     import fpu_utils::*;
     import fpu_operations::*;
 
-    function automatic fpu_float_conditions_t fpu_ref_get_conditions(
-        input fpu_float_fields_t a);
-
-        fpu_float_conditions_t c;
-
-        c.zero = (a.exponent == 0 && a.mantissa==0);
-        c.norm = (a.exponent!=0);
-        c.nan = (a==FPU_FLOAT_NAN);
-        c.inf = (a==FPU_FLOAT_POS_INF || a==FPU_FLOAT_NEG_INF);
-
-        return c;
-    endfunction 
-
     function automatic fpu_float_fields_t fpu_reference_float_add(
         input fpu_float_fields_t a, b,
         input fpu_round_mode_t mode
     );
-
 
         logic [26:0] a_mant, b_mant, sum;
         logic [7:0] exponent_diff, exponent;

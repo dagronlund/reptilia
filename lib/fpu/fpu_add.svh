@@ -6,10 +6,10 @@
 `include "fpu_operations.svh"
 
 package fpu_add;
+
     import fpu::*;
     import fpu_utils::*;
     import fpu_operations::*;
-
 
     typedef struct packed {
         logic sign_A, sign_B;
@@ -22,7 +22,7 @@ package fpu_add;
     function automatic fpu_add_exp_result_t fpu_float_add_exponent(
         input  fpu_float_fields_t a, b,
         input  fpu_float_conditions_t conditions_A, conditions_B,
-        input  logic valid,
+        // input  logic valid,
         input  fpu_round_mode_t mode);
 
         logic sticky;
@@ -63,7 +63,7 @@ package fpu_add;
         result.inf = conditions_A.nan || conditions_B.inf;
         result.zero = conditions_A.zero || conditions_B.zero;
         result.mode = mode;
-        result.valid = valid;
+        // result.valid = valid;
 
         return result;
     endfunction
