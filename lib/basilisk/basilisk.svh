@@ -22,10 +22,34 @@ package basilisk;
     import fpu::*;
 
     typedef struct packed {
-        fpu_float_fields_t a, b;
+        fpu_float_fields_t a, b; // a + b
         fpu_float_conditions_t conditions_a, conditions_b;
         fpu_round_mode_t mode;
     } basilisk_add_command_t;
+
+    typedef struct packed {
+        logic enable_macc;
+        fpu_float_fields_t a, b, c; // a * b or (a * b) + c
+        fpu_float_conditions_t conditions_a, conditions_b, conditions_c;
+        fpu_round_mode_t mode;
+    } basilisk_mult_command_t;
+
+    typedef struct packed {
+        logic enable_macc;
+        fpu_float_fields_t c;
+        fpu_mult_exp_result_t result;
+    } basilisk_mult_exponent_command_t;
+
+    typedef struct packed {
+        logic enable_macc;
+        fpu_float_fields_t c;
+        fpu_mult_op_result_t result;
+    } basilisk_mult_operation_command_t;
+
+    typedef struct packed {
+        fpu_float_fields_t c;
+        fpu_result_t result;
+    } basilisk_mult_add_normalize_command_t;
 
     // typedef struct packed {
     //     fpu_add_exp_result_t a;

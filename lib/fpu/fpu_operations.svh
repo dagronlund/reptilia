@@ -106,6 +106,12 @@ package fpu_operations;
         return y;
     endfunction
 
+    function automatic fpu_float_fields_t fpu_operations_round(
+            input fpu_result_t result
+    );
+        return FPU_round(result.mantissa, result.exponent, result.guard, result.sign, result.round_mode);
+    endfunction
+
 endpackage
 
 `endif

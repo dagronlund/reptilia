@@ -21,7 +21,7 @@ package fpu_mult;
     function automatic fpu_mult_exp_result_t fpu_float_mult_exponent(
         input fpu_float_fields_t a, b,
         input fpu_float_conditions_t conditions_A, conditions_B,
-        input logic valid, 
+        // input logic valid, 
         input fpu_round_mode_t mode);
 
         // result.sign = a.sign ^ b.sign;
@@ -67,7 +67,7 @@ package fpu_mult;
         result.nan = conditions_A.nan || conditions_B.nan;
         result.inf = conditions_A.inf || conditions_B.inf || overflow;
         result.exponent = expY_ex;
-        result.valid = valid;
+        // result.valid = valid;
         result.mode = mode;
         
         return result;
