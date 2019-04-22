@@ -10,7 +10,7 @@ package fpu_divide;
 
     typedef struct packed {
         logic sign;
-        logic [23:0] b;
+        logic [50:0] b;
         logic [50:0] A;
         logic [26:0] y;
         logic nan, inf, zero;
@@ -68,7 +68,7 @@ package fpu_divide;
         result.nan = conditions_B.inf || conditions_B.nan || conditions_A.nan || conditions_B.zero;
         result.zero = underflow || conditions_A.zero || zero;
         result.A = {1'b1, a.mantissa} << 26;
-        result.b = {1'b1, b.mantissa};
+        result.b = {1'b1, b.mantissa} << 26;
         result.sign = a.sign ^ b.sign;
         // result.valid = valid;
         result.mode = mode;
@@ -89,16 +89,18 @@ package fpu_divide;
     // } fpu_div_result_t;
 
     function automatic fpu_div_result_t fpu_float_div_operation(
-            input fpu_div_result_t result, 
-            input logic [4:0] i
+            input fpu_div_result_t result
     );
-        logic [50:0] x = result.b << (26-i);
-        if (x <= result.A) begin
-            result.A = result.A - x;
-            result.y[26-i] = 1;
-        end else begin
-            result.y[26-i] = 0;
-        end
+        if (result.b<=result.A) begin
+                result.A = result.A - result.b;
+                result.y[26-i] = 1;
+            end else begin
+                result.y[26-i] = 0;
+            end;
+
+            result.b = result.b >> 1;
+            result.exponent = result.exponent;
+
         return result;
     endfunction
 
