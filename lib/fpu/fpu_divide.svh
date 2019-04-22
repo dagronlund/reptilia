@@ -35,7 +35,7 @@ package fpu_divide;
     function automatic fpu_div_result_t fpu_float_div_exponent(
         fpu_float_fields_t a, b,
         fpu_float_conditions_t conditions_A, conditions_B,
-        logic valid,
+        // logic valid,
         fpu_round_mode_t mode
         );
 
@@ -70,7 +70,7 @@ package fpu_divide;
         result.A = {1'b1, a.mantissa} << 26;
         result.b = {1'b1, b.mantissa};
         result.sign = a.sign ^ b.sign;
-        result.valid = valid;
+        // result.valid = valid;
         result.mode = mode;
 
         return result;
@@ -89,21 +89,16 @@ package fpu_divide;
     // } fpu_div_result_t;
 
     function automatic fpu_div_result_t fpu_float_div_operation(
-            input fpu_div_result_t result, i);
-        //A = a<<27;
-            logic [50:0] x;
-
-            x = result.b<<(26-i);
-            if (x<=result.A) begin
-                result.A = result.A - x;
-                result.y[26-i] = 1;
-            end else begin
-                result.y[26-i] = 0;
-            end;
-
-            result.exponent = result.exponent;
-        // end
-
+            input fpu_div_result_t result, 
+            input logic [4:0] i
+    );
+        logic [50:0] x = result.b << (26-i);
+        if (x <= result.A) begin
+            result.A = result.A - x;
+            result.y[26-i] = 1;
+        end else begin
+            result.y[26-i] = 0;
+        end
         return result;
     endfunction
 
