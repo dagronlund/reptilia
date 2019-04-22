@@ -22,7 +22,7 @@ package fpu_add;
     function automatic fpu_add_exp_result_t fpu_float_add_exponent(
         input  fpu_float_fields_t a, b,
         input  fpu_float_conditions_t conditions_A, conditions_B,
-        // input  logic valid,
+        input  logic valid,
         input  fpu_round_mode_t mode);
 
         logic sticky;
@@ -42,9 +42,13 @@ package fpu_add;
         
         {argA, expA} = {A, exp1};
         {argB, expB} = {B, exp2};
+        result.sign_A = a.sign;
+        result.sign_B = b.sign;
         if (exp1 < exp2) begin
             {argA, expA} = {B, exp2};
             {argB, expB} = {A, exp1};
+            result.sign_A = b.sign;
+            result.sign_B = a.sign;
         end 
 
         // if (expA > expB) begin
@@ -57,13 +61,11 @@ package fpu_add;
 
         result.sigA = argA;
         result.sigB = argB;
-        result.sign_A = a.sign;
-        result.sign_B = b.sign;
         result.nan = conditions_A.nan || conditions_B.nan;
         result.inf = conditions_A.nan || conditions_B.inf;
         result.zero = conditions_A.zero || conditions_B.zero;
         result.mode = mode;
-        // result.valid = valid;
+        result.valid = valid;
 
         return result;
     endfunction

@@ -65,19 +65,32 @@ package fpu_operations;
     endfunction 
 
     function automatic fpu_float_fields_t FPU_round(
-        input logic [23:0] mantissa,
-        input logic [7:0] exponent,
-        input logic [2:0] guard,
-        input logic sign,
-        input fpu_round_mode_t round_mode);
+        input fpu_result_t y);
+        // logic [23:0] mantissa,
+        // input logic [7:0] exponent,
+        // input logic [2:0] guard,
+        // input logic sign,
+        // input fpu_round_mode_t round_mode,
+        // input logic nan, inf, zero);
 
-        logic [23:0] result;
+        logic [23:0] result, mantissa;
         logic [7:0] exp;
+        logic [2:0] guard;
+        logic inf, nan, zero, sign;
+        fpu_round_mode_t round_mode;
         logic carry, round, sticky;
 
-        fpu_float_fields_t y;
+        fpu_float_fields_t r;
 
-        exp = exponent;
+        sign = y.sign;
+        exp = y.exponent;
+        mantissa = y.mantissa;
+        guard = y.guard;
+        round_mode = y.mode;
+        nan = y.nan;
+        inf = y.inf;
+        zero = y.zero;
+        
         carry = 1'b0;
         round = 1'b0;
         case(round_mode)
@@ -99,17 +112,17 @@ package fpu_operations;
             else exp += 1;
         end
 
-        y.sign = sign;
-        y.exponent = exp;
-        y.mantissa = result[22:0];
+        r.sign = sign;
+        r.exponent = exp;
+        r.mantissa = result[22:0];
 
-        return y;
-    endfunction
+        if(nan) r = 32'hFFFFFFFF;
+        else if (inf) begin
+            r.mantissa = 23'd0;
+            r.exponent = 8'hFF;
+        end else if (zero) r = 32'd0;
 
-    function automatic fpu_float_fields_t fpu_operations_round(
-            input fpu_result_t result
-    );
-        return FPU_round(result.mantissa, result.exponent, result.guard, result.sign, result.round_mode);
+        return r;
     endfunction
 
 endpackage
