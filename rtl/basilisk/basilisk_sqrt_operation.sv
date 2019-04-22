@@ -7,7 +7,7 @@
 `include "../../lib/isa/rv32.svh"
 `include "../../lib/isa/rv32f.svh"
 `include "../../lib/fpu/fpu.svh"
-`include "../../lib/fpu/fpu_divide.svh"
+`include "../../lib/fpu/fpu_sqrt.svh"
 `include "../../lib/basilisk/basilisk.svh"
 
 `else
@@ -18,27 +18,27 @@
 `include "rv32f.svh"
 `include "basilisk.svh"
 `include "fpu.svh"
-`include "fpu_divide.svh"
+`include "fpu_sqrt.svh"
 
 `endif
 
-module basilisk_divide_operation
+module basilisk_sqrt_operation
     import rv::*;
     import rv32::*;
     import rv32f::*;
     import fpu::*;
-    import fpu_divide::*;
+    import fpu_sqrt::*;
     import basilisk::*;
 #(
     parameter int OUTPUT_REGISTER_MODE = 1
 )(
     input logic clk, rst,
 
-    std_stream_intf.in divide_exponent_command, // basilisk_divide_result_t
-    std_stream_intf.out divide_operation_command // basilisk_divide_result_t
+    std_stream_intf.in sqrt_exponent_command, // fpu_sqrt_result_t
+    std_stream_intf.out sqrt_operation_command // fpu_sqrt_result_t
 );
 
-    std_stream_intf #(.T(basilisk_divide_result_t)) next_divide_operation_command (.clk, .rst);
+    std_stream_intf #(.T(fpu_sqrt_result_t)) next_sqrt_operation_command (.clk, .rst);
 
     logic enable, consume, produce;
 
@@ -48,24 +48,24 @@ module basilisk_divide_operation
     ) std_flow_lite_inst (
         .clk, .rst,
 
-        .valid_input({divide_exponent_command.valid}),
-        .ready_input({divide_exponent_command.ready}),
+        .valid_input({sqrt_exponent_command.valid}),
+        .ready_input({sqrt_exponent_command.ready}),
 
-        .valid_output({next_divide_operation_command.valid}),
-        .ready_output({next_divide_operation_command.ready}),
+        .valid_output({next_sqrt_operation_command.valid}),
+        .ready_output({next_sqrt_operation_command.ready}),
 
         .consume, .produce, .enable
     );
 
     std_flow_stage #(
-        .T(basilisk_divide_result_t),
+        .T(fpu_sqrt_result_t),
         .MODE(OUTPUT_REGISTER_MODE)
     ) output_stage_inst (
         .clk, .rst,
-        .stream_in(next_divide_operation_command), .stream_out(divide_operation_command)
+        .stream_in(next_sqrt_operation_command), .stream_out(sqrt_operation_command)
     );
 
-    fpu_div_result_t partial_result, next_partial_result;
+    fpu_sqrt_result_t partial_result, next_partial_result;
     logic [4:0] counter, next_counter;
 
     always_ff @(posedge clk) begin
@@ -79,7 +79,7 @@ module basilisk_divide_operation
     end
 
     always_comb begin
-       automatic fpu_div_result_t starting_result = partial_result;
+       automatic fpu_sqrt_result_t starting_result = partial_result;
 
        consume = 'b0;
        produce = 'b0;
@@ -89,15 +89,15 @@ module basilisk_divide_operation
        // Runs the operation 27 times in a loop
         if (counter == 0) begin
             consume = 'b1;
-            starting_result = divide_exponent_command.payload.result;
+            starting_result = sqrt_exponent_command.payload;
         end else if (counter == 26) begin
             produce = 'b1;
             next_counter = 'b0;
         end
         
-        next_partial_result = fpu_float_div_operation(starting_result);
+        next_partial_result = fpu_float_sqrt_operation(starting_result);
 
-        next_divide_exponent_command.payload.result = next_partial_result;
+        next_sqrt_operation_command.payload = next_partial_result;
     end
 
 endmodule

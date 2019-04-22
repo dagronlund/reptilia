@@ -56,7 +56,7 @@ package fpu_sqrt;
     function automatic fpu_sqrt_result_t fpu_float_sqrt_exponent(
         input fpu_float_fields_t number,
         input fpu_float_conditions_t conditions,
-        input valid,
+        // input valid,
         input fpu_round_mode_t mode
     );
 
@@ -110,7 +110,7 @@ package fpu_sqrt;
         result.inf = conditions.inf;
         result.zero = conditions.zero;
         result.exponent_negative = exponent_negative;
-        result.valid = valid;
+        // result.valid = valid;
         result.mode = mode;
 
         return result;

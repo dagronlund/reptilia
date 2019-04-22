@@ -61,6 +61,12 @@ package basilisk;
         fpu_div_result_t result;
     } basilisk_divide_result_t;
 
+    typedef struct packed {
+        fpu_float_fields_t a; // sqrt(a)
+        fpu_float_conditions_t conditions_a;
+        fpu_round_mode_t mode;
+    } basilisk_sqrt_command_t;
+
 endpackage
 
 `endif
