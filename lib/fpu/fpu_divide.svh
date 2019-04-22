@@ -91,15 +91,17 @@ package fpu_divide;
     function automatic fpu_div_result_t fpu_float_div_operation(
             input fpu_div_result_t result
     );
-        if (result.b<=result.A) begin
-                result.A = result.A - result.b;
-                result.y[26-i] = 1;
-            end else begin
-                result.y[26-i] = 0;
-            end;
 
-            result.b = result.b >> 1;
-            result.exponent = result.exponent;
+        result.y = result.y << 1;
+        if (result.b<=result.A) begin
+            result.A = result.A - result.b;
+            result.y[0] = 1;
+        end else begin
+            result.y[0] = 0;
+        end
+
+        result.b = result.b >> 1;
+        result.exponent = result.exponent;
 
         return result;
     endfunction

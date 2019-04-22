@@ -51,9 +51,15 @@ package basilisk;
         fpu_result_t result;
     } basilisk_mult_add_normalize_command_t;
 
-    // typedef struct packed {
-    //     fpu_add_exp_result_t a;
-    // } basilisk_add_exponent_command_t;
+    typedef struct packed {
+        fpu_float_fields_t a, b; // a / b
+        fpu_float_conditions_t conditions_a, conditions_b;
+        fpu_round_mode_t mode;
+    } basilisk_divide_command_t;
+
+    typedef struct packed {
+        fpu_div_result_t result;
+    } basilisk_divide_result_t;
 
 endpackage
 
