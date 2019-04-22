@@ -35,10 +35,10 @@ module basilisk_sqrt_exponent
     input logic clk, rst,
 
     std_stream_intf.in sqrt_command, // basilisk_sqrt_command_t
-    std_stream_intf.out sqrt_exponent_command // fpu_sqrt_result_t
+    std_stream_intf.out sqrt_exponent_command // basilisk_sqrt_operation_t
 );
 
-    std_stream_intf #(.T(fpu_sqrt_result_t)) next_sqrt_exponent_command (.clk, .rst);
+    std_stream_intf #(.T(basilisk_sqrt_operation_t)) next_sqrt_exponent_command (.clk, .rst);
 
     logic enable, consume, produce;
 
@@ -58,7 +58,7 @@ module basilisk_sqrt_exponent
     );
 
     std_flow_stage #(
-        .T(fpu_sqrt_result_t),
+        .T(basilisk_sqrt_operation_t),
         .MODE(OUTPUT_REGISTER_MODE)
     ) output_stage_inst (
         .clk, .rst,
@@ -69,11 +69,12 @@ module basilisk_sqrt_exponent
         consume = 'b1;
         produce = 'b1;
 
-        next_sqrt_exponent_command.payload = fpu_float_sqrt_exponent(
+        next_sqrt_exponent_command.payload.result = fpu_float_sqrt_exponent(
                 sqrt_command.payload.a,
                 sqrt_command.payload.conditions_a,
                 sqrt_command.payload.mode
         );
+        next_sqrt_exponent_command.payload.dest_reg_addr = sqrt_command.payload.dest_reg_addr;
     end
 
 endmodule

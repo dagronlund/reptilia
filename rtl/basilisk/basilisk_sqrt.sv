@@ -38,8 +38,8 @@ module basilisk_sqrt
     std_stream_intf.out sqrt_result_command // fpu_result_t
 );
 
-    std_stream_intf #(.T(fpu_sqrt_result_t)) sqrt_exponent_command (.clk, .rst);
-    std_stream_intf #(.T(fpu_sqrt_result_t)) sqrt_operation_command (.clk, .rst);
+    std_stream_intf #(.T(basilisk_sqrt_operation_t)) sqrt_exponent_command (.clk, .rst);
+    std_stream_intf #(.T(basilisk_sqrt_operation_t)) sqrt_operation_command (.clk, .rst);
 
     basilisk_sqrt_exponent #(
         .OUTPUT_REGISTER_MODE(OUTPUT_REGISTER_MODE)

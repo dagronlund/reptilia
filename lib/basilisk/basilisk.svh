@@ -6,12 +6,20 @@
 `include "../isa/rv32.svh"
 `include "../isa/rv32f.svh"
 `include "../fpu/fpu.svh"
+`include "../fpu/fpu_add.svh"
+`include "../fpu/fpu_mult.svh"
+`include "../fpu/fpu_divide.svh"
+`include "../fpu/fpu_sqrt.svh"
 
 `else
 
 `include "rv32.svh"
 `include "rv32f.svh"
 `include "fpu.svh"
+`include "fpu_add.svh"
+`include "fpu_mult.svh"
+`include "fpu_divide.svh"
+`include "fpu_sqrt.svh"
 
 `endif
 
@@ -20,6 +28,15 @@ package basilisk;
     import rv32::*;
     import rv32f::*;
     import fpu::*;
+    import fpu_add::*;
+    import fpu_mult::*;
+    import fpu_divide::*;
+    import fpu_sqrt::*;
+
+    typedef struct packed {
+        rv32_reg_addr_t dest_reg_addr;
+        fpu_result_t result;
+    } basilisk_result_t;
 
     typedef struct packed {
         fpu_float_fields_t a, b; // a + b
@@ -62,10 +79,16 @@ package basilisk;
     } basilisk_divide_result_t;
 
     typedef struct packed {
+        rv32_reg_addr_t dest_reg_addr;
         fpu_float_fields_t a; // sqrt(a)
         fpu_float_conditions_t conditions_a;
         fpu_round_mode_t mode;
     } basilisk_sqrt_command_t;
+
+    typedef struct packed {
+        rv32_reg_addr_t dest_reg_addr;
+        fpu_sqrt_result_t result;
+    } basilisk_sqrt_operation_t;
 
 endpackage
 

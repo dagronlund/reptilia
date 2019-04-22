@@ -69,7 +69,6 @@ package fpu;
         logic [2:0] guard;
         logic [7:0] exponent;
         logic [23:0] mantissa;
-        logic valid;
         fpu_round_mode_t mode;
     } fpu_result_t;
 
@@ -100,7 +99,7 @@ package fpu;
     endfunction
 
     function automatic fpu_double_fields_t fpu_decode_double(
-        input fpu_float_t raw
+        input fpu_double_t raw
     );
         return '{
             sign: raw[63], 

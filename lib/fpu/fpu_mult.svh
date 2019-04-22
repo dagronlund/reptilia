@@ -15,7 +15,7 @@ package fpu_mult;
         logic nan, inf, zero;
         logic [8:0] exponent;
         fpu_round_mode_t mode;
-        logic valid;
+        // logic valid;
     } fpu_mult_exp_result_t;
 
     function automatic fpu_mult_exp_result_t fpu_float_mult_exponent(
@@ -80,7 +80,7 @@ package fpu_mult;
         logic nan, inf, zero;
         logic [8:0] exponent;
         fpu_round_mode_t mode;
-        logic valid;
+        // logic valid;
     } fpu_mult_op_result_t;
 
     function automatic fpu_mult_op_result_t fpu_float_mult_operation(
@@ -96,7 +96,7 @@ package fpu_mult;
         
         result.exponent = exp_result.exponent;
         result.mode = exp_result.mode;
-        result.valid = exp_result.valid;
+        // result.valid = exp_result.valid;
         result.zero = exp_result.zero;
         result.inf = exp_result.inf;
         result.nan = exp_result.nan;
@@ -156,7 +156,7 @@ package fpu_mult;
         result.inf = y.inf || overflow;
         result.zero = y.zero;
         result.mode = y.mode;
-        result.valid = y.valid;
+        // result.valid = y.valid;
 
         return result;
 

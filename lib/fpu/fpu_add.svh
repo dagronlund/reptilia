@@ -15,14 +15,14 @@ package fpu_add;
         logic sign_A, sign_B;
         logic [26:0] sigA, sigB;
         logic [7:0] exponent;
-        logic nan, inf, zero, valid;
+        logic nan, inf, zero;
         fpu_round_mode_t mode;
     } fpu_add_exp_result_t;
 
     function automatic fpu_add_exp_result_t fpu_float_add_exponent(
         input  fpu_float_fields_t a, b,
         input  fpu_float_conditions_t conditions_A, conditions_B,
-        input  logic valid,
+        // input  logic valid,
         input  fpu_round_mode_t mode);
 
         logic sticky;
@@ -65,7 +65,7 @@ package fpu_add;
         result.inf = conditions_A.nan || conditions_B.inf;
         result.zero = conditions_A.zero || conditions_B.zero;
         result.mode = mode;
-        result.valid = valid;
+        // result.valid = valid;
 
         return result;
     endfunction
@@ -74,7 +74,7 @@ package fpu_add;
         logic sign, carry;
         logic [26:0] sum;
         logic [7:0] exponent;
-        logic nan, inf, zero, valid;
+        logic nan, inf, zero;
         fpu_round_mode_t mode;
     } fpu_add_op_result_t;
 
@@ -125,7 +125,7 @@ package fpu_add;
         result.inf = exp_result.inf;
         result.zero = exp_result.zero;
         result.mode = exp_result.mode;
-        result.valid = exp_result.valid;
+        // result.valid = exp_result.valid;
 
         return result;
 
@@ -162,7 +162,7 @@ package fpu_add;
         result.inf = y.inf;
         result.zero = y.zero;
         result.mode = y.mode;
-        result.valid = y.valid;
+        // result.valid = y.valid;
 
         return result;
     endfunction

@@ -34,11 +34,11 @@ module basilisk_sqrt_operation
 )(
     input logic clk, rst,
 
-    std_stream_intf.in sqrt_exponent_command, // fpu_sqrt_result_t
-    std_stream_intf.out sqrt_operation_command // fpu_sqrt_result_t
+    std_stream_intf.in sqrt_exponent_command, // basilisk_sqrt_operation_t
+    std_stream_intf.out sqrt_operation_command // basilisk_sqrt_operation_t
 );
 
-    std_stream_intf #(.T(fpu_sqrt_result_t)) next_sqrt_operation_command (.clk, .rst);
+    std_stream_intf #(.T(basilisk_sqrt_operation_t)) next_sqrt_operation_command (.clk, .rst);
 
     logic enable, consume, produce;
 
@@ -58,22 +58,27 @@ module basilisk_sqrt_operation
     );
 
     std_flow_stage #(
-        .T(fpu_sqrt_result_t),
+        .T(basilisk_sqrt_operation_t),
         .MODE(OUTPUT_REGISTER_MODE)
     ) output_stage_inst (
         .clk, .rst,
         .stream_in(next_sqrt_operation_command), .stream_out(sqrt_operation_command)
     );
 
+    rv32_reg_addr_t dest_reg_addr, next_dest_reg_addr;
     fpu_sqrt_result_t partial_result, next_partial_result;
     logic [4:0] counter, next_counter;
 
     always_ff @(posedge clk) begin
         if(rst) begin
             counter <= 'b0;
-            partial_result <= '{default: 'b0};
+            dest_reg_addr <= 'b0;
         end else if (enable) begin
             counter <= next_counter;
+            dest_reg_addr <= next_dest_reg_addr;
+        end
+
+        if (enable) begin
             partial_result <= next_partial_result;
         end
     end
@@ -85,11 +90,13 @@ module basilisk_sqrt_operation
        produce = 'b0;
 
        next_counter = counter + 'b1;
+       next_dest_reg_addr = dest_reg_addr;
 
        // Runs the operation 27 times in a loop
         if (counter == 0) begin
             consume = 'b1;
-            starting_result = sqrt_exponent_command.payload;
+            starting_result = sqrt_exponent_command.payload.result;
+            next_dest_reg_addr = sqrt_exponent_command.payload.dest_reg_addr;
         end else if (counter == 26) begin
             produce = 'b1;
             next_counter = 'b0;
@@ -97,7 +104,8 @@ module basilisk_sqrt_operation
         
         next_partial_result = fpu_float_sqrt_operation(starting_result);
 
-        next_sqrt_operation_command.payload = next_partial_result;
+        next_sqrt_operation_command.payload.dest_reg_addr = dest_reg_addr;
+        next_sqrt_operation_command.payload.result = next_partial_result;
     end
 
 endmodule

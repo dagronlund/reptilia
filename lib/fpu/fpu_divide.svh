@@ -15,7 +15,7 @@ package fpu_divide;
         logic [26:0] y;
         logic nan, inf, zero;
         logic [8:0] exponent;
-        logic exp_neg, valid;
+        logic exp_neg;
         fpu_round_mode_t mode;
     } fpu_div_result_t;
 
@@ -159,7 +159,7 @@ package fpu_divide;
         result.nan = y.nan;
         result.zero = y.zero || underflow || result.exponent =='d0;
         result.inf = y.inf;
-        result.valid = y.valid;
+        // result.valid = y.valid;
         result.mode = y.mode;
 
         return result;

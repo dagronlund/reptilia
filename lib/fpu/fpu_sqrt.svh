@@ -23,7 +23,7 @@ package fpu_sqrt;
         logic [26:0] mantissa;
         logic [23:0] actual_mantissa;
         fpu_reference_float_sqrt_partial_t sqrt_partial;
-        logic inf, nan, zero, exponent_negative, valid;
+        logic inf, nan, zero, exponent_negative; //, valid;
         fpu_round_mode_t mode;
     } fpu_sqrt_result_t;
 
@@ -170,7 +170,7 @@ package fpu_sqrt;
         result.nan = y.nan;
         result.inf = y.inf;
         result.zero = y.zero;
-        result.valid = y.valid;
+        // result.valid = y.valid;
         result.mode = y.mode;
 
         // round
