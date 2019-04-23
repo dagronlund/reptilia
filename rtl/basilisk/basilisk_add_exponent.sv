@@ -36,10 +36,10 @@ module basilisk_add_exponent
 
     std_stream_intf.in add_command, // basilisk_add_command_t
     std_stream_intf.in mult_add_command, // basilisk_add_command_t
-    std_stream_intf.out add_exponent_command // fpu_add_exp_result_t
+    std_stream_intf.out add_exponent_command // basilisk_add_exponent_command_t
 );
 
-    std_stream_intf #(.T(fpu_add_exp_result_t)) next_add_exponent_command (.clk, .rst);
+    std_stream_intf #(.T(basilisk_add_exponent_command_t)) next_add_exponent_command (.clk, .rst);
 
     logic enable, consume_add, consume_mult_add, produce;
 
@@ -61,7 +61,7 @@ module basilisk_add_exponent
     );
 
     std_flow_stage #(
-        .T(fpu_add_exp_result_t),
+        .T(basilisk_add_exponent_command_t),
         .MODE(OUTPUT_REGISTER_MODE)
     ) output_stage_inst (
         .clk, .rst,
@@ -79,11 +79,13 @@ module basilisk_add_exponent
             consume_mult_add = 'b1;
             consume_add = 'b0;
             chosen_command = basilisk_add_command_t'(mult_add_command.payload);
+            next_add_exponent_command.payload.dest_reg_addr = mult_add_command.payload.dest_reg_addr;
         end else begin
             chosen_command = basilisk_add_command_t'(add_command.payload);
+            next_add_exponent_command.payload.dest_reg_addr = add_command.payload.dest_reg_addr;
         end
 
-        next_add_exponent_command.payload = fpu_float_add_exponent(
+        next_add_exponent_command.payload.result = fpu_float_add_exponent(
                 chosen_command.a, chosen_command.b,
                 chosen_command.conditions_a, chosen_command.conditions_b,
                 chosen_command.mode

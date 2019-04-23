@@ -69,11 +69,14 @@ module basilisk_mult_operation
         consume = 'b1;
         produce = 'b1;
 
-        next_mult_exponent_command.payload.result = fpu_float_mult_operation(
+        next_mult_operation_command.payload.result = fpu_float_mult_operation(
                 mult_exponent_command.payload.result
         );
         next_mult_operation_command.payload.enable_macc = mult_exponent_command.payload.enable_macc;
         next_mult_operation_command.payload.c = mult_exponent_command.payload.c;
+        next_mult_operation_command.payload.conditions_c = mult_exponent_command.payload.conditions_c;
+
+        next_mult_operation_command.payload.dest_reg_addr = mult_exponent_command.payload.dest_reg_addr;
     end
 
 endmodule

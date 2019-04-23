@@ -37,11 +37,11 @@ module basilisk_add
     std_stream_intf.in add_command, // basilisk_add_command_t
     std_stream_intf.in mult_add_command, // basilisk_add_command_t
     
-    std_stream_intf.out add_result_command // fpu_result_t
+    std_stream_intf.out add_result_command // basilisk_result_t
 );
 
-    std_stream_intf #(.T(fpu_add_exp_result_t)) add_exponent_command (.clk, .rst);
-    std_stream_intf #(.T(fpu_add_op_result_t)) add_operation_command (.clk, .rst);
+    std_stream_intf #(.T(basilisk_add_exponent_command_t)) add_exponent_command (.clk, .rst);
+    std_stream_intf #(.T(basilisk_add_operation_command_t)) add_operation_command (.clk, .rst);
 
     basilisk_add_exponent #(
         .OUTPUT_REGISTER_MODE(OUTPUT_REGISTER_MODE)

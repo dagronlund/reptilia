@@ -35,11 +35,11 @@ module basilisk_mult_normalize
     input logic clk, rst,
 
     std_stream_intf.in mult_operation_command, // basilisk_mult_operation_command_t
-    std_stream_intf.out mult_result_command,  // fpu_result_t
+    std_stream_intf.out mult_result_command,  // basilisk_result_t
     std_stream_intf.out mult_add_normalize_command // basilisk_mult_add_normalize_command_t
 );
 
-    std_stream_intf #(.T(fpu_result_t)) next_mult_result_command (.clk, .rst);
+    std_stream_intf #(.T(basilisk_result_t)) next_mult_result_command (.clk, .rst);
     std_stream_intf #(.T(basilisk_mult_add_normalize_command_t)) next_mult_add_normalize_command (.clk, .rst);
 
     logic enable, consume, produce_result, produce_macc;
@@ -60,7 +60,7 @@ module basilisk_mult_normalize
     );
 
     std_flow_stage #(
-        .T(fpu_result_t),
+        .T(basilisk_result_t),
         .MODE(OUTPUT_REGISTER_MODE)
     ) output_result_stage_inst (
         .clk, .rst,
@@ -80,12 +80,16 @@ module basilisk_mult_normalize
         produce_result = (!mult_operation_command.payload.enable_macc);
         produce_macc = (mult_operation_command.payload.enable_macc);
 
-        next_mult_result_command.payload = fpu_float_mult_normalize(
+        next_mult_result_command.payload.result = fpu_float_mult_normalize(
                 mult_operation_command.payload.result
         );
 
         next_mult_add_normalize_command.payload.result = next_mult_result_command.payload;
         next_mult_add_normalize_command.payload.c = mult_operation_command.payload.c;
+        next_mult_add_normalize_command.payload.conditions_c = mult_operation_command.payload.conditions_c;
+
+        next_mult_add_normalize_command.payload.dest_reg_addr = mult_operation_command.payload.dest_reg_addr;
+        next_mult_result_command.payload.dest_reg_addr = mult_operation_command.payload.dest_reg_addr;
     end
 
 endmodule

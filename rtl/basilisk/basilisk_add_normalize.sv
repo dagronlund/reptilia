@@ -34,11 +34,11 @@ module basilisk_add_normalize
 )(
     input logic clk, rst,
 
-    std_stream_intf.in add_operation_command, // fpu_add_op_result_t
-    std_stream_intf.out add_result_command // fpu_result_t
+    std_stream_intf.in add_operation_command, // basilisk_add_operation_command_t
+    std_stream_intf.out add_result_command // basilisk_result_t
 );
 
-    std_stream_intf #(.T(fpu_result_t)) next_add_result_command (.clk, .rst);
+    std_stream_intf #(.T(basilisk_result_t)) next_add_result_command (.clk, .rst);
 
     logic enable, consume, produce;
 
@@ -58,7 +58,7 @@ module basilisk_add_normalize
     );
 
     std_flow_stage #(
-        .T(fpu_result_t),
+        .T(basilisk_result_t),
         .MODE(OUTPUT_REGISTER_MODE)
     ) output_stage_inst (
         .clk, .rst,
@@ -69,7 +69,8 @@ module basilisk_add_normalize
         consume = 'b1;
         produce = 'b1;
 
-        next_add_result_command.payload = fpu_float_add_normalize(add_operation_command.payload);
+        next_add_result_command.payload.dest_reg_addr = add_operation_command.payload.dest_reg_addr;
+        next_add_result_command.payload.result = fpu_float_add_normalize(add_operation_command.payload.result);
     end
 
 endmodule

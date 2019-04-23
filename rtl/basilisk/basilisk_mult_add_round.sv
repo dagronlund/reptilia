@@ -64,20 +64,19 @@ module basilisk_mult_add_round
 
     always_comb begin
         automatic fpu_result_t mult_result = mult_add_normalize_command.payload.result;
-        automatic rv32_reg_value_t round_result;
-
+        
         consume = 'b1;
         produce = 'b1;
 
-        round_result = fpu_operations_round(mult_result);
-
-        next_mult_add_command.payload.a = fpu_decode_float(round_result);
+        next_mult_add_command.payload.a = fpu_decode_float(fpu_operations_round(mult_result));
         next_mult_add_command.payload.conditions_a = fpu_get_conditions(next_mult_add_command.payload.a);
 
         next_mult_add_command.payload.b = mult_add_normalize_command.payload.c;
         next_mult_add_command.payload.conditions_b = fpu_get_conditions(next_mult_add_command.payload.b);
 
         next_mult_add_command.payload.mode = mult_result.mode;
+
+        next_mult_add_command.payload.dest_reg_addr = mult_add_normalize_command.payload.dest_reg_addr;
     end
 
 endmodule

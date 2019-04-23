@@ -35,7 +35,7 @@ module basilisk_divide
     input logic clk, rst,
 
     std_stream_intf.in divide_command, // basilisk_divide_command_t
-    std_stream_intf.out divide_result_command // fpu_result_t
+    std_stream_intf.out divide_result_command // basilisk_result_t
 );
 
     std_stream_intf #(.T(basilisk_divide_result_t)) divide_exponent_command (.clk, .rst);

@@ -113,6 +113,7 @@ package fpu_mult;
         logic overflow;
         fpu_result_t result;
 
+        overflow = 'b0;
         sig_product = y.product;
         expY_ex = y.exponent;
         if (sig_product[47]) begin

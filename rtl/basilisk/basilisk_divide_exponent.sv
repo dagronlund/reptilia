@@ -69,6 +69,7 @@ module basilisk_divide_exponent
         consume = 'b1;
         produce = 'b1;
 
+        next_divide_exponent_command.payload.dest_reg_addr = divide_command.payload.dest_reg_addr;
         next_divide_exponent_command.payload.result = fpu_float_div_exponent(
                 divide_command.payload.a, divide_command.payload.b, 
                 divide_command.payload.conditions_a, divide_command.payload.conditions_b, 

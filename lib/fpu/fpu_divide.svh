@@ -116,6 +116,7 @@ package fpu_divide;
 
         fpu_result_t result;
 
+        underflow = 'b0;
         div_result = y.y;
         exponent = y.exponent;
         exp_neg = y.exp_neg;
@@ -126,8 +127,9 @@ package fpu_divide;
        
         if (leading_zeros) begin
             div_result = div_result << leading_zeros;
-            if (leading_zeros > exponent && exp_neg) underflow = 1;
-            else begin
+            if (leading_zeros > exponent && exp_neg) begin
+                underflow = 1;
+            end else begin
                 if (exp_neg) exponent += leading_zeros;
                 else exponent -= leading_zeros;
             end

@@ -76,6 +76,9 @@ module basilisk_mult_exponent
         );
         next_mult_exponent_command.payload.enable_macc = mult_command.payload.enable_macc;
         next_mult_exponent_command.payload.c = mult_command.payload.c;
+        next_mult_exponent_command.payload.conditions_c = mult_command.payload.conditions_c;
+
+        next_mult_exponent_command.payload.dest_reg_addr = mult_command.payload.dest_reg_addr;
     end
 
 endmodule

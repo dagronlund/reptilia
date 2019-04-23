@@ -39,12 +39,24 @@ package basilisk;
     } basilisk_result_t;
 
     typedef struct packed {
+        rv32_reg_addr_t dest_reg_addr;
         fpu_float_fields_t a, b; // a + b
         fpu_float_conditions_t conditions_a, conditions_b;
         fpu_round_mode_t mode;
     } basilisk_add_command_t;
 
     typedef struct packed {
+        rv32_reg_addr_t dest_reg_addr;
+        fpu_add_exp_result_t result;
+    } basilisk_add_exponent_command_t;
+
+    typedef struct packed {
+        rv32_reg_addr_t dest_reg_addr;
+        fpu_add_op_result_t result;
+    } basilisk_add_operation_command_t;
+
+    typedef struct packed {
+        rv32_reg_addr_t dest_reg_addr;
         logic enable_macc;
         fpu_float_fields_t a, b, c; // a * b or (a * b) + c
         fpu_float_conditions_t conditions_a, conditions_b, conditions_c;
@@ -52,29 +64,37 @@ package basilisk;
     } basilisk_mult_command_t;
 
     typedef struct packed {
+        rv32_reg_addr_t dest_reg_addr;
         logic enable_macc;
         fpu_float_fields_t c;
+        fpu_float_conditions_t conditions_c;
         fpu_mult_exp_result_t result;
     } basilisk_mult_exponent_command_t;
 
     typedef struct packed {
+        rv32_reg_addr_t dest_reg_addr;
         logic enable_macc;
         fpu_float_fields_t c;
+        fpu_float_conditions_t conditions_c;
         fpu_mult_op_result_t result;
     } basilisk_mult_operation_command_t;
 
     typedef struct packed {
+        rv32_reg_addr_t dest_reg_addr;
         fpu_float_fields_t c;
+        fpu_float_conditions_t conditions_c;
         fpu_result_t result;
     } basilisk_mult_add_normalize_command_t;
 
     typedef struct packed {
+        rv32_reg_addr_t dest_reg_addr;
         fpu_float_fields_t a, b; // a / b
         fpu_float_conditions_t conditions_a, conditions_b;
         fpu_round_mode_t mode;
     } basilisk_divide_command_t;
 
     typedef struct packed {
+        rv32_reg_addr_t dest_reg_addr;
         fpu_div_result_t result;
     } basilisk_divide_result_t;
 

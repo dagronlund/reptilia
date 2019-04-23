@@ -32,7 +32,7 @@ module basilisk_mult
     input logic clk, rst,
 
     std_stream_intf.in mult_command, // basilisk_mult_command_t
-    std_stream_intf.out mult_result_command, // fpu_result_t
+    std_stream_intf.out mult_result_command, // basilisk_result_t
     std_stream_intf.out mult_add_command  // basilisk_add_command_t
 );
 
