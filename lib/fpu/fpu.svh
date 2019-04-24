@@ -189,7 +189,7 @@ package fpu;
         sig = {31'd0, norm, float.mantissa};
         if (float.exponent >= 127) begin // positive exponent
             if (exp <= 31 && float.sign) // neg_out of range
-                y = (is_signed) ? 32'h8000_0000:32'd0
+                y = (is_signed) ? 32'h8000_0000:32'd0;
             else if (exp <= 31 && !float.sign)
                 y = (is_signed) ? 32'h7FFF_FFFF:32'hFFFF_FFFF;
             else begin
