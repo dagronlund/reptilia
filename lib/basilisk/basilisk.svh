@@ -110,6 +110,20 @@ package basilisk;
         fpu_sqrt_result_t result;
     } basilisk_sqrt_operation_t;
 
+    typedef enum logic [1:0] {
+        BASILISK_CONVERT_OP_MIN = 'b00,
+        BASILISK_CONVERT_OP_MAX = 'b01,
+        BASILISK_CONVERT_OP_RAW = 'b10,
+        BASILISK_CONVERT_OP_CNV = 'b11
+    } basilisk_convert_op_t;
+
+    typedef struct packed {
+        rv32_reg_addr_t dest_reg_addr;
+        rv32_reg_value_t a, b;
+        fpu_float_conditions_t conditions_a, conditions_b;
+        basilisk_convert_op_t op;
+    } basilisk_convert_command_t;
+
 endpackage
 
 `endif

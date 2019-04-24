@@ -466,60 +466,6 @@ package fpu_reference;
 
     endfunction
 
-function fpu_float_fields_t int2float(
-    logic [31:0] number
-    );
-    
-    logic [31:0] mantissa;
-    logic [7:0] exponent, diff;
-    logic [4:0] space;
-    logic sign, sticky;
-
-    sign = number[31];
-    if(sign) number = ~number + 1;
-
-    space = get_leading_zeros_47({number, 15'd0});
-    if(space < 8) begin
-        diff = 8-space;
-        sticky = get_sticky_bit_27(number[26:0], diff);
-        mantissa = number >> diff;
-        mantissa[0] = sticky;
-        exponent = 23 + diff;
-    end else begin
-        diff = space - 8;
-        mantissa = number << diff;
-        exponent = 23 - diff;
-    end
-
-    if(number==0) return 32'd0;
-    return {sign, exponent + 127, mantissa[22:0]};
-endfunction
-
-
-function logic [31:0] float2int(
-    fpu_float_fields_t float);
-
-    logic norm;
-    logic [7:0] exp;
-    logic [31:0] result;
-    logic [54:0] sig;
-
-    norm = (float.exponent != 0);
-    exp = float.exponent >= 127 ? float.exponent - 127: 127-float.exponent;
-
-    sig = {31'd0, norm, float.mantissa};
-    if (float.exponent >= 127)
-        sig = sig << exp;
-    else
-        sig = 0;
-
-    result = sig[54:23];
-    if(float.sign)
-        result = ~result + 1;
-
-    return result;
-endfunction
-
 endpackage
 
 `endif
