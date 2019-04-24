@@ -192,9 +192,10 @@ package fpu;
                 y = (is_signed) ? 32'h8000_0000:32'd0
             else if (exp <= 31 && !float.sign)
                 y = (is_signed) ? 32'h7FFF_FFFF:32'hFFFF_FFFF;
-            else
+            else begin
                 sig = sig << exp;
                 y = sig[54:23];
+            end
         end else
             y = 0;
 
