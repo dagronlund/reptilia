@@ -93,6 +93,7 @@ package gecko;
         logic update_pc, branched, jumped;
         gecko_pc_t current_pc, actual_next_pc;
         gecko_prediction_t prediction;
+        logic halt;
     } gecko_jump_operation_t;
 
     typedef struct packed {
@@ -133,6 +134,7 @@ package gecko;
         gecko_reg_status_t reg_status;
         gecko_jump_flag_t jump_flag;
         logic speculative;
+        logic halt;
 
         gecko_execute_type_t op_type;
         rv32i_funct3_t op;

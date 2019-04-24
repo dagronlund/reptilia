@@ -70,7 +70,7 @@ module std_flow_stage #(
 
         logic input_index, output_index;
         logic valid_buffer [2];
-        T payload_buffer [2];
+        (* ram_style =  "registers" *) T payload_buffer [2];
 
         // Synchronously connect valid
         always_ff @(posedge clk) begin

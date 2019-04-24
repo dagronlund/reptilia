@@ -158,6 +158,8 @@ module gecko_decode
             end
         end
         GECKO_DECODE_HALT, GECKO_DECODE_FAULT: begin
+            result.consume_instruction = 'b1;
+            result.flush_instruction = 'b1;
             result.next_state = current_state;
         end
         default: begin
@@ -604,40 +606,42 @@ module gecko_decode
         next_system_command.payload.reg_status = front_status_rd;
         next_system_command.payload.jump_flag = next_speculative_flag;
 
-`ifdef __SIMULATION__
-        flushing_inst = 'b0;
-        instruction_type_stalled = 'b0;
+        next_print_out.payload = rs2_value[7:0];
 
-        debug_signals = '{default: 'b0};
-        debug_signals.register_pending = !reg_file_ready;
-        debug_signals.register_full = (rd_status_calc == GECKO_REG_STATUS_FULL);
+// `ifdef __SIMULATION__
+//         flushing_inst = 'b0;
+//         instruction_type_stalled = 'b0;
 
-        case (rv32i_opcode_t'(instruction_fields.opcode))
-        RV32I_OPCODE_OP, RV32I_OPCODE_IMM, RV32I_OPCODE_LUI, RV32I_OPCODE_AUIPC: begin
-            debug_signals.inst_execute = 'b1;
-        end
-        RV32I_OPCODE_LOAD: begin
-            debug_signals.inst_execute = 'b1;
-            debug_signals.inst_load = 'b1;
-        end
-        RV32I_OPCODE_STORE: begin
-            debug_signals.inst_execute = 'b1;
-            debug_signals.inst_store = 'b1;
-        end
-        RV32I_OPCODE_JAL, RV32I_OPCODE_JALR: begin
-            debug_signals.inst_jump = 'b1;
-        end
-        RV32I_OPCODE_BRANCH: begin
-            debug_signals.inst_execute = 'b1;
-            debug_signals.inst_branch = 'b1;
-        end
-        RV32I_OPCODE_SYSTEM: begin
-            debug_signals.inst_system = 'b1;
-        end
-        default: begin
-        end
-        endcase
-`endif
+//         debug_signals = '{default: 'b0};
+//         debug_signals.register_pending = !reg_file_ready;
+//         debug_signals.register_full = (rd_status_calc == GECKO_REG_STATUS_FULL);
+
+//         case (rv32i_opcode_t'(instruction_fields.opcode))
+//         RV32I_OPCODE_OP, RV32I_OPCODE_IMM, RV32I_OPCODE_LUI, RV32I_OPCODE_AUIPC: begin
+//             debug_signals.inst_execute = 'b1;
+//         end
+//         RV32I_OPCODE_LOAD: begin
+//             debug_signals.inst_execute = 'b1;
+//             debug_signals.inst_load = 'b1;
+//         end
+//         RV32I_OPCODE_STORE: begin
+//             debug_signals.inst_execute = 'b1;
+//             debug_signals.inst_store = 'b1;
+//         end
+//         RV32I_OPCODE_JAL, RV32I_OPCODE_JALR: begin
+//             debug_signals.inst_jump = 'b1;
+//         end
+//         RV32I_OPCODE_BRANCH: begin
+//             debug_signals.inst_execute = 'b1;
+//             debug_signals.inst_branch = 'b1;
+//         end
+//         RV32I_OPCODE_SYSTEM: begin
+//             debug_signals.inst_system = 'b1;
+//         end
+//         default: begin
+//         end
+//         endcase
+// `endif
 
         state_transition = get_state_transition(next_state, 
                 instruction_fields,
@@ -653,6 +657,8 @@ module gecko_decode
 
         consume_instruction = state_transition.consume_instruction;
         send_operation = !state_transition.flush_instruction && consume_instruction;
+
+
 
         if (send_operation) begin
             if (next_state == GECKO_DECODE_SPECULATIVE) begin
@@ -678,7 +684,6 @@ module gecko_decode
                 RV32I_CSR_ECALL: begin // System Call
                     if (ENABLE_PRINT && rs1_value == 0) begin
                         produce_print = 'b1;
-                        next_print_out.payload = rs2_value[7:0];
                     end
                 end
                 endcase
@@ -689,12 +694,23 @@ module gecko_decode
             end
         end
 
-        produce_execute = opcode_status.execute && send_operation;
-        produce_system = opcode_status.system && send_operation;
-
-        if (decode_stop) next_state = GECKO_DECODE_HALT;
-        else if (decode_error) next_state = GECKO_DECODE_FAULT;
-        else next_state = state_transition.next_state;
+        if (decode_stop) begin
+            next_state = GECKO_DECODE_HALT;
+            next_execute_command.payload.halt = 'b1;
+            next_execute_command.payload.op_type = GECKO_EXECUTE_TYPE_JUMP;
+            produce_execute = 'b1;
+            produce_system = 'b0;
+        end else if (decode_error) begin
+            next_state = GECKO_DECODE_FAULT;
+            next_execute_command.payload.halt = 'b1;
+            next_execute_command.payload.op_type = GECKO_EXECUTE_TYPE_JUMP;
+            produce_execute = 'b1;
+            produce_system = 'b0;
+        end else begin
+            next_state = state_transition.next_state;
+            produce_execute = opcode_status.execute && send_operation;
+            produce_system = opcode_status.system && send_operation;
+        end
 
         // Handle writing back to the register file
         if (writeback_result.valid && writeback_result.ready) begin

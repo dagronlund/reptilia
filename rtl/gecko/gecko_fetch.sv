@@ -82,7 +82,14 @@ module gecko_fetch
         endcase
     endfunction
 
+    typedef enum logic [1:0] {
+        GECKO_FETCH_STATE_RESET = 'b00,
+        GECKO_FETCH_STATE_NORMAL = 'b01,
+        GECKO_FETCH_STATE_HALT = 'b10
+    } gecko_fetch_state_t;
+
     logic enable;
+    logic produce;
     logic ready_input_null;
     logic [1:0] enable_output_null;
     std_flow #(
@@ -98,16 +105,29 @@ module gecko_fetch
         .ready_output({instruction_command.ready, instruction_request.ready}),
 
         .consume('b1),
-        .produce('b11),
+        .produce({produce, produce}),
 
         .enable(enable),
         .enable_output(enable_output_null)
     );
 
+    logic halt_fetch;
+    gecko_fetch_state_t current_state, next_state;
+    gecko_fetch_table_addr_t current_reset_counter, next_reset_counter;
     logic [BRANCH_HISTORY_LENGTH-1:0] branch_table_valid, next_branch_table_valid;
     gecko_instruction_operation_t next_inst_cmd;
 
     always_ff @(posedge clk) begin
+        if (rst) begin
+            current_state <= GECKO_FETCH_STATE_RESET;
+            current_reset_counter <= 'b0;
+        end else if (halt_fetch) begin
+            current_state <= GECKO_FETCH_STATE_HALT;
+            current_reset_counter <= 'b0;
+        end else if (enable) begin
+            current_state <= next_state;
+            current_reset_counter <= next_reset_counter;
+        end
         if (rst) begin
             instruction_command.payload.pc <= (START_ADDR-4);
             instruction_command.payload.jump_flag <= 'b0;
@@ -157,11 +177,27 @@ module gecko_fetch
         current_pc = inst_cmd.pc;
 
         // Default Values
-        jump_command.ready = 'b1;
         instruction_request.read_enable = 'b1;
         instruction_request.write_enable = 'b0;
         instruction_request.data = 'b0;
         instruction_request.addr = current_pc;
+
+        // Increment reset counter
+        produce = 'b0;
+        next_state = current_state;
+        next_reset_counter = current_reset_counter + 'b1;
+        case (current_state)
+        GECKO_FETCH_STATE_RESET: begin
+            if (next_reset_counter == 'b0) begin
+                next_state = GECKO_FETCH_STATE_NORMAL;
+            end
+        end
+        GECKO_FETCH_STATE_NORMAL: begin
+            produce = 'b1;
+        end
+        GECKO_FETCH_STATE_HALT: begin
+        end
+        endcase
 
         // Default instruction increment
         default_next_pc = current_pc + 'd4;
@@ -192,7 +228,7 @@ module gecko_fetch
         instruction_command.payload.next_pc = next_pc;
 
         // Gate flow-control logic with clock-enable
-        if (!enable) begin
+        if (!enable || (current_state == GECKO_FETCH_STATE_RESET)) begin
             next_inst_cmd = inst_cmd;
         end
 
@@ -203,16 +239,28 @@ module gecko_fetch
         end
 
         // Update branch table when a jump command is recieved
-        branch_table_write_enable = jump_command.valid;
-        branch_table_write_addr = jump_op.current_pc[(BRANCH_ADDR_WIDTH+2-1):2];
-        branch_table_write_data.predicted_next = jump_op.actual_next_pc;
-        branch_table_write_data.tag = jump_op.current_pc[31:BRANCH_ADDR_WIDTH+2];
-        branch_table_write_data.jump_instruction = jump_op.jumped;
-        if (jump_op.prediction.miss) begin
-            branch_table_write_data.history = jump_op.branched ? DEFAULT_TAKEN_HISTORY : DEFAULT_NOT_TAKEN_HISTORY;
+        halt_fetch = 'b0;
+        branch_table_write_enable = jump_command.valid || (current_state == GECKO_FETCH_STATE_RESET);
+        if (current_state == GECKO_FETCH_STATE_RESET) begin
+            jump_command.ready = 'b0;
+            branch_table_write_enable = 'b0;
+            branch_table_write_addr = current_reset_counter;
+            branch_table_write_data = '{default: 'b0};
         end else begin
-            branch_table_write_data.history = update_history(jump_op.prediction.history, jump_op.branched);
+            jump_command.ready = 'b1;
+            branch_table_write_enable = jump_command.valid;
+            branch_table_write_addr = jump_op.current_pc[(BRANCH_ADDR_WIDTH+2-1):2];
+            branch_table_write_data.predicted_next = jump_op.actual_next_pc;
+            branch_table_write_data.tag = jump_op.current_pc[31:BRANCH_ADDR_WIDTH+2];
+            branch_table_write_data.jump_instruction = jump_op.jumped;
+            if (jump_op.prediction.miss) begin
+                branch_table_write_data.history = jump_op.branched ? DEFAULT_TAKEN_HISTORY : DEFAULT_NOT_TAKEN_HISTORY;
+            end else begin
+                branch_table_write_data.history = update_history(jump_op.prediction.history, jump_op.branched);
+            end
+            halt_fetch = jump_op.halt;
         end
+
         // Clock gated by jump_command.valid
         next_branch_table_valid = branch_table_valid | (1'b1 << branch_table_write_addr);
     end

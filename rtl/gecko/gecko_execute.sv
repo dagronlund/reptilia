@@ -26,7 +26,7 @@ module gecko_execute
     import rv32i::*;
     import gecko::*;
 #(
-    parameter int OUTPUT_REGISTER_MODE = 2
+    parameter int OUTPUT_REGISTER_MODE = 1
 )(
     input logic clk, rst,
 
@@ -214,9 +214,10 @@ module gecko_execute
             next_jump_command.payload.update_pc = (next_jump_command.payload.actual_next_pc != cmd_in.next_pc);
         end
         GECKO_EXECUTE_TYPE_JUMP: begin
-            produce_execute = (cmd_in.reg_addr != 'b0);
+            produce_execute = (cmd_in.reg_addr != 'b0) && !cmd_in.halt;
             produce_jump = 'b1;
 
+            next_jump_command.payload.halt = cmd_in.halt;
             next_jump_command.payload.actual_next_pc = d + cmd_in.immediate_value;
             next_jump_command.payload.jumped = 'b1;
             next_jump_command.payload.update_pc = (next_jump_command.payload.actual_next_pc != cmd_in.next_pc);

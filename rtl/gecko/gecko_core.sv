@@ -28,6 +28,7 @@ module gecko_core
 #(
     parameter int INST_LATENCY = 1,
     parameter int DATA_LATENCY = 1,
+    parameter int INST_PIPELINE_BREAK = 1,
     parameter gecko_pc_t START_ADDR = 'b0,
     parameter int ENABLE_PERFORMANCE_COUNTERS = 1,
     parameter int ENABLE_PRINT = 1
@@ -64,6 +65,7 @@ module gecko_core
 
     std_stream_intf #(.T(gecko_instruction_operation_t)) instruction_command_in (.clk, .rst);
     std_stream_intf #(.T(gecko_instruction_operation_t)) instruction_command_out (.clk, .rst);
+    std_stream_intf #(.T(gecko_instruction_operation_t)) instruction_command_break (.clk, .rst);
 
     std_stream_intf #(.T(gecko_mem_operation_t)) mem_command_in (.clk, .rst);
     std_stream_intf #(.T(gecko_mem_operation_t)) mem_command_out (.clk, .rst);
@@ -103,14 +105,31 @@ module gecko_core
         .data_out(instruction_command_out)
     );
 
+    std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) inst_result_break (.clk, .rst);
+
+    mem_stage #(
+        .MODE(INST_PIPELINE_BREAK ? 2 : 0)
+    ) mem_request_output_stage (
+        .clk, .rst,
+        .mem_in(inst_result), .mem_out(inst_result_break)
+    );
+
+    std_flow_stage #(
+        .T(gecko_instruction_operation_t),
+        .MODE(INST_PIPELINE_BREAK ? 2 : 0)
+    ) std_flow_stage_inst (
+        .clk, .rst,
+        .stream_in(instruction_command_out), .stream_out(instruction_command_break)
+    );
+
     gecko_decode #(
         .NUM_FORWARDED(3),
         .ENABLE_PRINT(ENABLE_PRINT)
     ) gecko_decode_inst (
         .clk, .rst,
 
-        .instruction_command(instruction_command_out),
-        .instruction_result(inst_result),
+        .instruction_command(instruction_command_break),
+        .instruction_result(inst_result_break),
 
         .system_command,
         .execute_command,
@@ -199,7 +218,6 @@ module gecko_core
             $fwrite(file, "Success");
         end
         $fclose(file);
-        $finish();
     end
 `endif
 

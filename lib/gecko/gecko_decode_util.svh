@@ -214,6 +214,7 @@ package gecko_decode_util;
     );
         gecko_execute_operation_t execute_op;
         execute_op.speculative = 'b0;
+        execute_op.halt = 'b0;
 
         // Default Execute Command Values
         execute_op.reg_addr = instruction_fields.rd;

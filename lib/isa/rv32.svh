@@ -15,6 +15,7 @@ package rv32;
     typedef logic signed [31:0] rv32_reg_signed_t;
     typedef logic [2:0] rv32_funct3_t;
     typedef logic [4:0] rv32_funct5_t;
+    typedef logic [5:0] rv32_funct6_t;
     typedef logic [6:0] rv32_funct7_t;
     typedef logic [11:0] rv32_funct12_t;
 

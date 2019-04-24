@@ -24,13 +24,17 @@ module gecko_micro_tb
     std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) supervisor_request (.clk, .rst);
     std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) supervisor_response (.clk, .rst);
 
+    std_stream_intf #(.T(logic [7:0])) print_out (.clk, .rst);
+    assign print_out.ready = 'b1;
+
     gecko_micro #(
-        .INST_LATENCY(2),
-        .DATA_LATENCY(2)
+        .INST_LATENCY(1),
+        .DATA_LATENCY(1)
     ) gecko_micro_inst (
         .clk, .rst,
         .faulted_flag, .finished_flag,
-        .supervisor_request, .supervisor_response
+        .supervisor_request, .supervisor_response,
+        .print_out
     );
 
     logic re;
@@ -43,18 +47,47 @@ module gecko_micro_tb
         supervisor_response.ready = 'b0;
         while (rst) @ (posedge clk);
 
+        while (!finished_flag) @ (posedge clk);
+        
         fork
         begin
-            for (int i = 0; i < (1<<30); i+=4) begin
-                supervisor_request.send('b1, 'b0, 'b0, i, 'b0);
-            end
+            supervisor_request.send('b1, 'b0, 'h400, 'h0, 'b0);
+            supervisor_request.send('b1, 'b0, 'h404, 'h0, 'b0);
+            supervisor_request.send('b1, 'b0, 'h000, 'h0, 'b0);
+            supervisor_request.send('b1, 'b0, 'h000, 'h0, 'b0);
+
+            supervisor_request.send('b1, 'b0, 'h000, 'h0, 'b0);
+            supervisor_request.send('b1, 'b0, 'h000, 'h0, 'b0);
+            supervisor_request.send('b1, 'b0, 'h000, 'h0, 'b0);
+            supervisor_request.send('b1, 'b0, 'h000, 'h0, 'b0);
         end
         begin
-            for (int i = 0; i < (1<<30); i+=4) begin
-                supervisor_response.recv(re, we, data, addr, id);
-            end
+            supervisor_response.recv(re, we, data, addr, id);
+            supervisor_response.recv(re, we, data, addr, id);
+            supervisor_response.recv(re, we, data, addr, id);
+            supervisor_response.recv(re, we, data, addr, id);
+
+            supervisor_response.recv(re, we, data, addr, id);
+            supervisor_response.recv(re, we, data, addr, id);
+            supervisor_response.recv(re, we, data, addr, id);
+            supervisor_response.recv(re, we, data, addr, id);
         end
         join
+
+        // fork
+        // begin
+        //     for (int i = 0; i < (1<<30); i+=4) begin
+        //         supervisor_request.send('b1, 'b0, 'b0, i, 'b0);
+        //     end
+        // end
+        // begin
+        //     for (int i = 0; i < (1<<30); i+=4) begin
+        //         supervisor_response.recv(re, we, data, addr, id);
+        //     end
+        // end
+        // join
+
+        $finish();
     end
 
 endmodule
