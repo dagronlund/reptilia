@@ -42,7 +42,7 @@ module gecko_writeback
 )(
     input logic clk, rst,
 
-    std_stream_intf.in writeback_results_in [PORTS],
+    std_stream_intf.in writeback_results_in [PORTS], // gecko_operation_t
 
     std_stream_intf.out writeback_result // gecko_operation_t
 );

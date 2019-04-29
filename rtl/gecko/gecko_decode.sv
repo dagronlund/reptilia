@@ -218,26 +218,6 @@ module gecko_decode
         .stream_in(next_print_out), .stream_out(print_out)
     );
 
-    // // Flow Controller
-    // std_flow #(
-    //     .NUM_INPUTS(2),
-    //     .NUM_OUTPUTS(3)
-    // ) std_flow_inst (
-    //     .clk, .rst,
-
-    //     .valid_input({instruction_result.valid, instruction_command.valid}),
-    //     .ready_input({instruction_result.ready, instruction_command.ready}),
-
-    //     .valid_output({system_command.valid, execute_command.valid, print_out.valid}),
-    //     .ready_output({system_command.ready, execute_command.ready, print_out.ready}),
-
-    //     .consume({consume_instruction, consume_instruction}),
-    //     .produce({produce_system, produce_execute, produce_print}),
-
-    //     .enable,
-    //     .enable_output({enable_system, enable_execute, enable_print})
-    // );
-
     logic faulted, fault_flag;
     logic next_state_speculative_to_normal;
     gecko_decode_state_t state, next_state;
@@ -256,12 +236,8 @@ module gecko_decode
     gecko_speculative_status_t speculative_status, next_speculative_status;
     gecko_jump_flag_t speculative_flag, next_speculative_flag;
 
-    // gecko_system_operation_t next_system_command; 
-    // gecko_execute_operation_t next_execute_command;
     logic normal_resolved_instruction;
     gecko_speculative_count_t speculation_resolved_instructions;
-
-    // logic [7:0] next_print_out;
 
 `ifdef __SIMULATION__
     typedef struct packed {
@@ -302,7 +278,9 @@ module gecko_decode
             if (enable) begin
                 state <= next_state;
             end else if (state == GECKO_DECODE_SPECULATIVE) begin
-                if (next_state_speculative_to_normal) state <= GECKO_DECODE_NORMAL;
+                if (next_state_speculative_to_normal) begin
+                    state <= GECKO_DECODE_NORMAL;
+                end
             end
             reset_counter <= next_reset_counter;
             retired_instructions <= speculation_resolved_instructions + 
@@ -345,16 +323,6 @@ module gecko_decode
         end else if (enable) begin
             execute_saved <= next_execute_saved;
         end
-        
-        // if (enable_system) begin
-        //     system_command.payload <= next_system_command;
-        // end
-        // if (enable_execute) begin
-        //     execute_command.payload <= next_execute_command;
-        // end
-        // if (enable_print) begin
-        //     print_out.payload <= next_print_out;
-        // end
     end
 
     logic register_write_enable;
@@ -427,7 +395,39 @@ module gecko_decode
         .read_data_out('{rear_status_rd, rear_status_rs1, rear_status_rs2})
     );
 
-    gecko_decode_state_transition_t state_transition;
+    (* mark_debug = "true" *) logic inst_valid, inst_ready;
+    (* mark_debug = "true" *) logic [31:0] inst_debug, pc_debug;
+    (* mark_debug = "true" *) logic debug_decode_consume_inst;
+    (* mark_debug = "true" *) logic debug_decode_produce_system, debug_decode_produce_execute, debug_decode_produce_print;
+    (* mark_debug = "true" *) logic debug_decode_enable;
+    (* mark_debug = "true" *) logic debug_decode_print_ready, debug_decode_execute_ready, debug_decode_system_ready;
+    (* mark_debug = "true" *) logic [2:0] debug_decode_state;
+    (* mark_debug = "true" *) logic debug_decode_spec_normal, debug_decode_jump_valid, debug_decode_jump_ready;
+
+    always_comb begin
+        inst_valid = instruction_result.valid;
+        inst_ready = instruction_result.ready;
+        inst_debug = instruction_result.data;
+        pc_debug = instruction_command.payload.pc;
+
+        debug_decode_consume_inst = consume_instruction;
+        debug_decode_produce_execute = produce_execute;
+        debug_decode_produce_system = produce_system;
+        debug_decode_produce_print = produce_print;
+        debug_decode_enable = enable;
+
+        debug_decode_state = state;
+
+        debug_decode_print_ready = next_print_out.ready;
+        debug_decode_execute_ready = next_execute_command.ready;
+        debug_decode_system_ready = next_system_command.ready;
+
+        debug_decode_spec_normal = next_state_speculative_to_normal;
+        debug_decode_jump_valid = jump_command.valid;
+        debug_decode_jump_ready = jump_command.ready;
+        
+    end
+
     always_comb begin
         automatic gecko_instruction_operation_t inst_cmd_in;
         automatic gecko_jump_operation_t jump_cmd_in;
@@ -441,7 +441,7 @@ module gecko_decode
 
         automatic logic send_operation, reg_file_ready, reg_file_clear;
         automatic logic decode_stop, decode_error;
-        // automatic gecko_decode_state_transition_t state_transition;
+        automatic gecko_decode_state_transition_t state_transition;
         automatic gecko_decode_opcode_status_t opcode_status;
         automatic gecko_jump_flag_t next_jump_flag;
 
@@ -511,7 +511,7 @@ module gecko_decode
         speculation_resolved_instructions = 'b0;
         update_jump_flag = 'b0;
         next_jump_flag = jump_flag;
-        if (jump_command.valid && jump_command.ready) begin
+        if (jump_command.valid) begin
             if (jump_cmd_in.update_pc) begin // Mispredicted
                 update_jump_flag = 'b1;
                 next_jump_flag = jump_flag + update_jump_flag;
@@ -520,12 +520,13 @@ module gecko_decode
                 speculative_status_mispredicted_enable = 'b1;
                 next_speculative_status[speculative_status_mispredicted_index].mispredicted = 'b1;
             end else begin // Predicted Correctly
-                
                 speculation_resolved_instructions = next_speculative_retired_counter;
             end
 
             next_state_speculative_to_normal = 'b1;
-            if (next_state == GECKO_DECODE_SPECULATIVE) next_state = GECKO_DECODE_NORMAL;
+            if (next_state == GECKO_DECODE_SPECULATIVE) begin
+                next_state = GECKO_DECODE_NORMAL;
+            end
 
             clear_speculative_retired_counter = 'b1;
             next_speculative_flag += 'b1;

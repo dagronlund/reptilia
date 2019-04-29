@@ -195,29 +195,36 @@ module gecko_core
 
 `ifdef __SIMULATION__
     initial begin
+        // Clear file
         automatic integer file = $fopen("log.txt", "w");
-        $display("Opened file");
-        @ (posedge clk);
-        while (1) begin
-            if (print_out.valid && print_out.ready) begin
-                $fwrite(file, "%c", print_out.payload);
-            end
-            if (faulted_flag || finished_flag) begin
-                $display("Closed file");
-                $fclose(file);
-                break;
-            end
-            @ (posedge clk);
-        end
-        file = $fopen("status.txt", "w");
-        if (faulted_flag) begin
-            $display("Exit Error!!!");
-            $fwrite(file, "Failure");
-        end else begin
-            $display("Exit Success!!!");
-            $fwrite(file, "Success");
-        end
         $fclose(file);
+
+        while ('b1) begin
+            while (finished_flag || faulted_flag) @ (posedge clk);
+            file = $fopen("log.txt", "w+");
+            $display("Opened file");
+            @ (posedge clk);
+            while (1) begin
+                if (print_out.valid && print_out.ready) begin
+                    $fwrite(file, "%c", print_out.payload);
+                end
+                if (faulted_flag || finished_flag) begin
+                    $display("Closed file");
+                    $fclose(file);
+                    break;
+                end
+                @ (posedge clk);
+            end
+            file = $fopen("status.txt", "w");
+            if (faulted_flag) begin
+                $display("Exit Error!!!");
+                $fwrite(file, "Failure");
+            end else begin
+                $display("Exit Success!!!");
+                $fwrite(file, "Success");
+            end
+            $fclose(file);
+        end
     end
 `endif
 

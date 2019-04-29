@@ -34,7 +34,8 @@ module gecko_compute
     parameter DATA_LATENCY = 2,
     parameter gecko_pc_t START_ADDR = 'h0,
     parameter int ENABLE_PERFORMANCE_COUNTERS = 1,
-    parameter int ENABLE_PRINT = 1
+    parameter int ENABLE_PRINT = 1,
+    parameter int AXI_ID_WIDTH = 1
 )(
     input logic clk, rst,
 
@@ -56,6 +57,7 @@ module gecko_compute
     std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) mem_response (.clk, .rst);
 
     axi4_slave #(
+        .AXI_ID_WIDTH(AXI_ID_WIDTH)
         // parameter int AXI_ADDR_WIDTH = 32,
         // parameter int AXI_DATA_WIDTH = 32,
         // parameter int AXI_ID_WIDTH = 1,

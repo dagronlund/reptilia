@@ -69,36 +69,67 @@ module std_flow_stage #(
     end else begin // MODE == 2
 
         logic input_index, output_index;
-        logic valid_buffer [2];
-        (* ram_style =  "registers" *) T payload_buffer [2];
+        logic valid_buffer0, valid_buffer1;
+        T payload_buffer0, payload_buffer1;
+        // logic [1:0] valid_buffer;
+        // T [1:0] payload_buffer;
 
         // Synchronously connect valid
         always_ff @(posedge clk) begin
             if (rst) begin
                 input_index <= 'b0;
                 output_index <= 'b0;
-                valid_buffer <= '{'b0, 'b0};
+                // valid_buffer <= '{'b0, 'b0};
+                valid_buffer0 <= 'b0;
+                valid_buffer1 <= 'b0;
             end else begin
-                if (!valid_buffer[input_index] && stream_in.valid) begin
-                    valid_buffer[input_index] <= 'b1;
+                if (!(input_index ? valid_buffer1 : valid_buffer0) && stream_in.valid) begin
+                    if (input_index) begin
+                        valid_buffer1 <= 'b1;
+                    end else begin
+                        valid_buffer0 <= 'b1;
+                    end
+                    // valid_buffer[input_index] <= 'b1;
                     input_index <= input_index + 'b1;
                 end
-                if (valid_buffer[output_index] && stream_out.ready) begin
-                    valid_buffer[output_index] <= 'b0;
+                if ((output_index ? valid_buffer1 : valid_buffer0) && stream_out.ready) begin
+                    if (output_index) begin
+                        valid_buffer1 <= 'b0;
+                    end else begin
+                        valid_buffer0 <= 'b0;
+                    end
+                    // valid_buffer[output_index] <= 'b0;
                     output_index <= output_index + 'b1;
                 end
             end
 
-            if (!valid_buffer[input_index] && stream_in.valid) begin
-                payload_buffer[input_index] <= stream_in.payload;
+            if (!(input_index ? valid_buffer1 : valid_buffer0) && stream_in.valid) begin
+                if (input_index) begin
+                    payload_buffer1 <= stream_in.payload;
+                end else begin
+                    payload_buffer0 <= stream_in.payload;
+                end
+                // payload_buffer[input_index] <= stream_in.payload;
             end
         end
 
         // Combinationally connect ready
         always_comb begin
-            stream_out.valid = valid_buffer[output_index];
-            stream_out.payload = payload_buffer[output_index];
-            stream_in.ready = !valid_buffer[input_index];
+            if (output_index) begin
+                stream_out.valid = valid_buffer1;
+                stream_out.payload = payload_buffer1;
+            end else begin
+                stream_out.valid = valid_buffer0;
+                stream_out.payload = payload_buffer0;
+            end
+            if (input_index) begin
+                stream_in.ready = !valid_buffer1;
+            end else begin
+                stream_in.ready = !valid_buffer0;
+            end
+            // stream_out.valid = valid_buffer[output_index];
+            // stream_out.payload = payload_buffer[output_index];
+            // stream_in.ready = !valid_buffer[input_index];
         end        
 
     end

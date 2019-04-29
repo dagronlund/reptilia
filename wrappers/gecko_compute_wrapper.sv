@@ -90,11 +90,11 @@ module gecko_compute_wrapper_sv #(
     import gecko::*;
     import axi4::*;
 
-    axi4_ar_intf axi_ar(.clk, .rst);
-    axi4_aw_intf axi_aw(.clk, .rst);
+    axi4_ar_intf #(.ID_WIDTH(ID_WIDTH)) axi_ar(.clk, .rst);
+    axi4_aw_intf #(.ID_WIDTH(ID_WIDTH)) axi_aw(.clk, .rst);
     axi4_w_intf axi_w(.clk, .rst);
-    axi4_r_intf axi_r(.clk, .rst);
-    axi4_b_intf axi_b(.clk, .rst);
+    axi4_r_intf #(.ID_WIDTH(ID_WIDTH)) axi_r(.clk, .rst);
+    axi4_b_intf #(.ID_WIDTH(ID_WIDTH))axi_b(.clk, .rst);
 
     std_stream_intf #(.T(logic [7:0])) print_out(.clk, .rst);
     
@@ -104,7 +104,8 @@ module gecko_compute_wrapper_sv #(
         .DATA_LATENCY(DATA_LATENCY),
         .START_ADDR(START_ADDR),
         .ENABLE_PERFORMANCE_COUNTERS(ENABLE_PERFORMANCE_COUNTERS),
-        .ENABLE_PRINT(ENABLE_PRINT)
+        .ENABLE_PRINT(ENABLE_PRINT),
+        .AXI_ID_WIDTH(ID_WIDTH)
     ) gecko_compute_inst (
         .clk, .rst,
 

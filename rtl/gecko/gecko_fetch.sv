@@ -166,6 +166,22 @@ module gecko_fetch
         .read_data_out('{branch_table_read_data})
     );
 
+    (* mark_debug = "true" *) logic fetch_inst_command_valid, fetch_inst_command_ready;
+    (* mark_debug = "true" *) logic fetch_inst_request_valid, fetch_inst_request_ready;
+    (* mark_debug = "true" *) logic [31:0] fetch_inst_pc;
+    (* mark_debug = "true" *) logic fetch_inst_jump_flag;
+
+    always_comb begin
+        fetch_inst_command_valid = instruction_command.valid;
+        fetch_inst_command_ready = instruction_command.ready;
+
+        fetch_inst_request_valid = instruction_request.valid;
+        fetch_inst_request_ready = instruction_request.ready;
+
+        fetch_inst_pc = instruction_command.payload.pc;
+        fetch_inst_jump_flag = instruction_command.payload.jump_flag;
+    end
+
     always_comb begin
         automatic logic branch_table_hit;
         automatic gecko_pc_t current_pc, next_pc, default_next_pc;
@@ -258,7 +274,7 @@ module gecko_fetch
             end else begin
                 branch_table_write_data.history = update_history(jump_op.prediction.history, jump_op.branched);
             end
-            halt_fetch = jump_op.halt;
+            halt_fetch = jump_op.halt && jump_command.valid;
         end
 
         // Clock gated by jump_command.valid

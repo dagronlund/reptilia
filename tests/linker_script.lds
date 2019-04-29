@@ -1,6 +1,10 @@
 OUTPUT_FORMAT("elf32-littleriscv")
 
-__stack = 0x10000;
+/* 16-bit */
+/* __stack = 0x10000; */
+
+/* 13-bit */
+__stack = 0x2000;
 
 SECTIONS
 {

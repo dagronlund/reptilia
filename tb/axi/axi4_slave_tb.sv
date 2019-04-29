@@ -12,16 +12,17 @@ module axi4_slave_tb
     logic clk, rst;
     clk_rst_gen clk_rst_gen_inst(.clk, .rst);
 
-    axi4_ar_intf axi_ar(.clk, .rst);
-    axi4_aw_intf axi_aw(.clk, .rst);
+    axi4_ar_intf #(.ID_WIDTH(4)) axi_ar(.clk, .rst);
+    axi4_aw_intf #(.ID_WIDTH(4)) axi_aw(.clk, .rst);
     axi4_w_intf axi_w(.clk, .rst);
-    axi4_r_intf axi_r(.clk, .rst);
-    axi4_b_intf axi_b(.clk, .rst);
+    axi4_r_intf #(.ID_WIDTH(4)) axi_r(.clk, .rst);
+    axi4_b_intf #(.ID_WIDTH(4)) axi_b(.clk, .rst);
 
     std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) mem_request (.clk, .rst);
     std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) mem_response (.clk, .rst);
 
     axi4_slave #(
+        .AXI_ID_WIDTH(4)
     ) axi4_slave_inst (
         .clk, .rst,
 
@@ -61,7 +62,7 @@ module axi4_slave_tb
     axi4_resp_t temp_resp;
     logic [31:0] temp_data;
     logic temp_last;
-    logic temp_id;
+    logic [3:0] temp_id;
 
     initial begin
         axi_ar.arvalid = 'b0;
@@ -84,7 +85,7 @@ module axi4_slave_tb
                     'b0, 
                     'h2, 
                     'b0, 
-                    'b0);
+                    'h5);
 
             axi_w.send('h42, 'hF, 'h1);
             axi_w.send('h69, 'hF, 'h1);
@@ -98,7 +99,7 @@ module axi4_slave_tb
                     'b0, 
                     'h2, 
                     'b0, 
-                    'b0);
+                    'h4);
 
         end
         begin
