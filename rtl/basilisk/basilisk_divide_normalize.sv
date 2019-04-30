@@ -73,6 +73,7 @@ module basilisk_divide_normalize
                 divide_operation_command.payload.result
         );
         next_divide_result_command.payload.dest_reg_addr = divide_operation_command.payload.dest_reg_addr;
+        next_divide_result_command.payload.dest_offset_addr = divide_operation_command.payload.dest_offset_addr;
     end
 
 endmodule

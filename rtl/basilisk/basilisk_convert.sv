@@ -40,7 +40,7 @@ module basilisk_convert
     logic enable, consume, produce;
 
     std_flow_lite #(
-        .NUM_INPUTS(2),
+        .NUM_INPUTS(1),
         .NUM_OUTPUTS(1)
     ) std_flow_lite_inst (
         .clk, .rst,
@@ -55,11 +55,11 @@ module basilisk_convert
     );
 
     std_flow_stage #(
-        .T(basilisk_add_exponent_command_t),
+        .T(basilisk_result_t),
         .MODE(OUTPUT_REGISTER_MODE)
     ) output_stage_inst (
         .clk, .rst,
-        .stream_in(next_convert_result), .stream_out(next_convert_result)
+        .stream_in(next_convert_result), .stream_out(convert_result)
     );
 
     always_comb begin
@@ -83,49 +83,40 @@ module basilisk_convert
         a_lt_b = (cmd.a < cmd.b);
         fields_a = fpu_decode_float(cmd.a);
         fields_b = fpu_decode_float(cmd.b);
-        fields_cnv = fpu_int2float(cmd.a);
+        // fields_cnv = fpu_int2float(cmd.a, cmd.signed_integer);
 
-        result = '{
-            sign: fields_a.sign,
-            exponent: fields_a.exponent,
-            mantissa: fields_a.mantissa
-        };
+        result.sign = fields_a.sign;
+        result.exponent = fields_a.exponent;
+        result.mantissa = fields_a.mantissa;
 
         case (cmd.op)
         BASILISK_CONVERT_OP_MIN: begin
             if (cmd.conditions_a.nan || cmd.conditions_b.nan) begin
                 result.nan = 'b1;
             end else if (!a_lt_b) begin
-                result = '{
-                    sign: fields_b.sign,
-                    exponent: fields_b.exponent,
-                    mantissa: fields_b.mantissa
-                };
+                result.sign = fields_b.sign;
+                result.exponent = fields_b.exponent;
+                result.mantissa = fields_b.mantissa;
             end
         end
         BASILISK_CONVERT_OP_MAX: begin 
             if (cmd.conditions_a.nan || cmd.conditions_b.nan) begin
                 result.nan = 'b1;
             end else if (a_lt_b) begin
-                result = '{
-                    sign: fields_b.sign,
-                    exponent: fields_b.exponent,
-                    mantissa: fields_b.mantissa
-                };
+                result.sign = fields_b.sign;
+                result.exponent = fields_b.exponent;
+                result.mantissa = fields_b.mantissa;
             end
         end
         BASILISK_CONVERT_OP_RAW: begin 
         end
-        BASILISK_CONVERT_OP_CNV: begin 
-            result = '{
-                sign: fields_cnv.sign,
-                exponent: fields_cnv.exponent,
-                mantissa: fields_cnv.mantissa
-            };
+        BASILISK_CONVERT_OP_CNV: begin
+            result = fpu_int2float(cmd.a, cmd.signed_integer);
         end
         endcase
 
         next_convert_result.payload.dest_reg_addr = cmd.dest_reg_addr;
+        next_convert_result.payload.dest_offset_addr = cmd.dest_offset_addr;
         next_convert_result.payload.result = result;
     end
 

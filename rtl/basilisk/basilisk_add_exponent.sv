@@ -80,9 +80,11 @@ module basilisk_add_exponent
             consume_add = 'b0;
             chosen_command = basilisk_add_command_t'(mult_add_command.payload);
             next_add_exponent_command.payload.dest_reg_addr = mult_add_command.payload.dest_reg_addr;
+            next_add_exponent_command.payload.dest_offset_addr = mult_add_command.payload.dest_offset_addr;
         end else begin
             chosen_command = basilisk_add_command_t'(add_command.payload);
             next_add_exponent_command.payload.dest_reg_addr = add_command.payload.dest_reg_addr;
+            next_add_exponent_command.payload.dest_offset_addr = add_command.payload.dest_offset_addr;
         end
 
         next_add_exponent_command.payload.result = fpu_float_add_exponent(

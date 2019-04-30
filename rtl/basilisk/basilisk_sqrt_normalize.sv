@@ -70,6 +70,7 @@ module basilisk_sqrt_normalize
         produce = 'b1;
 
         next_sqrt_result_command.payload.dest_reg_addr = sqrt_operation_command.payload.dest_reg_addr;
+        next_sqrt_result_command.payload.dest_offset_addr = sqrt_operation_command.payload.dest_offset_addr;
         next_sqrt_result_command.payload.result = fpu_float_sqrt_normalize(
                 sqrt_operation_command.payload.result
         );

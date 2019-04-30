@@ -70,6 +70,7 @@ module basilisk_add_normalize
         produce = 'b1;
 
         next_add_result_command.payload.dest_reg_addr = add_operation_command.payload.dest_reg_addr;
+        next_add_result_command.payload.dest_offset_addr = add_operation_command.payload.dest_offset_addr;
         next_add_result_command.payload.result = fpu_float_add_normalize(add_operation_command.payload.result);
     end
 

@@ -1,7 +1,11 @@
 `ifndef __FPU__
 `define __FPU__
 
+`include "fpu_utils.svh"
+
 package fpu;
+
+    import fpu_utils::*;
 
     typedef logic [31:0] fpu_float_t;
     typedef logic        fpu_float_sign_t;
@@ -132,12 +136,11 @@ package fpu;
         };
     endfunction
 
-    function fpu_result_t fpu_int2float(
-        input logic [31:0] number,
-        input logic is_signed
+    function automatic fpu_result_t fpu_int2float(
+            input logic [31:0] number,
+            input logic is_signed
     );
-        
-        logic [31:0] mantissa;
+        logic [31:0] mantissa = 'b0;
         logic [7:0] exponent, diff;
         logic [4:0] space;
         logic sign, sticky;
@@ -163,19 +166,19 @@ package fpu;
 
         result.sign = sign;
         result.exponent = exponent;
-        result.mantissa = mantissa[22:0];
-        result.nan = 1'b0;
-        result.inf = 1'b0;
-        result.zero = 1'b0;
+        result.mantissa = mantissa[23:0];
+        result.nan = 'b0;
+        result.inf = 'b0;
+        result.zero = 'b0;
+        result.guard = 'b0;
         result.mode = FPU_ROUND_MODE_ZERO;
         return result;
     endfunction
 
-    function fpu_result_t fpu_float2int(
-        input fpu_float_fields_t float,
-        input logic is_signed 
+    function automatic fpu_result_t fpu_float2int(
+            input fpu_float_fields_t float,
+            input logic is_signed 
     );
-
         logic norm;
         logic [7:0] exp;
         logic [31:0] y;

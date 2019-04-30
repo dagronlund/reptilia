@@ -77,6 +77,7 @@ module basilisk_mult_add_round
         next_mult_add_command.payload.mode = mult_result.mode;
 
         next_mult_add_command.payload.dest_reg_addr = mult_add_normalize_command.payload.dest_reg_addr;
+        next_mult_add_command.payload.dest_offset_addr = mult_add_normalize_command.payload.dest_offset_addr;
     end
 
 endmodule

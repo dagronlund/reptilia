@@ -89,7 +89,10 @@ module basilisk_mult_normalize
         next_mult_add_normalize_command.payload.conditions_c = mult_operation_command.payload.conditions_c;
 
         next_mult_add_normalize_command.payload.dest_reg_addr = mult_operation_command.payload.dest_reg_addr;
+        next_mult_add_normalize_command.payload.dest_offset_addr = mult_operation_command.payload.dest_offset_addr;
+
         next_mult_result_command.payload.dest_reg_addr = mult_operation_command.payload.dest_reg_addr;
+        next_mult_result_command.payload.dest_offset_addr = mult_operation_command.payload.dest_offset_addr;
     end
 
 endmodule

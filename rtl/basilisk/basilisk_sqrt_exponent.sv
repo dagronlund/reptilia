@@ -75,6 +75,7 @@ module basilisk_sqrt_exponent
                 sqrt_command.payload.mode
         );
         next_sqrt_exponent_command.payload.dest_reg_addr = sqrt_command.payload.dest_reg_addr;
+        next_sqrt_exponent_command.payload.dest_offset_addr = sqrt_command.payload.dest_offset_addr;
     end
 
 endmodule

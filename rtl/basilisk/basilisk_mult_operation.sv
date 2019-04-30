@@ -77,6 +77,7 @@ module basilisk_mult_operation
         next_mult_operation_command.payload.conditions_c = mult_exponent_command.payload.conditions_c;
 
         next_mult_operation_command.payload.dest_reg_addr = mult_exponent_command.payload.dest_reg_addr;
+        next_mult_operation_command.payload.dest_offset_addr = mult_exponent_command.payload.dest_offset_addr;
     end
 
 endmodule

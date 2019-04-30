@@ -66,6 +66,7 @@ module basilisk_sqrt_operation
     );
 
     rv32_reg_addr_t dest_reg_addr, next_dest_reg_addr;
+    basilisk_offset_addr_t dest_offset_addr, next_dest_offset_addr;
     fpu_sqrt_result_t partial_result, next_partial_result;
     logic [4:0] counter, next_counter;
 
@@ -73,9 +74,11 @@ module basilisk_sqrt_operation
         if(rst) begin
             counter <= 'b0;
             dest_reg_addr <= 'b0;
+            dest_offset_addr <= 'b0;
         end else if (enable) begin
             counter <= next_counter;
             dest_reg_addr <= next_dest_reg_addr;
+            dest_offset_addr <= next_dest_offset_addr;
         end
 
         if (enable) begin
@@ -91,12 +94,14 @@ module basilisk_sqrt_operation
 
        next_counter = counter + 'b1;
        next_dest_reg_addr = dest_reg_addr;
+       next_dest_offset_addr = dest_offset_addr;
 
        // Runs the operation 27 times in a loop
         if (counter == 0) begin
             consume = 'b1;
             starting_result = sqrt_exponent_command.payload.result;
             next_dest_reg_addr = sqrt_exponent_command.payload.dest_reg_addr;
+            next_dest_offset_addr = sqrt_exponent_command.payload.dest_offset_addr;
         end else if (counter == 26) begin
             produce = 'b1;
             next_counter = 'b0;
@@ -105,6 +110,7 @@ module basilisk_sqrt_operation
         next_partial_result = fpu_float_sqrt_operation(starting_result);
 
         next_sqrt_operation_command.payload.dest_reg_addr = dest_reg_addr;
+        next_sqrt_operation_command.payload.dest_offset_addr = dest_offset_addr;
         next_sqrt_operation_command.payload.result = next_partial_result;
     end
 
