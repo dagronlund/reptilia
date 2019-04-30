@@ -141,7 +141,7 @@ package fpu;
             input logic is_signed
     );
         logic [31:0] mantissa = 'b0;
-        logic [7:0] exponent, diff;
+        logic [7:0] diff;
         logic [4:0] space;
         logic sign, sticky;
         fpu_result_t result;
@@ -151,21 +151,21 @@ package fpu;
 
         space = get_leading_zeros_47({number, 15'd0});
         if(space < 8) begin
-            diff = 8-space;
+            diff = 8 - space;
             sticky = get_sticky_bit_27(number[26:0], diff);
             mantissa = number >> diff;
             mantissa[0] = sticky;
-            exponent = 23 + diff;
         end else begin
             diff = space - 8;
             mantissa = number << diff;
-            exponent = 23 - diff;
         end
 
-        if(number==0) return 32'd0;
+        if (number == 0) begin
+            return 32'd0;
+        end
 
         result.sign = sign;
-        result.exponent = exponent;
+        result.exponent = (23 + 127 + 8) - space;
         result.mantissa = mantissa[23:0];
         result.nan = 'b0;
         result.inf = 'b0;
