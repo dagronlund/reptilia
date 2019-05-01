@@ -128,7 +128,7 @@ module gecko_micro_tb
         end
         join
 
-        $finish();
+        // $finish();
 
         @ (posedge clk);
         @ (posedge clk);

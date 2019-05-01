@@ -6,6 +6,7 @@
 `include "../isa/rv.svh"
 `include "../isa/rv32.svh"
 `include "../isa/rv32i.svh"
+`include "../isa/rv32f.svh"
 `include "gecko.svh"
 
 `else
@@ -13,6 +14,7 @@
 `include "rv.svh"
 `include "rv32.svh"
 `include "rv32i.svh"
+`include "rv32f.svh"
 `include "gecko.svh"
 
 `endif
@@ -21,6 +23,7 @@ package gecko_decode_util;
 
     import rv32::*;
     import rv32i::*;
+    import rv32f::*;
     import gecko::*;
 
     typedef gecko_reg_status_t gecko_decode_reg_file_status_t [32];
@@ -31,7 +34,7 @@ package gecko_decode_util;
     } gecko_decode_operands_status_t;
 
     typedef struct packed {
-        logic execute, system, error;
+        logic execute, system, float, error;
     } gecko_decode_opcode_status_t;
 
     function automatic rv32_reg_addr_t update_execute_saved(
@@ -56,6 +59,18 @@ package gecko_decode_util;
             RV32I_FUNCT3_SYS_CSRRW, RV32I_FUNCT3_SYS_CSRRS, 
             RV32I_FUNCT3_SYS_CSRRC, RV32I_FUNCT3_SYS_CSRRWI, 
             RV32I_FUNCT3_SYS_CSRRSI, RV32I_FUNCT3_SYS_CSRRCI: begin
+                // Execute result superceded
+                if (current_execute_saved == instruction_fields.rd) begin
+                    return 'b0;
+                end
+            end
+            endcase
+        end
+        endcase
+        case (rv32f_opcode_t'(instruction_fields.opcode))
+        RV32F_OPCODE_FP_OP_S: begin
+            case (rv32f_funct7_t'(instruction_fields.funct7))
+            RV32F_FUNCT7_FCVT_W_S, RV32F_FUNCT7_FMV_X_W, RV32F_FUNCT7_FCMP_S: begin
                 // Execute result superceded
                 if (current_execute_saved == instruction_fields.rd) begin
                     return 'b0;
@@ -96,6 +111,14 @@ package gecko_decode_util;
         end
         default: begin
             status.error = 'b1;
+        end
+        endcase
+        case (rv32f_opcode_t'(instruction_fields.opcode))
+        RV32F_OPCODE_FLW, RV32F_OPCODE_FSW,
+        RV32F_OPCODE_FMADD_S, RV32F_OPCODE_FMSUB_S,
+        RV32F_OPCODE_FNMSUB_S, RV32F_OPCODE_FNMADD_S, RV32F_OPCODE_FP_OP_S: begin
+            status.float = 'b1;
+            status.error = 'b0;
         end
         endcase
         return status;
@@ -358,8 +381,20 @@ package gecko_decode_util;
             default: return 'b0;
             endcase
         end
-        default: return (instruction_fields.rd != 'b0);
         endcase
+
+        case (rv32f_opcode_t'(instruction_fields.opcode))
+        RV32F_OPCODE_FP_OP_S: begin
+            case (rv32f_funct7_t'(instruction_fields.funct7))
+            RV32F_FUNCT7_FCVT_W_S, RV32F_FUNCT7_FMV_X_W, RV32F_FUNCT7_FCMP_S: begin
+                return (instruction_fields.rd != 'b0);
+            end
+            default: return 'b0;
+            endcase
+        end
+        endcase
+
+        return (instruction_fields.rd != 'b0);
     endfunction
 
 endpackage

@@ -147,6 +147,25 @@ package gecko;
         gecko_prediction_t prediction;
     } gecko_execute_operation_t;
 
+    typedef struct packed {
+        rv32_reg_addr_t dest_reg_addr;
+        gecko_reg_status_t dest_reg_status;
+        gecko_jump_flag_t jump_flag;        
+
+        rv32_fields_t instruction_fields;
+        rv32_reg_value_t rs1_value;
+        
+        logic enable_status_op;
+        rv32i_funct3_sys_t sys_op;
+        rv32_reg_addr_t sys_imm;
+        rv32_funct12_t sys_csr;
+    } gecko_float_operation_t;
+
+    typedef struct packed {
+        logic [7:0] operation;
+        logic [7:0] data;
+    } gecko_ecall_operation_t;
+
     /*************************************************************************
      * Internal Gecko Helper Functions                                       *
      *************************************************************************/

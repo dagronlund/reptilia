@@ -56,6 +56,9 @@ module gecko_core
 
     std_stream_intf #(.T(gecko_execute_operation_t)) execute_command (.clk, .rst);
     std_stream_intf #(.T(gecko_system_operation_t)) system_command (.clk, .rst);
+    std_stream_intf #(.T(gecko_ecall_operation_t)) ecall_command (.clk, .rst);
+    std_stream_intf #(.T(gecko_float_operation_t)) float_command (.clk, .rst);
+    assign float_command.ready = 'b1;
 
     std_stream_intf #(.T(gecko_operation_t)) execute_result (.clk, .rst);
     std_stream_intf #(.T(gecko_operation_t)) system_result (.clk, .rst);
@@ -122,6 +125,9 @@ module gecko_core
         .stream_in(instruction_command_out), .stream_out(instruction_command_break)
     );
 
+    logic exit_flag;
+    logic [7:0] exit_code;
+
     gecko_decode #(
         .NUM_FORWARDED(3),
         .ENABLE_PRINT(ENABLE_PRINT)
@@ -133,8 +139,9 @@ module gecko_core
 
         .system_command,
         .execute_command,
+        .float_command,
 
-        .print_out,
+        .ecall_command,
 
         .jump_command,
 
@@ -142,8 +149,13 @@ module gecko_core
 
         .forwarded_results('{execute_forwarded, memory_forwarded, writeback_forwarded}),
 
-        .faulted_flag, .finished_flag, .retired_instructions
+        .exit_flag, .exit_code,
+        // .faulted_flag, .finished_flag, 
+        .retired_instructions
     );
+
+    assign finished_flag = exit_flag && (exit_code == 'b0);
+    assign faulted_flag = exit_flag && (exit_code != 'b0);
 
     gecko_execute gecko_execute_inst
     (
@@ -177,6 +189,13 @@ module gecko_core
 
         .system_command,
         .system_result
+    );
+
+    gecko_print #(
+    ) gecko_print_inst (
+        .clk, .rst,
+        .ecall_command,
+        .print_out
     );
 
     std_stream_intf #(.T(gecko_operation_t)) writeback_results_in [3] (.clk, .rst);

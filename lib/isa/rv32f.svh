@@ -9,15 +9,19 @@ package rv32f;
     import rv::*;
     import rv32::*;
 
-    typedef enum rv32_funct7_t {
-        RV32F_FUNCT7_FLW = 7'b0000111,
-        RV32F_FUNCT7_FSW = 7'b0100111,
-        RV32F_FUNCT7_FMADD_S = 7'b1000011,
-        RV32F_FUNCT7_FMSUB_S = 7'b1000111,
-        RV32F_FUNCT7_FNMSUB_S = 7'b1001011,
-        RV32F_FUNCT7_FNMADD_S = 7'b1001111,
-        RV32F_FUNCT7_FP_OP_S = 7'b1010011
-    } rv32f_funct7_t;
+    parameter rv32_funct12_t RV32F_CSR_FFLAGS = 12'h001;
+    parameter rv32_funct12_t RV32F_CSR_FRM = 12'h002;
+    parameter rv32_funct12_t RV32F_CSR_FCSR = 12'h003; // (FRM + FLAGS)
+
+    typedef enum rv32_opcode_t {
+        RV32F_OPCODE_FLW = 7'b0000111,
+        RV32F_OPCODE_FSW = 7'b0100111,
+        RV32F_OPCODE_FMADD_S = 7'b1000011,
+        RV32F_OPCODE_FMSUB_S = 7'b1000111,
+        RV32F_OPCODE_FNMSUB_S = 7'b1001011,
+        RV32F_OPCODE_FNMADD_S = 7'b1001111,
+        RV32F_OPCODE_FP_OP_S = 7'b1010011
+    } rv32f_opcode_t;
 
     typedef enum rv32_funct7_t {
         RV32F_FUNCT7_FADD_S = 7'b0000000,
@@ -32,7 +36,7 @@ package rv32f;
         RV32F_FUNCT7_FCMP_S = 7'b1010000, // 3 funct3
         RV32F_FUNCT7_FCVT_S_W = 7'b1101000, // 2 funct5s
         RV32F_FUNCT7_FMV_W_X = 7'b1111000
-    } rv32f_funct7_op_t;
+    } rv32f_funct7_t;
 
     typedef enum rv32_funct3_t {
         RV32F_FUNCT3_FSGNJ_S = 3'b000,
