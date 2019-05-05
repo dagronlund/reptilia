@@ -1,8 +1,14 @@
 #include <stdint.h>
 
+#include "math.h"
 #include "libio.h"
-#include "dhrystone/dhrystone_main.h"
-#include "dhrystone/encoding.h"
+// #include "dhrystone/dhrystone_main.h"
+// #include "dhrystone/encoding.h"
+
+volatile float a = 1.0f;
+volatile float b = 2.0f;
+volatile float c = 3.0f;
+volatile float d = 4.0f;
 
 int GLOBAL_ZERO = 0;
 int GLOBAL_MEMEZ = 69;
@@ -37,14 +43,23 @@ int main() {
     // uint32_t time = rdtime();
     // uint32_t instret = rdinstret();
 
+    GLOBAL_MEMEZ = 42;
+
+    // float d = a + b;
+    // float e = fsqrt(c);
+    tiny_printf("Should be 3: %d, 2: %d\n", (int) (a + b), (int) (a / c * 100.0f));
+
     // tiny_printf("Time: %u, Instructions: %d\n", time, instret);
-    // tiny_printf("Should be hello: %s\n", "hello");
+    tiny_printf("Should be hello: %s\n", "hello");
+    rv_ecall(1, 'a');
+    tiny_printf("Should be 42: %d\n", GLOBAL_MEMEZ);
     // tiny_printf("Should be c: %c\n", 'c');
     // tiny_printf("Should be 0xABCD1234: 0x%x\n", 0xABCD1234);
     // tiny_printf("Should be 5: %d\n", 5);
     // tiny_printf("Should be 5: %u\n", 5);
     // tiny_printf("Should be -5: %d\n", -5);
-    // tiny_printf("Should be 69: %d\n", GLOBAL_MEMEZ);
-    // return 0;
-    return dhrystone_main();
+    /// tiny_printf("Should be 69: %d\n", GLOBAL_MEMEZ);
+    // *((int*)0x0) = 0x69;
+    return 0;
+    // return dhrystone_main();
 }

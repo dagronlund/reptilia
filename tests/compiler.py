@@ -10,15 +10,17 @@ name_mem = base_name + ".mem"
 
 call(["C:/gnu_riscv/bin/riscv-none-embed-gcc.exe",
       # "-nostdlib",
-      "-lgcc",
+      "-mfdiv",
       "-nostartfiles",
       "-Wl,--no-relax",
       "-T", "linker_script.lds",
-      "-march=rv32i",
-      "-mabi=ilp32",
+      "-march=rv32if",
+      "-mabi=ilp32f",
       "-O3", "-fno-inline",
+      "-lgcc",
       # Files to include
-      name_c, "crt0.s", "libmem.c", "libio.c", "dhrystone/dhrystone.c", "dhrystone/dhrystone_main.c",
+      name_c, "crt0.s", "libmem.c", "libio.c",
+      # "dhrystone/dhrystone.c", "dhrystone/dhrystone_main.c",
       # "-S",
       "-o", name_o
       ]) # Compiler

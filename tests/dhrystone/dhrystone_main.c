@@ -78,7 +78,7 @@ int dhrystone_main()
   REG   int             Number_Of_Runs;
 
   /* Arguments */
-  Number_Of_Runs = NUMBER_OF_RUNS;
+  Number_Of_Runs = 5; // NUMBER_OF_RUNS;
 
   /* Initializations */
 
