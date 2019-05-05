@@ -63,14 +63,13 @@ module basilisk_vpu
     endfunction
 
     std_stream_intf #(.T(basilisk_encode_command_t)) encode_command (.clk, .rst);
-
-    std_stream_intf #(.T(basilisk_mult_command_t)) mult_command (.clk, .rst);
-    std_stream_intf #(.T(basilisk_add_command_t)) add_command (.clk, .rst);
-    std_stream_intf #(.T(basilisk_sqrt_command_t)) sqrt_command (.clk, .rst);
-    std_stream_intf #(.T(basilisk_divide_command_t)) divide_command (.clk, .rst);
-    
     std_stream_intf #(.T(basilisk_convert_command_t)) convert_command (.clk, .rst);
     std_stream_intf #(.T(basilisk_memory_command_t)) memory_command (.clk, .rst);
+
+    std_stream_intf #(.T(basilisk_mult_command_t)) mult_command [BASILISK_COMPUTE_WIDTH] (.clk, .rst);
+    std_stream_intf #(.T(basilisk_add_command_t)) add_command [BASILISK_COMPUTE_WIDTH] (.clk, .rst);
+    std_stream_intf #(.T(basilisk_sqrt_command_t)) sqrt_command [BASILISK_COMPUTE_WIDTH] (.clk, .rst);
+    std_stream_intf #(.T(basilisk_divide_command_t)) divide_command [BASILISK_COMPUTE_WIDTH] (.clk, .rst);
 
     std_stream_intf #(.T(basilisk_result_t)) memory_result (.clk, .rst);
     std_stream_intf #(.T(basilisk_result_t)) convert_result (.clk, .rst);
@@ -78,7 +77,7 @@ module basilisk_vpu
     std_stream_intf #(.T(basilisk_result_t)) partial_memory_result_in (.clk, .rst);
     std_stream_intf #(.T(basilisk_result_t)) partial_memory_result_out (.clk, .rst);
 
-    std_stream_intf #(.T(basilisk_writeback_result_t)) writeback_result (.clk, .rst);
+    std_stream_intf #(.T(basilisk_writeback_result_t)) writeback_result [BASILISK_COMPUTE_WIDTH] (.clk, .rst);
 
     basilisk_decode #(
         .OUTPUT_REGISTER_MODE(2)
@@ -128,15 +127,24 @@ module basilisk_vpu
         partial_memory_result_out.ready = memory_result.ready;
     end
 
-    basilisk_math_unit #(
-        .OUTPUT_REGISTER_MODE(1),
-        .ENABLE_MEMORY_CONVERT(1)
-    ) basilisk_math_unit_inst (
-        .clk, .rst,
-        .add_command, .mult_command, .divide_command, .sqrt_command,
-        .memory_result, .convert_result,
-        .writeback_result
-    );
+    generate
+    genvar k;
+    for (k = 0; k < BASILISK_COMPUTE_WIDTH; k++) begin
+        basilisk_math_unit #(
+            .OUTPUT_REGISTER_MODE(1),
+            .ENABLE_MEMORY_CONVERT((k == 0) ? 1 : 0)
+        ) basilisk_math_unit_inst (
+            .clk, .rst,
+            .add_command(add_command[k]),
+            .mult_command(mult_command[k]),
+            .divide_command(divide_command[k]),
+            .sqrt_command(sqrt_command[k]),
+            
+            .memory_result, .convert_result,
+            .writeback_result(writeback_result[k])
+        );
+    end
+    endgenerate
 
     basilisk_encode #() basilisk_encode_inst (
         .clk, .rst,

@@ -36,11 +36,11 @@ package basilisk;
     import fpu_sqrt::*;
     import gecko::*;
 
-    parameter int BASILISK_VECTOR_WIDTH = 16;
+    parameter int BASILISK_VECTOR_WIDTH = 1;
     parameter int BASILISK_VECTOR_BITWIDTH = BASILISK_VECTOR_WIDTH * $bits(rv32_reg_value_t);
-    parameter int BASILISK_VECTOR_UNIT_WIDTH = 4;
+    parameter int BASILISK_COMPUTE_WIDTH = 1;
 
-    parameter int BASILISK_OFFSET_ADDR_WIDTH_RAW = $clog2(BASILISK_VECTOR_WIDTH/BASILISK_VECTOR_UNIT_WIDTH);
+    parameter int BASILISK_OFFSET_ADDR_WIDTH_RAW = $clog2(BASILISK_VECTOR_WIDTH/BASILISK_COMPUTE_WIDTH);
     parameter int BASILISK_OFFSET_ADDR_WIDTH = (BASILISK_OFFSET_ADDR_WIDTH_RAW > 0) ?
             BASILISK_OFFSET_ADDR_WIDTH_RAW : 1;
     typedef logic [BASILISK_OFFSET_ADDR_WIDTH-1:0] basilisk_offset_addr_t;
