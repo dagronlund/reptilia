@@ -34,6 +34,7 @@ module gecko_micro_tb
     gecko_micro #(
         .INST_LATENCY(1),
         .DATA_LATENCY(1),
+        .FLOAT_LATENCY(1),
         .ADDR_SPACE_WIDTH(13)
     ) gecko_micro_inst (
         .clk, .rst,

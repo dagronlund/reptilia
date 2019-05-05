@@ -32,7 +32,8 @@ module gecko_micro
     parameter int FLOAT_LATENCY = 2,
     parameter gecko_pc_t START_ADDR = 'h0,
     parameter int ENABLE_PERFORMANCE_COUNTERS = 1,
-    parameter int ENABLE_PRINT = 1
+    parameter int ENABLE_PRINT = 1,
+    parameter int ENABLE_FLOAT = 1
 )(
     input logic clk, rst,
 
@@ -46,6 +47,7 @@ module gecko_micro
 
     `STATIC_ASSERT(INST_LATENCY > 0)
     `STATIC_ASSERT(DATA_LATENCY > 0)
+    `STATIC_ASSERT(FLOAT_LATENCY > 0)
 
     std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) inst_request (.clk, .rst);
     std_mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) inst_result (.clk, .rst);
@@ -156,9 +158,11 @@ module gecko_micro
     gecko_core #(
         .INST_LATENCY(INST_LATENCY),
         .DATA_LATENCY(DATA_LATENCY),
+        .FLOAT_LATENCY(FLOAT_LATENCY),
         .START_ADDR(START_ADDR),
         .ENABLE_PERFORMANCE_COUNTERS(ENABLE_PERFORMANCE_COUNTERS),
-        .ENABLE_PRINT(ENABLE_PRINT)
+        .ENABLE_PRINT(ENABLE_PRINT),
+        .ENABLE_FLOAT(ENABLE_FLOAT)
     ) gecko_core_inst (
         .clk, .rst,
         .inst_request, .inst_result(inst_result_registered),

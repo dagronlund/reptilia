@@ -10,9 +10,11 @@ module gecko_compute_wrapper #(
     parameter ADDR_SPACE_WIDTH = 13,
     parameter INST_LATENCY = 2,
     parameter DATA_LATENCY = 2,
+    parameter FLOAT_LATENCY = 2,
     parameter [31:0] START_ADDR = 'h0,
     parameter ENABLE_PERFORMANCE_COUNTERS = 1,
-    parameter ENABLE_PRINT = 1
+    parameter ENABLE_PRINT = 1,
+    parameter ENABLE_FLOAT = 1
 )(
     input wire clk, rst,
     
@@ -73,9 +75,11 @@ module gecko_compute_wrapper #(
         .ADDR_SPACE_WIDTH(ADDR_SPACE_WIDTH),
         .INST_LATENCY(INST_LATENCY),
         .DATA_LATENCY(DATA_LATENCY),
+        .FLOAT_LATENCY(FLOAT_LATENCY),
         .START_ADDR(START_ADDR),
         .ENABLE_PERFORMANCE_COUNTERS(ENABLE_PERFORMANCE_COUNTERS),
-        .ENABLE_PRINT(ENABLE_PRINT)
+        .ENABLE_PRINT(ENABLE_PRINT),
+        .ENABLE_FLOAT(ENABLE_FLOAT)
     ) gecko_compute_wrapper_sv_inst (
         .clk(clk), .rst(rst),
 

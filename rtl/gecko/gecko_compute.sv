@@ -29,12 +29,14 @@ module gecko_compute
     import gecko::*;
     import axi4::*;
 #(
-    parameter ADDR_SPACE_WIDTH = 16,
-    parameter INST_LATENCY = 2,
-    parameter DATA_LATENCY = 2,
+    parameter int ADDR_SPACE_WIDTH = 16,
+    parameter int INST_LATENCY = 2,
+    parameter int DATA_LATENCY = 2,
+    parameter int FLOAT_LATENCY = 2,
     parameter gecko_pc_t START_ADDR = 'h0,
     parameter int ENABLE_PERFORMANCE_COUNTERS = 1,
     parameter int ENABLE_PRINT = 1,
+    parameter int ENABLE_FLOAT = 1,
     parameter int AXI_ID_WIDTH = 1
 )(
     input logic clk, rst,
@@ -77,9 +79,11 @@ module gecko_compute
         .ADDR_SPACE_WIDTH(ADDR_SPACE_WIDTH),
         .INST_LATENCY(INST_LATENCY),
         .DATA_LATENCY(DATA_LATENCY),
+        .FLOAT_LATENCY(FLOAT_LATENCY),
         .START_ADDR(START_ADDR),
         .ENABLE_PERFORMANCE_COUNTERS(ENABLE_PERFORMANCE_COUNTERS),
-        .ENABLE_PRINT(ENABLE_PRINT)
+        .ENABLE_PRINT(ENABLE_PRINT),
+        .ENABLE_FLOAT(ENABLE_FLOAT)
     ) gecko_micro_inst (
         .clk, .rst,
 

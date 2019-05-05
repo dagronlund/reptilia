@@ -230,7 +230,12 @@ module gecko_core
     std_stream_intf #(.T(gecko_operation_t)) writeback_results_in [4] (.clk, .rst);
 
     stream_tie stream_tie_inst0(.stream_in(execute_result), .stream_out(writeback_results_in[0]));
-    stream_tie stream_tie_inst1(.stream_in(memory_result), .stream_out(writeback_results_in[1]));
+    
+    // stream_tie stream_tie_inst1(.stream_in(memory_result), .stream_out(writeback_results_in[1]));
+    assign writeback_results_in[1].valid = memory_result.valid;
+    assign writeback_results_in[1].payload = memory_result.payload;
+    assign memory_result.ready = writeback_results_in[1].ready;
+
     stream_tie stream_tie_inst2(.stream_in(system_result), .stream_out(writeback_results_in[2]));
     stream_tie stream_tie_inst3(.stream_in(float_result), .stream_out(writeback_results_in[3]));
 
