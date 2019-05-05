@@ -5,6 +5,7 @@
 
 `include "../isa/rv32.svh"
 `include "../isa/rv32f.svh"
+`include "../isa/rv32v.svh"
 `include "../fpu/fpu.svh"
 `include "../fpu/fpu_add.svh"
 `include "../fpu/fpu_mult.svh"
@@ -17,6 +18,7 @@
 
 `include "rv32.svh"
 `include "rv32f.svh"
+`include "rv32v.svh"
 `include "fpu.svh"
 `include "fpu_add.svh"
 `include "fpu_mult.svh"
@@ -31,6 +33,7 @@ package basilisk_decode_util;
 
     import rv32::*;
     import rv32f::*;
+    import rv32v::*;
     import fpu::*;
     import fpu_add::*;
     import fpu_mult::*;
@@ -65,6 +68,11 @@ package basilisk_decode_util;
             endcase
         end
         endcase
+        
+        case (rv32v_opcode_t'(inst_fields.opcode))
+        RV32V_FUNCT3_OP_FVV, RV32V_FUNCT3_OP_FVF, RV32V_FUNCT3_OP_IVI: return 'b1;
+        endcase
+        
         return 'b0;
     endfunction
 
@@ -87,6 +95,11 @@ package basilisk_decode_util;
             endcase
         end
         endcase
+
+        case (rv32v_opcode_t'(inst_fields.opcode))
+        RV32V_FUNCT3_OP_FVV, RV32V_FUNCT3_OP_FVF, RV32V_FUNCT3_OP_IVI: return 'b1;
+        endcase
+
         return 'b0;
     endfunction
 
@@ -110,6 +123,17 @@ package basilisk_decode_util;
             endcase
         end
         endcase
+
+        case (rv32v_opcode_t'(inst_fields.opcode))
+        RV32V_FUNCT3_OP_FVV, RV32V_FUNCT3_OP_FVF: begin
+            case (rv32v_funct6_t'(inst_fields.funct6))
+            RV32V_FUNCT6_VFSQRT: return 'b0;
+            default: return 'b1;
+            endcase
+        end
+        RV32V_FUNCT3_OP_IVI: return 'b0;
+        endcase
+
         return 'b0;
     endfunction
 
@@ -120,6 +144,18 @@ package basilisk_decode_util;
         RV32F_OPCODE_FMADD_S, RV32F_OPCODE_FMSUB_S,
         RV32F_OPCODE_FNMSUB_S, RV32F_OPCODE_FNMADD_S: return 'b1;
         endcase
+
+        case (rv32v_opcode_t'(inst_fields.opcode))
+        RV32V_FUNCT3_OP_FVV, RV32V_FUNCT3_OP_FVF: begin
+            case (rv32v_funct6_t'(inst_fields.funct6))
+            RV32V_FUNCT6_VFMACC, RV32V_FUNCT6_VFNMACC,
+            RV32V_FUNCT6_VFMSAC, RV32V_FUNCT6_VFNMSAC: return 'b1;
+            default: return 'b0;
+            endcase
+        end
+        RV32V_FUNCT3_OP_IVI: return 'b0;
+        endcase
+
         return 'b0;
     endfunction
 

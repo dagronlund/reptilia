@@ -29,14 +29,10 @@ package rv32v;
     typedef enum rv32_funct6_t {
         RV32V_FUNCT6_VFADD = 'b000000, // OP_FVV or OP_FVF
         RV32V_FUNCT6_VFSUB = 'b000010, // OP_FVV or OP_FVF
-        RV32V_FUNCT6_VFMIN = 'b000100, // OP_FVV or OP_FVF
-        RV32V_FUNCT6_VFMAX = 'b000110, // OP_FVV or OP_FVF
-        RV32V_FUNCT6_VFSGNJ = 'b001000, // OP_FVV or OP_FVF
-        RV32V_FUNCT6_VFSGNN = 'b001001, // OP_FVV or OP_FVF
-        RV32V_FUNCT6_VFSGNX = 'b001010, // OP_FVV or OP_FVF
         RV32V_FUNCT6_VSLIDEUP = 'b001110, // OP_IVI only
         RV32V_FUNCT6_VSLIDEDOWN = 'b001111, // OP_IVI only
         RV32V_FUNCT6_VFDIV = 'b100000, // OP_FVV or OP_FVF
+        RV32V_FUNCT6_VFSQRT = 'b100011, // OP_FVV or OP_FVF
         RV32V_FUNCT6_VFRDIV = 'b100001, // OP_FVF only
         RV32V_FUNCT6_VFMUL = 'b100100, // OP_FVV or OP_FVF
         RV32V_FUNCT6_VFMACC = 'b101100, // OP_FVV or OP_FVF
@@ -44,6 +40,13 @@ package rv32v;
         RV32V_FUNCT6_VFMSAC = 'b101110, // OP_FVV or OP_FVF
         RV32V_FUNCT6_VFNMSAC = 'b101111 // OP_FVV or OP_FVF
     } rv32v_funct6_t;
+
+    
+// RV32V_FUNCT6_VFMIN = 'b000100, // OP_FVV or OP_FVF
+// RV32V_FUNCT6_VFMAX = 'b000110, // OP_FVV or OP_FVF
+// RV32V_FUNCT6_VFSGNJ = 'b001000, // OP_FVV or OP_FVF
+// RV32V_FUNCT6_VFSGNN = 'b001001, // OP_FVV or OP_FVF
+// RV32V_FUNCT6_VFSGNX = 'b001010, // OP_FVV or OP_FVF
 
 // Integer Integer FP
 // funct3 funct3 funct3

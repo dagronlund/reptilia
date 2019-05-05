@@ -25,6 +25,7 @@ package rv32;
         rv32_reg_addr_t rd, rs1, rs2, rs3;
         rv32_funct3_t funct3;
         rv32_funct5_t funct5;
+        rv32_funct6_t funct6;
         rv32_funct7_t funct7;
         rv32_funct12_t funct12;
         rv32_imm_t imm;

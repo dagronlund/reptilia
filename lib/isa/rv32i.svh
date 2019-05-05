@@ -107,6 +107,7 @@ package rv32i;
             funct3: inst[14:12],
             funct7: inst[31:25],
             funct5: inst[31:27],
+            funct6: inst[31:26],
             funct12: inst[31:20],
             decode_error: 1'b0,
             default:'0

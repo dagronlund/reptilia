@@ -37,6 +37,7 @@ package basilisk;
     import gecko::*;
 
     parameter int BASILISK_VECTOR_WIDTH = 1;
+    parameter int BASILISK_VECTOR_ADDR_WIDTH = $clog2(BASILISK_VECTOR_WIDTH) + 1;
     parameter int BASILISK_VECTOR_BITWIDTH = BASILISK_VECTOR_WIDTH * $bits(rv32_reg_value_t);
     parameter int BASILISK_COMPUTE_WIDTH = 1;
 
@@ -45,7 +46,7 @@ package basilisk;
             BASILISK_OFFSET_ADDR_WIDTH_RAW : 1;
     typedef logic [BASILISK_OFFSET_ADDR_WIDTH-1:0] basilisk_offset_addr_t;
 
-    typedef logic [BASILISK_VECTOR_BITWIDTH-1:0] basilisk_vector_t;
+    // typedef logic [BASILISK_VECTOR_BITWIDTH-1:0] basilisk_vector_t;
     typedef logic [($clog2(BASILISK_VECTOR_WIDTH)):0] basilisk_vector_length_t;
 
     typedef struct packed {
@@ -192,6 +193,12 @@ package basilisk;
         fpu_float_fields_t a, b;
         fpu_float_conditions_t conditions_a, conditions_b;
     } basilisk_encode_command_t;
+
+    function automatic basilisk_offset_addr_t basilisk_get_offset_from_length (
+            input basilisk_vector_length_t length
+    );
+        return length[BASILISK_VECTOR_WIDTH-1:BASILISK_COMPUTE_WIDTH];
+    endfunction
 
 endpackage
 
