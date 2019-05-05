@@ -660,6 +660,8 @@ module gecko_decode
                     end
                 end
                 endcase
+            end else if (instruction_fields.opcode == RV32I_OPCODE_SYSTEM && opcode_status.float) begin
+                next_float_command.payload.enable_status_op = 'b1;
             end
 
             if (instruction_fields.rd != 'b0 && does_opcode_writeback(instruction_fields)) begin

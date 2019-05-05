@@ -7,6 +7,7 @@
 `include "../isa/rv32.svh"
 `include "../isa/rv32i.svh"
 `include "../isa/rv32f.svh"
+`include "../isa/rv32v.svh"
 `include "gecko.svh"
 
 `else
@@ -15,6 +16,7 @@
 `include "rv32.svh"
 `include "rv32i.svh"
 `include "rv32f.svh"
+`include "rv32v.svh"
 `include "gecko.svh"
 
 `endif
@@ -24,6 +26,7 @@ package gecko_decode_util;
     import rv32::*;
     import rv32i::*;
     import rv32f::*;
+    import rv32v::*;
     import gecko::*;
 
     typedef gecko_reg_status_t gecko_decode_reg_file_status_t [32];
@@ -102,7 +105,16 @@ package gecko_decode_util;
             RV32I_FUNCT3_SYS_CSRRW, RV32I_FUNCT3_SYS_CSRRS, 
             RV32I_FUNCT3_SYS_CSRRC, RV32I_FUNCT3_SYS_CSRRWI, 
             RV32I_FUNCT3_SYS_CSRRSI, RV32I_FUNCT3_SYS_CSRRCI: begin
-                status.system = 'b1;
+                case (instruction_fields.funct12)
+                RV32I_CSR_CYCLE, RV32I_CSR_TIME, RV32I_CSR_INSTRET, 
+                RV32I_CSR_CYCLEH, RV32I_CSR_TIMEH, RV32I_CSR_INSTRETH: begin
+                    status.system = 'b1;
+                end
+                RV32F_CSR_FFLAGS, RV32F_CSR_FRM, RV32F_CSR_FCSR, RV32V_CSR_VL: begin
+                    status.float = 'b1;
+                end
+                default: status.error = 'b1;
+                endcase
             end
             default: begin
                 status.error = 'b1;

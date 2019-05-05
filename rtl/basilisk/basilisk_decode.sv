@@ -7,6 +7,7 @@
 `include "../../lib/isa/rv32.svh"
 `include "../../lib/isa/rv32i.svh"
 `include "../../lib/isa/rv32f.svh"
+`include "../../lib/isa/rv32v.svh"
 `include "../../lib/gecko/gecko.svh"
 `include "../../lib/basilisk/basilisk.svh"
 `include "../../lib/basilisk/basilisk_decode_util.svh"
@@ -19,6 +20,7 @@
 `include "rv32.svh"
 `include "rv32i.svh"
 `include "rv32f.svh"
+`include "rv32v.svh"
 `include "gecko.svh"
 `include "basilisk.svh"
 `include "basilisk_decode_util.svh"
@@ -31,6 +33,7 @@ module basilisk_decode
     import rv32::*;
     import rv32i::*;
     import rv32f::*;
+    import rv32v::*;
     import gecko::*;
     import basilisk::*;
     import basilisk_decode_util::*;
@@ -54,6 +57,31 @@ module basilisk_decode
     std_stream_intf.out convert_command, // basilisk_convert_command_t
     std_stream_intf.out memory_command // basilisk_memory_command_t
 );
+
+    function automatic fpu_round_mode_t basilisk_decode_find_rounding_mode(
+            rv32f_funct3_round_t inst_round_mode,
+            input fpu_round_mode_t current_round_mode
+    );
+        case (inst_round_mode)
+        RV32F_FUNCT3_ROUND_EVEN: return FPU_ROUND_MODE_EVEN;
+        RV32F_FUNCT3_ROUND_ZERO: return FPU_ROUND_MODE_ZERO;
+        RV32F_FUNCT3_ROUND_DOWN: return FPU_ROUND_MODE_DOWN;
+        RV32F_FUNCT3_ROUND_UP: return FPU_ROUND_MODE_UP;
+        RV32F_FUNCT3_ROUND_DYNAMIC: return current_round_mode;
+        default: return FPU_ROUND_MODE_EVEN;
+        endcase
+    endfunction
+
+    function automatic rv32f_funct3_round_t basilisk_decode_encode_rounding_mode(
+            input fpu_round_mode_t current_round_mode
+    );
+        case (current_round_mode)
+        FPU_ROUND_MODE_EVEN: return RV32F_FUNCT3_ROUND_EVEN;
+        FPU_ROUND_MODE_ZERO: return RV32F_FUNCT3_ROUND_ZERO;
+        FPU_ROUND_MODE_DOWN: return RV32F_FUNCT3_ROUND_DOWN;
+        FPU_ROUND_MODE_UP: return RV32F_FUNCT3_ROUND_UP;
+        endcase
+    endfunction
 
     typedef enum logic {
         BASILISK_DECODE_STATE_RESET = 'b0,
@@ -192,6 +220,7 @@ module basilisk_decode
     basilisk_decode_reg_status_t current_reg_status [32], next_reg_status [32];
     rv32_reg_addr_t current_reset_counter, next_reset_counter;
     fpu_round_mode_t current_round_mode, next_round_mode;
+    basilisk_vector_length_t current_vector_length, next_vector_length;
 
     logic reg_status_writeback_enable;
     rv32_reg_addr_t reg_status_writeback_addr;
@@ -202,6 +231,7 @@ module basilisk_decode
             current_reg_status <= '{32{BASILISK_DECODE_REG_STATUS_VALID}};
             current_reset_counter <= 'b0;
             current_round_mode <= FPU_ROUND_MODE_EVEN;
+            current_vector_length <= 'b1;
         end else if (enable) begin
             current_state <= next_state;
             current_reg_status <= next_reg_status;
@@ -210,6 +240,7 @@ module basilisk_decode
             end
             current_reset_counter <= next_reset_counter;
             current_round_mode <= next_round_mode;
+            current_vector_length <= next_vector_length;
         end else if (reg_status_writeback_enable) begin
             current_reg_status[reg_status_writeback_addr] <= BASILISK_DECODE_REG_STATUS_VALID;
         end
@@ -225,6 +256,9 @@ module basilisk_decode
         automatic basilisk_encode_op_t encode_op;
         automatic logic enable_macc, convert_signed_integer;
         automatic logic sys_write, sys_set, sys_clear, sys_use_imm;
+        automatic fpu_round_mode_t selected_round_mode;
+        automatic fpu_round_mode_t incoming_round_mode;
+        automatic rv32f_funct3_round_t outgoing_round_mode;
 
         consume = (current_state == BASILISK_DECODE_STATE_NORMAL);
         produce_encode = 'b0;
@@ -239,6 +273,7 @@ module basilisk_decode
         next_reset_counter = current_reset_counter + 'b1;
         next_round_mode = current_round_mode;
         next_reg_status = current_reg_status;
+        next_vector_length = current_vector_length;
 
         rs1_read_addr = inst_fields.rs1;
         rs2_read_addr = inst_fields.rs2;
@@ -272,6 +307,12 @@ module basilisk_decode
 
         // Handle integer sign
         convert_signed_integer = ((rv32f_funct5_fcvt_t'(inst_fields.rs2)) == RV32F_FUNCT5_FCVT_W);
+
+        // Handle rounding mode selection    
+        selected_round_mode =basilisk_decode_find_rounding_mode(
+            rv32f_funct3_round_t'(inst_fields.funct3),
+            current_round_mode
+        );
 
         case (rv32f_opcode_t'(inst_fields.opcode))
         RV32F_OPCODE_FLW: begin
@@ -374,6 +415,9 @@ module basilisk_decode
         default: sys_value = float_command.payload.rs1_value;
         endcase
 
+        incoming_round_mode = basilisk_decode_find_rounding_mode(rv32f_funct3_round_t'(sys_value[2:0]), FPU_ROUND_MODE_EVEN);
+        outgoing_round_mode = basilisk_decode_encode_rounding_mode(current_round_mode);
+
         case (float_command.payload.sys_op)
         RV32I_FUNCT3_SYS_CSRRW, RV32I_FUNCT3_SYS_CSRRWI: sys_write = 'b1;
         RV32I_FUNCT3_SYS_CSRRS, RV32I_FUNCT3_SYS_CSRRSI: sys_set = 'b1;
@@ -397,7 +441,7 @@ module basilisk_decode
         // Change status registers
         end else if (float_command.payload.enable_status_op) begin
             consume = 'b1;
-            produce_encode = 'b0;
+            produce_encode = (float_command.payload.dest_reg_addr != 'b0); // Don't produce writeback to x0
             produce_mult = 'b0;
             produce_add = 'b0;
             produce_sqrt = 'b0;
@@ -405,28 +449,23 @@ module basilisk_decode
             produce_convert = 'b0;
             produce_memory = 'b0;
 
-            case (float_command.payload.sys_op)
-            RV32I_FUNCT3_SYS_CSRRW, RV32I_FUNCT3_SYS_CSRRS,
-            RV32I_FUNCT3_SYS_CSRRC, RV32I_FUNCT3_SYS_CSRRWI,
-            RV32I_FUNCT3_SYS_CSRRSI, RV32I_FUNCT3_SYS_CSRRCI: begin
-                produce_encode = (float_command.payload.dest_reg_addr != 'b0); // Don't produce writeback to x0
-            end
-            endcase
-
             // Have CSR operation return proper flags
             case (rv32_funct12_t'(float_command.payload.sys_csr))
             RV32F_CSR_FRM: begin
-                rs1_fields = fpu_decode_float({30'b0, current_round_mode});
+                rs1_fields = fpu_decode_float({29'b0, outgoing_round_mode});
                 if (sys_write) begin
-                    next_round_mode = fpu_round_mode_t'(sys_value);
-                end else if (sys_set) begin
-                    next_round_mode = fpu_round_mode_t'(sys_value | next_round_mode);
-                end else if (sys_clear) begin
-                    next_round_mode = fpu_round_mode_t'(~sys_value & next_round_mode);
+                    next_round_mode = incoming_round_mode;
+                end
+            end
+            RV32V_CSR_VL: begin
+                rs1_fields = fpu_decode_float(current_vector_length);
+                if (sys_write) begin
+                    next_vector_length = sys_value;
                 end
             end
             default: rs1_fields = fpu_decode_float({32'b0});
             endcase
+        
         // Stall for register availability
         end else if (!basilisk_decode_depend_registers(inst_fields, current_reg_status)) begin
             consume = 'b0;
@@ -463,7 +502,7 @@ module basilisk_decode
             conditions_a: rs1_conditions,
             conditions_b: rs2_conditions,
             conditions_c: rs3_conditions,
-            mode: current_round_mode
+            mode: selected_round_mode
         };
 
         next_add_command.payload = '{
@@ -473,7 +512,7 @@ module basilisk_decode
             b: rs2_fields,
             conditions_a: rs1_conditions,
             conditions_b: rs2_conditions,
-            mode: current_round_mode
+            mode: selected_round_mode
         };
 
         next_sqrt_command.payload = '{
@@ -481,7 +520,7 @@ module basilisk_decode
             dest_offset_addr: 'b0,
             a: rs1_fields,
             conditions_a: rs1_conditions,
-            mode: current_round_mode
+            mode: selected_round_mode
         };
 
         next_divide_command.payload = '{
@@ -491,7 +530,7 @@ module basilisk_decode
             b: rs2_fields,
             conditions_a: rs1_conditions,
             conditions_b: rs2_conditions,
-            mode: current_round_mode
+            mode: selected_round_mode
         };
         
         next_convert_command.payload = '{

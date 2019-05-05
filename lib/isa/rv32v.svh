@@ -1,5 +1,5 @@
-`ifndef __RV32I__
-`define __RV32I__
+`ifndef __RV32V__
+`define __RV32V__
 
 `include "rv.svh"
 `include "rv32.svh"
@@ -8,6 +8,8 @@ package rv32v;
 
     import rv::*;
     import rv32::*;
+
+    parameter rv32_funct12_t RV32V_CSR_VL = 12'hC20;
 
     typedef enum rv32_opcode_t {
         RV32V_OPCODE_OP = 'b1010111

@@ -60,6 +60,15 @@ package rv32f;
     } rv32f_funct3_class_t;
 
     typedef enum rv32_funct3_t {
+        RV32F_FUNCT3_ROUND_EVEN = 3'b000,
+        RV32F_FUNCT3_ROUND_ZERO = 3'b001,
+        RV32F_FUNCT3_ROUND_DOWN = 3'b010,
+        RV32F_FUNCT3_ROUND_UP = 3'b011,
+        RV32F_FUNCT3_ROUND_MAX = 3'b100,
+        RV32F_FUNCT3_ROUND_DYNAMIC = 3'b111
+    } rv32f_funct3_round_t;
+
+    typedef enum rv32_funct3_t {
         RV32F_FUNCT3_FLE_S = 3'b000,
         RV32F_FUNCT3_FLT_S = 3'b001,
         RV32F_FUNCT3_FEQ_S = 3'b010
