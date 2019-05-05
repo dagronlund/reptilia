@@ -36,7 +36,7 @@ module basilisk_memory
     std_stream_intf.out partial_memory_result // basilisk_result_t
 );
 
-    std_mem_intf next_memory_request (.clk, .rst);
+    std_mem_intf #(.ADDR_WIDTH(32), .DATA_WIDTH(32)) next_memory_request (.clk, .rst);
     std_stream_intf #(.T(basilisk_result_t)) next_partial_memory_result (.clk, .rst);
 
     logic enable, consume, produce_request, produce_partial_result;

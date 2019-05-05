@@ -24,18 +24,6 @@ package fpu;
     parameter fpu_float_t FPU_FLOAT_POS_INF = 32'h7F80_0000;
     parameter fpu_float_t FPU_FLOAT_NEG_INF = 32'hFF80_0000;
 
-    // typedef struct packed {
-    //     fpu_instr_t instr_info;
-    //     logic add_en, mult_en, div_en, sqrt_en, encoder_en, decoder_en;
-    //     logic rd_we;
-    //     logic round_en;
-    //     logic invert_sign;
-    //     logic compare;
-    //     logic max;
-    //     logic int_signed;
-    //     logic move;
-    // }
-
     typedef struct packed {
         fpu_float_sign_t sign;
         fpu_float_exponent_t exponent;
@@ -175,45 +163,28 @@ package fpu;
         return result;
     endfunction
 
-    function automatic fpu_result_t fpu_float2int(
+    function automatic logic [31:0] fpu_float2int(
             input fpu_float_fields_t float,
             input logic is_signed 
     );
-        logic norm;
-        logic [7:0] exp;
+        logic norm = (float.exponent != 0);
+        logic [7:0] exp = float.exponent - 'd127;
+        logic [54:0] sig = {31'd0, norm, float.mantissa};
         logic [31:0] y;
-        logic [54:0] sig;
 
-        fpu_result_t result;
-        
-        norm = (float.exponent != 0);
-        exp = float.exponent >= 127 ? float.exponent - 127: 127-float.exponent;
-
-        sig = {31'd0, norm, float.mantissa};
-        if (float.exponent >= 127) begin // positive exponent
-            if (exp <= 31 && float.sign) // neg_out of range
-                y = (is_signed) ? 32'h8000_0000:32'd0;
-            else if (exp <= 31 && !float.sign)
-                y = (is_signed) ? 32'h7FFF_FFFF:32'hFFFF_FFFF;
-            else begin
+        if (float.exponent >= 127) begin // Exponent >= 0
+            if (is_signed && exp > 30) begin // Signed Overflow
+                return float.sign ? 32'h8000_0000 : 32'h7FFF_FFFF;
+            end else if (exp > 31) begin // Unsigned Overflow
+                return float.sign ? 32'h0000_0000 : 32'hFFFF_FFFF;
+            end else begin
                 sig = sig << exp;
                 y = sig[54:23];
+                return float.sign ? (~y + 1) : (y);
             end
-        end else
-            y = 0;
-
-        if(float.sign)
-            y = ~y + 1;
-
-        result.sign = y[31];
-        result.exponent = y[30:23];
-        result.mantissa = y[22:0];
-        result.nan = 1'b0;
-        result.inf = 1'b0;
-        result.zero = 1'b0;
-        result.mode = FPU_ROUND_MODE_ZERO;
-
-        return result;
+        end else begin // Exponent < 0
+            return 'b0;
+        end
     endfunction
 
 endpackage

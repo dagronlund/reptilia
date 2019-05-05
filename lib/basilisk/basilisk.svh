@@ -10,6 +10,7 @@
 `include "../fpu/fpu_mult.svh"
 `include "../fpu/fpu_divide.svh"
 `include "../fpu/fpu_sqrt.svh"
+`include "../gecko/gecko.svh"
 
 `else
 
@@ -20,6 +21,7 @@
 `include "fpu_mult.svh"
 `include "fpu_divide.svh"
 `include "fpu_sqrt.svh"
+`include "gecko.svh"
 
 `endif
 
@@ -32,14 +34,18 @@ package basilisk;
     import fpu_mult::*;
     import fpu_divide::*;
     import fpu_sqrt::*;
+    import gecko::*;
 
-    parameter int BASILISK_VECTOR_WIDTH = 16;
+    parameter int BASILISK_VECTOR_WIDTH = 1;
+    parameter int BASILISK_VECTOR_BITWIDTH = BASILISK_VECTOR_WIDTH * $bits(rv32_reg_value_t);
     parameter int BASILISK_VECTOR_UNIT_WIDTH = 4;
 
     parameter int BASILISK_OFFSET_ADDR_WIDTH = 
             ($clog2(BASILISK_VECTOR_WIDTH/BASILISK_VECTOR_UNIT_WIDTH) > 0) ?
             $clog2(BASILISK_VECTOR_WIDTH/BASILISK_VECTOR_UNIT_WIDTH) : 1;
     typedef logic [BASILISK_OFFSET_ADDR_WIDTH-1:0] basilisk_offset_addr_t;
+
+    typedef logic [BASILISK_VECTOR_BITWIDTH-1:0] basilisk_vector_t;
 
     typedef struct packed {
         rv32_reg_addr_t dest_reg_addr;
@@ -146,7 +152,7 @@ package basilisk;
     typedef struct packed {
         rv32_reg_addr_t dest_reg_addr;
         basilisk_offset_addr_t dest_offset_addr;
-        rv32_reg_value_t a, b;
+        fpu_float_fields_t a, b;
         fpu_float_conditions_t conditions_a, conditions_b;
         basilisk_convert_op_t op;
         logic signed_integer;
@@ -165,6 +171,26 @@ package basilisk;
         rv32_reg_value_t mem_base_addr;
         rv32_reg_value_t mem_offset_addr;
     } basilisk_memory_command_t;
+
+    typedef enum logic [2:0] {
+        BASILISK_ENCODE_OP_RAW = 'b000,
+        BASILISK_ENCODE_OP_CONVERT = 'b001,
+        BASILISK_ENCODE_OP_EQUAL = 'b010,
+        BASILISK_ENCODE_OP_LT = 'b011,
+        BASILISK_ENCODE_OP_LE = 'b100,
+        BASILISK_ENCODE_OP_CLASS = 'b101
+    } basilisk_encode_op_t;
+
+    typedef struct packed {
+        rv32_reg_addr_t dest_reg_addr;
+        gecko_reg_status_t dest_reg_status;
+        gecko_jump_flag_t jump_flag;
+
+        basilisk_encode_op_t op;
+        logic signed_integer;
+        fpu_float_fields_t a, b;
+        fpu_float_conditions_t conditions_a, conditions_b;
+    } basilisk_encode_command_t;
 
 endpackage
 

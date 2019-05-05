@@ -633,8 +633,6 @@ module gecko_decode
         consume_instruction = state_transition.consume_instruction;
         send_operation = !state_transition.flush_instruction && consume_instruction;
 
-
-
         if (send_operation) begin
             if (next_state == GECKO_DECODE_SPECULATIVE) begin
                 next_speculative_retired_counter += 'b1;

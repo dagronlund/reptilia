@@ -61,7 +61,7 @@ package rv32f;
 
     typedef enum rv32_funct3_t {
         RV32F_FUNCT3_FLE_S = 3'b000,
-        RV32F_FUNCT3_FGE_S = 3'b001,
+        RV32F_FUNCT3_FLT_S = 3'b001,
         RV32F_FUNCT3_FEQ_S = 3'b010
     } rv32f_funct3_compare_t;
 

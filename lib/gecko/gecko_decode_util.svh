@@ -368,6 +368,12 @@ package gecko_decode_util;
             input rv32_fields_t instruction_fields
     );
         case (rv32i_opcode_t'(instruction_fields.opcode))
+        RV32I_OPCODE_OP, RV32I_OPCODE_IMM,
+        RV32I_OPCODE_LOAD, RV32I_OPCODE_LUI,
+        RV32I_OPCODE_AUIPC, RV32I_OPCODE_JAL,
+        RV32I_OPCODE_JALR, RV32I_OPCODE_FENCE: begin
+            return (instruction_fields.rd != 'b0);
+        end
         RV32I_OPCODE_STORE, RV32I_OPCODE_BRANCH: begin
             return 'b0;
         end
@@ -392,9 +398,14 @@ package gecko_decode_util;
             default: return 'b0;
             endcase
         end
+        RV32F_OPCODE_FLW, RV32F_OPCODE_FSW,
+        RV32F_OPCODE_FMADD_S, RV32F_OPCODE_FMSUB_S,
+        RV32F_OPCODE_FNMSUB_S, RV32F_OPCODE_FNMADD_S: begin
+            return 'b0;
+        end
         endcase
 
-        return (instruction_fields.rd != 'b0);
+        return 'b0;
     endfunction
 
 endpackage

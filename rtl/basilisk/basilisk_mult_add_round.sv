@@ -7,6 +7,7 @@
 `include "../../lib/isa/rv32.svh"
 `include "../../lib/isa/rv32f.svh"
 `include "../../lib/fpu/fpu.svh"
+`include "../../lib/fpu/fpu_operations.svh"
 `include "../../lib/basilisk/basilisk.svh"
 
 `else
@@ -17,6 +18,7 @@
 `include "rv32f.svh"
 `include "basilisk.svh"
 `include "fpu.svh"
+`include "fpu_operations.svh"
 
 `endif
 
@@ -25,6 +27,7 @@ module basilisk_mult_add_round
     import rv32::*;
     import rv32f::*;
     import fpu::*;
+    import fpu_operations::*;
     import basilisk::*;
 #(
     parameter int OUTPUT_REGISTER_MODE = 1

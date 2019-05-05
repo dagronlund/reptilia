@@ -22,8 +22,9 @@ package rv32;
     typedef struct packed {
         rv32_inst_t inst;
         rv32_opcode_t opcode;
-        rv32_reg_addr_t rd, rs1, rs2;
+        rv32_reg_addr_t rd, rs1, rs2, rs3;
         rv32_funct3_t funct3;
+        rv32_funct5_t funct5;
         rv32_funct7_t funct7;
         rv32_funct12_t funct12;
         rv32_imm_t imm;

@@ -65,7 +65,6 @@ module basilisk_convert
     always_comb begin
         automatic basilisk_convert_command_t cmd = basilisk_convert_command_t'(convert_command.payload);
         automatic logic a_lt_b;
-        automatic fpu_float_fields_t fields_a, fields_b, fields_cnv;
         automatic fpu_result_t result = '{
             sign: 'b0,
             nan: 'b0,
@@ -80,38 +79,35 @@ module basilisk_convert
         consume = 'b1;
         produce = 'b1;
 
-        a_lt_b = (cmd.a < cmd.b);
-        fields_a = fpu_decode_float(cmd.a);
-        fields_b = fpu_decode_float(cmd.b);
-        // fields_cnv = fpu_int2float(cmd.a, cmd.signed_integer);
+        a_lt_b = ({cmd.a.sign, cmd.a.exponent, cmd.a.mantissa} < {cmd.b.sign, cmd.b.exponent, cmd.b.mantissa});
 
-        result.sign = fields_a.sign;
-        result.exponent = fields_a.exponent;
-        result.mantissa = fields_a.mantissa;
+        result.sign = cmd.a.sign;
+        result.exponent = cmd.a.exponent;
+        result.mantissa = cmd.a.mantissa;
 
         case (cmd.op)
         BASILISK_CONVERT_OP_MIN: begin
             if (cmd.conditions_a.nan || cmd.conditions_b.nan) begin
                 result.nan = 'b1;
             end else if (!a_lt_b) begin
-                result.sign = fields_b.sign;
-                result.exponent = fields_b.exponent;
-                result.mantissa = fields_b.mantissa;
+                result.sign = cmd.b.sign;
+                result.exponent = cmd.b.exponent;
+                result.mantissa = cmd.b.mantissa;
             end
         end
         BASILISK_CONVERT_OP_MAX: begin 
             if (cmd.conditions_a.nan || cmd.conditions_b.nan) begin
                 result.nan = 'b1;
             end else if (a_lt_b) begin
-                result.sign = fields_b.sign;
-                result.exponent = fields_b.exponent;
-                result.mantissa = fields_b.mantissa;
+                result.sign = cmd.b.sign;
+                result.exponent = cmd.b.exponent;
+                result.mantissa = cmd.b.mantissa;
             end
         end
         BASILISK_CONVERT_OP_RAW: begin 
         end
         BASILISK_CONVERT_OP_CNV: begin
-            result = fpu_int2float(cmd.a, cmd.signed_integer);
+            result = fpu_int2float({cmd.a.sign, cmd.a.exponent, cmd.a.mantissa}, cmd.signed_integer);
         end
         endcase
 

@@ -317,6 +317,16 @@ module basilisk_tb
                 op: BASILISK_CONVERT_OP_CNV,
                 signed_integer: 'b0
             });
+            convert_command.send('{
+                dest_reg_addr: 'b1,
+                dest_offset_addr: 'h3,
+                a: 'd1000000001,
+                conditions_a: 'b0,
+                b: input_fields[2],
+                conditions_b: input_conditions[2],
+                op: BASILISK_CONVERT_OP_CNV,
+                signed_integer: 'b0
+            });
         end
         begin
 

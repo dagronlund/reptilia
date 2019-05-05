@@ -28,10 +28,12 @@ module gecko_core
 #(
     parameter int INST_LATENCY = 1,
     parameter int DATA_LATENCY = 1,
+    parameter int FLOAT_LATENCY = 1,
     parameter int INST_PIPELINE_BREAK = 1,
     parameter gecko_pc_t START_ADDR = 'b0,
     parameter int ENABLE_PERFORMANCE_COUNTERS = 1,
-    parameter int ENABLE_PRINT = 1
+    parameter int ENABLE_PRINT = 1,
+    parameter int ENABLE_FLOAT = 1
 )(
     input logic clk, rst,
 
@@ -40,6 +42,9 @@ module gecko_core
 
     std_mem_intf.out data_request,
     std_mem_intf.in data_result,
+
+    std_mem_intf.out float_mem_request,
+    std_mem_intf.in float_mem_result,
 
     std_stream_intf.out print_out,
 
@@ -58,11 +63,11 @@ module gecko_core
     std_stream_intf #(.T(gecko_system_operation_t)) system_command (.clk, .rst);
     std_stream_intf #(.T(gecko_ecall_operation_t)) ecall_command (.clk, .rst);
     std_stream_intf #(.T(gecko_float_operation_t)) float_command (.clk, .rst);
-    assign float_command.ready = 'b1;
 
     std_stream_intf #(.T(gecko_operation_t)) execute_result (.clk, .rst);
     std_stream_intf #(.T(gecko_operation_t)) system_result (.clk, .rst);
     std_stream_intf #(.T(gecko_operation_t)) memory_result (.clk, .rst);
+    std_stream_intf #(.T(gecko_operation_t)) float_result (.clk, .rst);
 
     std_stream_intf #(.T(gecko_operation_t)) writeback_result (.clk, .rst);
 
@@ -130,7 +135,8 @@ module gecko_core
 
     gecko_decode #(
         .NUM_FORWARDED(3),
-        .ENABLE_PRINT(ENABLE_PRINT)
+        .ENABLE_PRINT(ENABLE_PRINT),
+        .ENABLE_FLOAT(ENABLE_FLOAT)
     ) gecko_decode_inst (
         .clk, .rst,
 
@@ -191,21 +197,45 @@ module gecko_core
         .system_result
     );
 
-    gecko_print #(
-    ) gecko_print_inst (
+    gecko_print #() gecko_print_inst (
         .clk, .rst,
         .ecall_command,
         .print_out
     );
 
-    std_stream_intf #(.T(gecko_operation_t)) writeback_results_in [3] (.clk, .rst);
+    generate
+    if (ENABLE_FLOAT) begin
+
+        // gecko_float_dummy #() gecko_float_dummy_inst (
+        //     .clk, .rst,
+        //     .float_command, .float_result
+        // );
+
+        basilisk_vpu #(
+            .MEMORY_LATENCY(FLOAT_LATENCY)
+        ) basilisk_vpu_inst (
+            .clk, .rst,
+            .float_command, .float_result,
+            .float_mem_request, .float_mem_result
+        );
+
+    end else begin
+        assign float_mem_request.valid = 'b0;
+        assign float_mem_result.ready = 'b0;
+        assign float_command.ready = 'b0;
+        assign float_result.valid = 'b0;
+    end
+    endgenerate
+
+    std_stream_intf #(.T(gecko_operation_t)) writeback_results_in [4] (.clk, .rst);
 
     stream_tie stream_tie_inst0(.stream_in(execute_result), .stream_out(writeback_results_in[0]));
     stream_tie stream_tie_inst1(.stream_in(memory_result), .stream_out(writeback_results_in[1]));
     stream_tie stream_tie_inst2(.stream_in(system_result), .stream_out(writeback_results_in[2]));
+    stream_tie stream_tie_inst3(.stream_in(float_result), .stream_out(writeback_results_in[3]));
 
     gecko_writeback #(
-        .PORTS(3)
+        .PORTS(4)
     ) gecko_writeback_inst (
         .clk, .rst,
 

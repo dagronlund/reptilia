@@ -103,8 +103,10 @@ package rv32i;
             rd: inst[11:7],
             rs1: inst[19:15],
             rs2: inst[24:20],
+            rs3: inst[31:27],
             funct3: inst[14:12],
             funct7: inst[31:25],
+            funct5: inst[31:27],
             funct12: inst[31:20],
             decode_error: 1'b0,
             default:'0
