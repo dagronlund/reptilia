@@ -62,8 +62,8 @@ package fpu_add;
         result.sigA = argA;
         result.sigB = argB;
         result.nan = conditions_A.nan || conditions_B.nan;
-        result.inf = conditions_A.nan || conditions_B.inf;
-        result.zero = conditions_A.zero || conditions_B.zero;
+        result.inf = conditions_A.inf || conditions_B.inf;
+        result.zero = conditions_A.zero && conditions_B.zero;
         result.mode = mode;
         // result.valid = valid;
 
