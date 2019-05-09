@@ -17,8 +17,11 @@ package rv32v;
 
     typedef enum rv32_funct3_t {
         RV32V_FUNCT3_OP_IVV = 'b000,
-        RV32V_FUNCT3_OP_FVV = 'b001, // Floating Point Vector-Vector
-        RV32V_FUNCT3_OP_MVV = 'b010,
+
+        // DANGER: Swapping these to compensate for assembler bug
+        RV32V_FUNCT3_OP_FVV = 'b010, // Floating Point Vector-Vector
+        RV32V_FUNCT3_OP_MVV = 'b001,
+        
         RV32V_FUNCT3_OP_IVI = 'b011, // Integer Vector-Immediate (Slideup/Slidedown)
         RV32V_FUNCT3_OP_IVX = 'b100, 
         RV32V_FUNCT3_OP_FVF = 'b101, // Floating Point Vector-Scalar
@@ -41,7 +44,7 @@ package rv32v;
         RV32V_FUNCT6_VFNMSAC = 'b101111 // OP_FVV or OP_FVF
     } rv32v_funct6_t;
 
-    
+
 // RV32V_FUNCT6_VFMIN = 'b000100, // OP_FVV or OP_FVF
 // RV32V_FUNCT6_VFMAX = 'b000110, // OP_FVV or OP_FVF
 // RV32V_FUNCT6_VFSGNJ = 'b001000, // OP_FVV or OP_FVF

@@ -70,7 +70,11 @@ package basilisk_decode_util;
         endcase
         
         case (rv32v_opcode_t'(inst_fields.opcode))
-        RV32V_FUNCT3_OP_FVV, RV32V_FUNCT3_OP_FVF, RV32V_FUNCT3_OP_IVI: return 'b1;
+        RV32V_OPCODE_OP: begin
+            case (rv32v_funct3_t'(inst_fields.funct3))
+            RV32V_FUNCT3_OP_FVV, RV32V_FUNCT3_OP_FVF, RV32V_FUNCT3_OP_IVI: return 'b1;
+            endcase
+        end
         endcase
         
         return 'b0;
@@ -81,7 +85,7 @@ package basilisk_decode_util;
     );
         case (rv32f_opcode_t'(inst_fields.opcode))
         RV32F_OPCODE_FLW: return 'b0;
-        RV32F_OPCODE_FSW: return 'b1;
+        RV32F_OPCODE_FSW: return 'b0;
         RV32F_OPCODE_FMADD_S, RV32F_OPCODE_FMSUB_S,
         RV32F_OPCODE_FNMSUB_S, RV32F_OPCODE_FNMADD_S: return 'b1;
         RV32F_OPCODE_FP_OP_S: begin
@@ -100,6 +104,20 @@ package basilisk_decode_util;
         RV32V_FUNCT3_OP_FVV, RV32V_FUNCT3_OP_FVF, RV32V_FUNCT3_OP_IVI: return 'b1;
         endcase
 
+        case (rv32v_opcode_t'(inst_fields.opcode))
+        RV32V_OPCODE_OP: begin
+            case (rv32v_funct3_t'(inst_fields.funct3))
+            RV32V_FUNCT3_OP_FVV, RV32V_FUNCT3_OP_FVF: begin
+                case (rv32v_funct6_t'(inst_fields.funct6))
+                RV32V_FUNCT6_VFSQRT: return 'b0;
+                default: return 'b1;
+                endcase
+            end
+            RV32V_FUNCT3_OP_IVI: return 'b0;
+            endcase
+        end
+        endcase
+
         return 'b0;
     endfunction
 
@@ -108,7 +126,7 @@ package basilisk_decode_util;
     );
         case (rv32f_opcode_t'(inst_fields.opcode))
         RV32F_OPCODE_FLW: return 'b0;
-        RV32F_OPCODE_FSW: return 'b0;
+        RV32F_OPCODE_FSW: return 'b1;
         RV32F_OPCODE_FMADD_S, RV32F_OPCODE_FMSUB_S,
         RV32F_OPCODE_FNMSUB_S, RV32F_OPCODE_FNMADD_S: return 'b1;
         RV32F_OPCODE_FP_OP_S: begin
@@ -125,13 +143,11 @@ package basilisk_decode_util;
         endcase
 
         case (rv32v_opcode_t'(inst_fields.opcode))
-        RV32V_FUNCT3_OP_FVV, RV32V_FUNCT3_OP_FVF: begin
-            case (rv32v_funct6_t'(inst_fields.funct6))
-            RV32V_FUNCT6_VFSQRT: return 'b0;
-            default: return 'b1;
+        RV32V_OPCODE_OP: begin
+            case (rv32v_funct3_t'(inst_fields.funct3))
+            RV32V_FUNCT3_OP_FVV, RV32V_FUNCT3_OP_FVF, RV32V_FUNCT3_OP_IVI: return 'b1;
             endcase
         end
-        RV32V_FUNCT3_OP_IVI: return 'b0;
         endcase
 
         return 'b0;
@@ -146,14 +162,18 @@ package basilisk_decode_util;
         endcase
 
         case (rv32v_opcode_t'(inst_fields.opcode))
-        RV32V_FUNCT3_OP_FVV, RV32V_FUNCT3_OP_FVF: begin
-            case (rv32v_funct6_t'(inst_fields.funct6))
-            RV32V_FUNCT6_VFMACC, RV32V_FUNCT6_VFNMACC,
-            RV32V_FUNCT6_VFMSAC, RV32V_FUNCT6_VFNMSAC: return 'b1;
-            default: return 'b0;
+        RV32V_OPCODE_OP: begin
+            case (rv32v_funct3_t'(inst_fields.funct3))
+            RV32V_FUNCT3_OP_FVV, RV32V_FUNCT3_OP_FVF: begin
+                case (rv32v_funct6_t'(inst_fields.funct6))
+                RV32V_FUNCT6_VFMACC, RV32V_FUNCT6_VFNMACC,
+                RV32V_FUNCT6_VFMSAC, RV32V_FUNCT6_VFNMSAC: return 'b1;
+                default: return 'b0;
+                endcase
+            end
+            RV32V_FUNCT3_OP_IVI: return 'b0;
             endcase
         end
-        RV32V_FUNCT3_OP_IVI: return 'b0;
         endcase
 
         return 'b0;
@@ -161,22 +181,19 @@ package basilisk_decode_util;
 
     function automatic logic basilisk_decode_depend_registers(
             input rv32_fields_t inst_fields,
-            input basilisk_decode_reg_status_t reg_status [32]
+            input logic rd_status, rs1_status, rs2_status, rs3_status
+            // input basilisk_decode_reg_status_t reg_status [32]
     );
-        if (basilisk_decode_depend_rd(inst_fields) && 
-                reg_status[inst_fields.rd] != BASILISK_DECODE_REG_STATUS_VALID) begin
+        if (basilisk_decode_depend_rd(inst_fields) && rd_status == 'b0) begin
             return 'b0;
         end
-        if (basilisk_decode_depend_rs1(inst_fields) && 
-                reg_status[inst_fields.rs1] != BASILISK_DECODE_REG_STATUS_VALID) begin
+        if (basilisk_decode_depend_rs1(inst_fields) && rs1_status == 'b0) begin
             return 'b0;
         end
-        if (basilisk_decode_depend_rs2(inst_fields) && 
-                reg_status[inst_fields.rs2] != BASILISK_DECODE_REG_STATUS_VALID) begin
+        if (basilisk_decode_depend_rs2(inst_fields) && rs2_status == 'b0) begin
             return 'b0;
         end
-        if (basilisk_decode_depend_rs3(inst_fields) && 
-                reg_status[inst_fields.rs3] != BASILISK_DECODE_REG_STATUS_VALID) begin
+        if (basilisk_decode_depend_rs3(inst_fields) && rs3_status == 'b0) begin
             return 'b0;
         end
         return 'b1;

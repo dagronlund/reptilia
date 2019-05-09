@@ -125,6 +125,7 @@ package gecko_decode_util;
             status.error = 'b1;
         end
         endcase
+
         case (rv32f_opcode_t'(instruction_fields.opcode))
         RV32F_OPCODE_FLW, RV32F_OPCODE_FSW,
         RV32F_OPCODE_FMADD_S, RV32F_OPCODE_FMSUB_S,
@@ -133,6 +134,41 @@ package gecko_decode_util;
             status.error = 'b0;
         end
         endcase
+        
+        case (rv32v_opcode_t'(instruction_fields.opcode))
+        RV32V_OPCODE_OP: begin
+            case(rv32v_funct3_t'(instruction_fields.funct3))
+            RV32V_FUNCT3_OP_FVV: begin // Floating Point Vector-Vector
+                case (rv32v_funct6_t'(instruction_fields.funct6))
+                RV32V_FUNCT6_VFADD, RV32V_FUNCT6_VFSUB, RV32V_FUNCT6_VFDIV, 
+                RV32V_FUNCT6_VFSQRT, RV32V_FUNCT6_VFMUL, RV32V_FUNCT6_VFMACC,
+                RV32V_FUNCT6_VFNMACC, RV32V_FUNCT6_VFMSAC, RV32V_FUNCT6_VFNMSAC: begin
+                    status.float = 'b1;
+                    status.error = 'b0;
+                end
+                endcase
+            end
+            RV32V_FUNCT3_OP_FVF: begin // Floating Point Vector-Scalar
+                case (rv32v_funct6_t'(instruction_fields.funct6))
+                RV32V_FUNCT6_VFADD, RV32V_FUNCT6_VFSUB, RV32V_FUNCT6_VFDIV,
+                RV32V_FUNCT6_VFSQRT, RV32V_FUNCT6_VFRDIV, RV32V_FUNCT6_VFMUL: begin
+                    status.float = 'b1;
+                    status.error = 'b0;
+                end
+                endcase
+            end
+            RV32V_FUNCT3_OP_IVI: begin // Integer Vector-Immediate (Slideup/Slidedown)
+                case (rv32v_funct6_t'(instruction_fields.funct6))
+                RV32V_FUNCT6_VSLIDEUP, RV32V_FUNCT6_VSLIDEDOWN: begin
+                    status.float = 'b1;
+                    status.error = 'b0;
+                end
+                endcase
+            end
+            endcase
+        end
+        endcase
+        
         return status;
     endfunction
 
@@ -235,10 +271,37 @@ package gecko_decode_util;
             end
             endcase
         end
-        default: begin
-            return '{default: 'b1};
+        endcase
+
+        case (rv32f_opcode_t'(instruction_fields.opcode))
+        RV32F_OPCODE_FLW, RV32F_OPCODE_FSW: begin
+            return '{
+                rs1_valid: is_register_readable(rs1, 'b0, rs1_status), 
+                rs2_valid: 'b1,
+                rd_valid: 'b1
+            };
+        end
+        RV32F_OPCODE_FP_OP_S: begin
+            case (rv32f_funct7_t'(instruction_fields.funct7))
+            RV32F_FUNCT7_FCVT_W_S, RV32F_FUNCT7_FMV_X_W, RV32F_FUNCT7_FCMP_S: begin
+                return '{
+                    rs1_valid: 'b1, 
+                    rs2_valid: 'b1,
+                    rd_valid: is_register_writeable(rd_status)
+                };
+            end
+            RV32F_FUNCT7_FCVT_S_W, RV32F_FUNCT7_FMV_W_X: begin
+                return '{
+                    rs1_valid: is_register_readable(rs1, 'b0, rs1_status), 
+                    rs2_valid: 'b1,
+                    rd_valid: 'b1
+                };
+            end
+            endcase
         end
         endcase
+
+        return '{default: 'b1};
     endfunction
 
     function automatic gecko_execute_operation_t create_execute_op(

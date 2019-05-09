@@ -87,6 +87,43 @@ module basilisk_decode
         BASILISK_DECODE_STATE_NORMAL = 'b1
     } basilisk_decode_state_t;
 
+    typedef basilisk_vector_length_t basilisk_vector_status_count_t [32];
+    typedef basilisk_decode_reg_status_t basilisk_vector_status_reg_t [32];
+
+    function automatic basilisk_vector_status_count_t basilisk_decode_update_reg_status_count(
+            input basilisk_vector_status_count_t current_status_count,
+            input logic vector_writeback_enables [BASILISK_COMPUTE_WIDTH],
+            input rv32_reg_addr_t vector_writeback_addresses [BASILISK_COMPUTE_WIDTH]
+    );
+        int i;
+        for (i = 0; i < BASILISK_COMPUTE_WIDTH; i++) begin
+            if (vector_writeback_enables[i]) begin
+                current_status_count[vector_writeback_addresses[i]] -= 'b1;
+            end
+        end
+        return current_status_count;
+    endfunction
+
+    function automatic basilisk_vector_status_reg_t basilisk_decode_update_reg_status(
+        input basilisk_vector_status_reg_t current_status,
+        input basilisk_vector_status_count_t current_status_count,
+        input logic vector_writeback_enables [BASILISK_COMPUTE_WIDTH],
+        input rv32_reg_addr_t vector_writeback_addresses [BASILISK_COMPUTE_WIDTH]
+    );
+        int i;
+        for (i = 0; i < BASILISK_COMPUTE_WIDTH; i++) begin
+            if (vector_writeback_enables[i]) begin
+                current_status_count[vector_writeback_addresses[i]] -= 'b1;
+            end
+        end
+        for (i = 0; i < BASILISK_COMPUTE_WIDTH; i++) begin
+            if (current_status_count[vector_writeback_addresses[i]] == 'b0) begin
+                current_status[vector_writeback_addresses[i]] = BASILISK_DECODE_REG_STATUS_VALID;
+            end
+        end
+        return current_status;
+    endfunction
+
     std_stream_intf #(.T(basilisk_encode_command_t)) next_encode_command (.clk, .rst);
     std_stream_intf #(.T(basilisk_convert_command_t)) next_convert_command (.clk, .rst);
     std_stream_intf #(.T(basilisk_memory_command_t)) next_memory_command (.clk, .rst);
@@ -234,9 +271,17 @@ module basilisk_decode
         .stream_in(next_memory_command), .stream_out(memory_command)
     );
 
+    basilisk_decode_state_t current_state, next_state;
+    logic current_vector_progress, next_vector_progress;
+    rv32_reg_addr_t current_reset_counter, next_reset_counter;
+    fpu_round_mode_t current_round_mode, next_round_mode;
+    basilisk_vector_length_t current_vector_length, next_vector_length;
+    basilisk_vector_length_t current_vector_start, next_vector_start;
+
     logic rd_write_enable [BASILISK_VECTOR_WIDTH];
     rv32_reg_addr_t rd_write_addr [BASILISK_VECTOR_WIDTH];
     rv32_reg_value_t rd_write_value [BASILISK_VECTOR_WIDTH];
+    rv32_reg_addr_t rd_read_addr [BASILISK_VECTOR_WIDTH];
     rv32_reg_addr_t rs1_read_addr [BASILISK_VECTOR_WIDTH];
     rv32_reg_addr_t rs2_read_addr [BASILISK_VECTOR_WIDTH];
     rv32_reg_addr_t rs3_read_addr [BASILISK_VECTOR_WIDTH];
@@ -244,8 +289,65 @@ module basilisk_decode
     rv32_reg_value_t rs2_read_value [BASILISK_VECTOR_WIDTH];
     rv32_reg_value_t rs3_read_value [BASILISK_VECTOR_WIDTH];
 
+    logic rd_front_status_write_enable [BASILISK_VECTOR_WIDTH];
+    rv32_reg_addr_t rd_front_status_write_addr [BASILISK_VECTOR_WIDTH];
+    logic rs1_front_status [BASILISK_VECTOR_WIDTH];
+    logic rs2_front_status [BASILISK_VECTOR_WIDTH];
+    logic rs3_front_status [BASILISK_VECTOR_WIDTH];
+
+    logic rs1_rear_status [BASILISK_VECTOR_WIDTH];
+    logic rs2_rear_status [BASILISK_VECTOR_WIDTH];
+    logic rs3_rear_status [BASILISK_VECTOR_WIDTH];
+
+    logic rd_status [BASILISK_VECTOR_WIDTH];
+    logic rs1_status [BASILISK_VECTOR_WIDTH];
+    logic rs2_status [BASILISK_VECTOR_WIDTH];
+    logic rs3_status [BASILISK_VECTOR_WIDTH];
+
     generate
     for (k = 0; k < BASILISK_VECTOR_WIDTH; k++) begin
+        logic front_status_write_value, rear_status_rd_value;
+
+        assign rd_status[k] = (front_status_write_value == rear_status_rd_value);
+        assign rs1_status[k] = (rs1_front_status[k] == rs1_rear_status[k]);
+        assign rs2_status[k] = (rs2_front_status[k] == rs2_rear_status[k]);
+        assign rs3_status[k] = (rs3_front_status[k] == rs3_rear_status[k]);
+
+        // Front Register Status
+        std_distributed_ram #(
+            .DATA_WIDTH(1),
+            .ADDR_WIDTH($size(rv32_reg_addr_t)),
+            .READ_PORTS(3)
+        ) front_register_status_inst (
+            .clk, .rst,
+
+            .write_enable(rd_front_status_write_enable[k] && enable),
+            .write_addr(rd_front_status_write_addr[k]),
+            .write_data_in((current_state == BASILISK_DECODE_STATE_RESET) ? 'b0 : (~front_status_write_value)),
+            .write_data_out(front_status_write_value),
+
+            .read_addr('{rs1_read_addr[k], rs2_read_addr[k], rs3_read_addr[k]}),
+            .read_data_out('{rs1_front_status[k], rs2_front_status[k], rs3_front_status[k]})
+        );
+
+        // Rear Register Status
+        logic rear_status_write_value;
+        std_distributed_ram #(
+            .DATA_WIDTH(1),
+            .ADDR_WIDTH($size(rv32_reg_addr_t)),
+            .READ_PORTS(4)
+        ) rear_register_status_inst (
+            .clk, .rst,
+
+            .write_enable(rd_write_enable[k]),
+            .write_addr(rd_write_addr[k]),
+            .write_data_in((current_state == BASILISK_DECODE_STATE_RESET) ? 'b0 : (~rear_status_write_value)),
+            .write_data_out(rear_status_write_value),
+
+            .read_addr('{rd_read_addr[k], rs1_read_addr[k], rs2_read_addr[k], rs3_read_addr[k]}),
+            .read_data_out('{rear_status_rd_value, rs1_rear_status[k], rs2_rear_status[k], rs3_rear_status[k]})
+        );
+
         // Register File
         std_distributed_ram #(
             .DATA_WIDTH($size(rv32_reg_value_t)),
@@ -265,49 +367,32 @@ module basilisk_decode
     end
     endgenerate
 
-    basilisk_decode_state_t current_state, next_state;
-    basilisk_decode_reg_status_t current_reg_status [32], next_reg_status [32];
-    basilisk_vector_length_t current_reg_status_count [32], next_reg_status_count [32];
-    rv32_reg_addr_t current_reset_counter, next_reset_counter;
-    fpu_round_mode_t current_round_mode, next_round_mode;
-    basilisk_vector_length_t current_vector_length, next_vector_length;
-    basilisk_vector_length_t current_vector_start, next_vector_start;
-
-    logic reg_status_writeback_enable;
-    rv32_reg_addr_t reg_status_writeback_addr;
+    logic reg_status_writeback_enable [BASILISK_COMPUTE_WIDTH];
+    rv32_reg_addr_t reg_status_writeback_addr [BASILISK_COMPUTE_WIDTH];
 
     always_ff @(posedge clk) begin
         if(rst) begin
             current_state <= BASILISK_DECODE_STATE_RESET;
-            current_reg_status <= '{32{BASILISK_DECODE_REG_STATUS_VALID}};
-            current_reg_status_count <= '{32{'b0}};
+            current_vector_progress <= 'b0;
             current_reset_counter <= 'b0;
             current_round_mode <= FPU_ROUND_MODE_EVEN;
             current_vector_length <= 'b1;
             current_vector_start <= 'b0;
         end else if (enable) begin
             current_state <= next_state;
-            current_reg_status <= next_reg_status;
-            current_reg_status_count <= next_reg_status_count;
-            if (reg_status_writeback_enable) begin
-                current_reg_status_count[reg_status_writeback_addr] <= current_reg_status_count[reg_status_writeback_addr] - 'b1;
-                if (current_reg_status_count[reg_status_writeback_addr] == 'b1) begin
-                    current_reg_status[reg_status_writeback_addr] <= BASILISK_DECODE_REG_STATUS_VALID;
-                end
-            end
+            current_vector_progress <= next_vector_progress;
             current_reset_counter <= next_reset_counter;
             current_round_mode <= next_round_mode;
             current_vector_length <= next_vector_length;
             current_vector_start <= next_vector_start;
-        end else if (reg_status_writeback_enable) begin
-            current_reg_status_count[reg_status_writeback_addr] <= current_reg_status_count[reg_status_writeback_addr] - 'b1;
-            if (current_reg_status_count[reg_status_writeback_addr] == 'b1) begin
-                current_reg_status[reg_status_writeback_addr] <= BASILISK_DECODE_REG_STATUS_VALID;
-            end
         end
     end
 
     logic reg_file_clear;
+    basilisk_vector_length_t calc_vector_addr, read_vector_addr;
+    basilisk_offset_addr_t calc_vector_offset;
+    logic enable_slideup, enable_slidedown, enable_scalar_rs1, enable_scalar_rs2;
+    logic rd_vector_status, rs1_vector_status, rs2_vector_status, rs3_vector_status;
     always_comb begin
         automatic rv32_fields_t inst_fields = float_command.payload.instruction_fields;
 
@@ -330,10 +415,10 @@ module basilisk_decode
         automatic fpu_round_mode_t selected_round_mode;
         automatic fpu_round_mode_t incoming_round_mode;
         automatic rv32f_funct3_round_t outgoing_round_mode;
-        automatic basilisk_vector_length_t calc_vector_addr;
-        automatic basilisk_offset_addr_t calc_vector_offset;
-        automatic logic enable_slideup, enable_slidedown, enable_scalar_rs1, enable_scalar_rs2;
-        automatic logic enable_vector_macc;
+        // automatic basilisk_vector_length_t calc_vector_addr;
+        // automatic basilisk_offset_addr_t calc_vector_offset;
+        // automatic logic enable_slideup, enable_slidedown, enable_scalar_rs1, enable_scalar_rs2;
+        automatic logic enable_vector, enable_vector_macc, enable_vector_sqrt;
         // automatic logic reg_file_clear;
 
         consume = (current_state == BASILISK_DECODE_STATE_NORMAL);
@@ -346,41 +431,61 @@ module basilisk_decode
         produce_memory = 'b0;
 
         next_state = current_state;
+        next_vector_progress = current_vector_progress;
         next_reset_counter = current_reset_counter + 'b1;
         next_round_mode = current_round_mode;
-        next_reg_status = current_reg_status;
-        next_reg_status_count = current_reg_status_count;
         next_vector_length = current_vector_length;
         next_vector_start = current_vector_start;
+
+        rd_front_status_write_enable = '{BASILISK_VECTOR_WIDTH{(current_state == BASILISK_DECODE_STATE_RESET)}};
+        if (current_state == BASILISK_DECODE_STATE_RESET) begin
+            rd_front_status_write_addr = '{BASILISK_VECTOR_WIDTH{current_reset_counter}};
+        end else begin
+            rd_front_status_write_addr = '{BASILISK_VECTOR_WIDTH{inst_fields.rd}};
+        end
 
         enable_slideup = 'b0;
         enable_slidedown = 'b0;
         enable_scalar_rs1 = 'b0;
         enable_scalar_rs2 = 'b0;
         enable_vector_macc = 'b0;
+        enable_vector_sqrt = 'b0;
         case (rv32v_opcode_t'(inst_fields.opcode))
-        RV32V_FUNCT3_OP_IVI: begin // Integer Vector-Immediate (Slideup/Slidedown)
-            case (rv32v_funct6_t'(inst_fields.funct6))
-                RV32V_FUNCT6_VSLIDEUP: enable_slideup = 'b1;
-                RV32V_FUNCT6_VSLIDEDOWN: enable_slidedown = 'b1;
-            endcase
-        end
-        RV32V_FUNCT3_OP_FVF: begin
-            case (rv32v_funct6_t'(inst_fields.funct6))
-            RV32V_FUNCT6_VFRDIV: enable_scalar_rs1 = 'b1;
-            default: enable_scalar_rs2 = 'b1;
-            endcase
-        end
-        RV32V_FUNCT3_OP_FVV: begin // Floating Point Vector-Vector
-            case (rv32v_funct6_t'(inst_fields.funct6))
-            RV32V_FUNCT6_VFMACC, RV32V_FUNCT6_VFNMACC,
-            RV32V_FUNCT6_VFMSAC, RV32V_FUNCT6_VFNMSAC: enable_vector_macc = 'b1;
+        RV32V_OPCODE_OP: begin
+            case (rv32v_funct3_t'(inst_fields.funct3))
+            RV32V_FUNCT3_OP_IVI: begin // Integer Vector-Immediate (Slideup/Slidedown)
+                case (rv32v_funct6_t'(inst_fields.funct6))
+                    RV32V_FUNCT6_VSLIDEUP: enable_slideup = 'b1;
+                    RV32V_FUNCT6_VSLIDEDOWN: enable_slidedown = 'b1;
+                endcase
+            end
+            RV32V_FUNCT3_OP_FVF: begin
+                case (rv32v_funct6_t'(inst_fields.funct6))
+                RV32V_FUNCT6_VFRDIV: enable_scalar_rs1 = 'b1;
+                default: enable_scalar_rs2 = 'b1;
+                endcase
+            end
+            RV32V_FUNCT3_OP_FVV: begin // Floating Point Vector-Vector
+                case (rv32v_funct6_t'(inst_fields.funct6))
+                RV32V_FUNCT6_VFMACC, RV32V_FUNCT6_VFNMACC,
+                RV32V_FUNCT6_VFMSAC, RV32V_FUNCT6_VFNMSAC: enable_vector_macc = 'b1;
+                RV32V_FUNCT6_VFSQRT: enable_vector_sqrt = 'b1;
+                endcase
+            end
             endcase
         end
         endcase
 
         for (int i = 0; i < BASILISK_VECTOR_WIDTH; i++) begin
-            rs1_read_addr[i] = inst_fields.rs1;
+            rd_read_addr[i] = inst_fields.rd;
+
+            // Vector sqrt works using rs2
+            if (enable_vector_sqrt) begin
+                rs1_read_addr[i] = inst_fields.rs2;
+            end else begin
+                rs1_read_addr[i] = inst_fields.rs1;
+            end
+
             rs2_read_addr[i] = inst_fields.rs2;
 
             // Vector MACC instructions reuse rd as rs3
@@ -393,43 +498,45 @@ module basilisk_decode
 
         // Retrieve vector values from register file
         for (int i = 0; i < BASILISK_COMPUTE_WIDTH; i++) begin
-            // Shift results for sliding up or down
             if (enable_slideup) begin
-                if (i == 0) begin
-                    calc_vector_addr = ((BASILISK_VECTOR_WIDTH) - current_vector_start) - 'b1;
+                read_vector_addr = (BASILISK_VECTOR_WIDTH - BASILISK_COMPUTE_WIDTH - current_vector_start) + i;
+                if (read_vector_addr == 0) begin
+                    read_vector_addr = BASILISK_VECTOR_WIDTH - 1;
                 end else begin
-                    calc_vector_addr = ((BASILISK_VECTOR_WIDTH - BASILISK_COMPUTE_WIDTH) - current_vector_start) + i - 'b1;
+                    read_vector_addr -= 'b1;
                 end
             end else if (enable_slidedown) begin
-                if (i == BASILISK_COMPUTE_WIDTH - 1) begin
-                    calc_vector_addr = current_vector_start;
+                read_vector_addr = current_vector_start + i;
+                if (read_vector_addr == BASILISK_VECTOR_WIDTH - 1) begin
+                    read_vector_addr = 'b0;
                 end else begin
-                    calc_vector_addr = current_vector_start + i + 'b1;
+                    read_vector_addr += 'b1;
                 end
             end else begin
-                calc_vector_addr = current_vector_start + i;
+                read_vector_addr = current_vector_start + i;
             end
 
+            // Add zero from rs1 if sliding up or down
+            if (enable_slideup || enable_slidedown) begin
+                rs1_fields_vector[i] = fpu_decode_float('b0);
+                rs1_conditions_vector[i] = fpu_get_conditions('b0);
             // Scalar operation on rs1
-            if (enable_scalar_rs1) begin
+            end else if (enable_scalar_rs1) begin
                 rs1_fields_vector[i] = fpu_decode_float(rs1_read_value['b0]);
                 rs1_conditions_vector[i] = fpu_get_conditions(rs1_read_value['b0]); 
             end else begin
-                rs1_fields_vector[i] = fpu_decode_float(rs1_read_value[calc_vector_addr]);
-                rs1_conditions_vector[i] = fpu_get_conditions(rs1_read_value[calc_vector_addr]);
+                rs1_fields_vector[i] = fpu_decode_float(rs1_read_value[current_vector_start + i]);
+                rs1_conditions_vector[i] = fpu_get_conditions(rs1_read_value[current_vector_start + i]);
             end
             
-            // Add zero if sliding up or down
-            if (enable_slideup || enable_slidedown) begin
-                rs2_fields_vector[i] = fpu_decode_float('b0);
-                rs2_conditions_vector[i] = fpu_get_conditions('b0);
             // Scalar operation on rs2
-            end else if (enable_scalar_rs2) begin
+            if (enable_scalar_rs2) begin
                 rs2_fields_vector[i] = fpu_decode_float(rs2_read_value['b0]);
                 rs2_conditions_vector[i] = fpu_get_conditions(rs2_read_value['b0]);
+            // Use calculated address
             end else begin
-                rs2_fields_vector[i] = fpu_decode_float(rs2_read_value[current_vector_start + i]);
-                rs2_conditions_vector[i] = fpu_get_conditions(rs2_read_value[current_vector_start + i]);
+                rs2_fields_vector[i] = fpu_decode_float(rs2_read_value[read_vector_addr]);
+                rs2_conditions_vector[i] = fpu_get_conditions(rs2_read_value[read_vector_addr]);
             end
 
             rs3_fields_vector[i] = fpu_decode_float(rs3_read_value[current_vector_start + i]);
@@ -444,20 +551,23 @@ module basilisk_decode
         rs2_conditions_scalar = fpu_get_conditions(rs2_read_value[0]);
         rs3_conditions_scalar = fpu_get_conditions(rs3_read_value[0]);
 
+        rd_vector_status = 'b1;
+        rs1_vector_status = 'b1;
+        rs2_vector_status = 'b1;
+        rs3_vector_status = 'b1;
+        for (int i = 0; i < BASILISK_VECTOR_WIDTH; i++) begin
+            rd_vector_status &= rd_status[i];
+            rs1_vector_status &= rs1_status[i];
+            rs2_vector_status &= rs2_status[i];
+            rs3_vector_status &= rs3_status[i];
+        end
+
         sys_write = 'b0;
         sys_set = 'b0;
         sys_clear = 'b0;
         sys_use_imm = 'b0;
 
-        enable_slideup = 'b0;
-        enable_slidedown = 'b0;
-
-        reg_file_clear = 'b1;
-        for (int i = 0; i < 32; i++) begin
-            if (current_reg_status[i[4:0]] != BASILISK_DECODE_REG_STATUS_VALID) begin
-                reg_file_clear = 'b0;
-            end
-        end
+        // reg_file_clear = 'b1;
 
         // Handle floating-point load-store immediate
         immediate_value = {{20{inst_fields.inst[31]}}, inst_fields.inst[31:20]};
@@ -606,98 +716,106 @@ module basilisk_decode
             endcase
         end
         endcase
-
+        
+        enable_vector = 'b0;
         case (rv32v_opcode_t'(inst_fields.opcode))
-        RV32V_FUNCT3_OP_FVV: begin // Floating Point Vector-Vector
-            case (rv32v_funct6_t'(inst_fields.funct6))
-            RV32V_FUNCT6_VFADD: begin
-                produce_add = {BASILISK_COMPUTE_WIDTH{1'b1}};
-            end
-            RV32V_FUNCT6_VFSUB: begin
-                for (int i = 0; i < BASILISK_COMPUTE_WIDTH; i++) begin
-                    rs2_fields_vector[i].sign = ~rs2_fields_vector[i].sign;
+        RV32V_OPCODE_OP: begin
+            enable_vector = 'b1;
+            consume = 'b0;
+
+            case (rv32v_funct3_t'(inst_fields.funct3))
+            RV32V_FUNCT3_OP_FVV: begin // Floating Point Vector-Vector
+                case (rv32v_funct6_t'(inst_fields.funct6))
+                RV32V_FUNCT6_VFADD: begin
+                    produce_add = {BASILISK_COMPUTE_WIDTH{1'b1}};
                 end
-                produce_add = {BASILISK_COMPUTE_WIDTH{1'b1}};
-            end
-            RV32V_FUNCT6_VFDIV: begin
-                produce_divide = {BASILISK_COMPUTE_WIDTH{1'b1}};
-            end
-            RV32V_FUNCT6_VFSQRT: begin
-                produce_sqrt = {BASILISK_COMPUTE_WIDTH{1'b1}};
-            end
-            RV32V_FUNCT6_VFMUL: begin
-                produce_mult = {BASILISK_COMPUTE_WIDTH{1'b1}};
-            end
-            RV32V_FUNCT6_VFMACC: begin
-                produce_mult = {BASILISK_COMPUTE_WIDTH{1'b1}};
-            end
-            RV32V_FUNCT6_VFNMACC: begin
-                produce_mult = {BASILISK_COMPUTE_WIDTH{1'b1}};
-                for (int i = 0; i < BASILISK_COMPUTE_WIDTH; i++) begin
-                    rs1_fields_vector[i].sign = ~rs1_fields_vector[i].sign;
-                    rs3_fields_vector[i].sign = ~rs3_fields_vector[i].sign;
+                RV32V_FUNCT6_VFSUB: begin
+                    for (int i = 0; i < BASILISK_COMPUTE_WIDTH; i++) begin
+                        rs2_fields_vector[i].sign = ~rs2_fields_vector[i].sign;
+                    end
+                    produce_add = {BASILISK_COMPUTE_WIDTH{1'b1}};
                 end
-            end
-            RV32V_FUNCT6_VFMSAC: begin
-                produce_mult = {BASILISK_COMPUTE_WIDTH{1'b1}};
-                for (int i = 0; i < BASILISK_COMPUTE_WIDTH; i++) begin
-                    rs3_fields_vector[i].sign = ~rs3_fields_vector[i].sign;
+                RV32V_FUNCT6_VFDIV: begin
+                    produce_divide = {BASILISK_COMPUTE_WIDTH{1'b1}};
                 end
-            end
-            RV32V_FUNCT6_VFNMSAC: begin
-                produce_mult = {BASILISK_COMPUTE_WIDTH{1'b1}};
-                for (int i = 0; i < BASILISK_COMPUTE_WIDTH; i++) begin
-                    rs1_fields_vector[i].sign = ~rs1_fields_vector[i].sign;
+                RV32V_FUNCT6_VFSQRT: begin
+                    produce_sqrt = {BASILISK_COMPUTE_WIDTH{1'b1}};
                 end
-            end
-            endcase
-            
-            next_vector_start += BASILISK_COMPUTE_WIDTH;
-            if (next_vector_start > BASILISK_VECTOR_WIDTH) begin
-                consume = 'b1;
-                next_vector_start = 'b0;
-            end
-        end
-        RV32V_FUNCT3_OP_FVF: begin // Floating Point Vector-Scalar
-            case (rv32v_funct6_t'(inst_fields.funct6))
-            RV32V_FUNCT6_VFADD: begin
-                produce_add = {BASILISK_COMPUTE_WIDTH{1'b1}};
-            end
-            RV32V_FUNCT6_VFSUB: begin
-                for (int i = 0; i < BASILISK_COMPUTE_WIDTH; i++) begin
-                    rs2_fields_vector[i].sign = ~rs2_fields_vector[i].sign;
+                RV32V_FUNCT6_VFMUL: begin
+                    produce_mult = {BASILISK_COMPUTE_WIDTH{1'b1}};
                 end
-                produce_add = {BASILISK_COMPUTE_WIDTH{1'b1}};
-            end
-            RV32V_FUNCT6_VFDIV: begin
-                produce_divide = {BASILISK_COMPUTE_WIDTH{1'b1}};
-            end
-            RV32V_FUNCT6_VFSQRT: begin
-                produce_sqrt = {BASILISK_COMPUTE_WIDTH{1'b1}};
-            end
-            RV32V_FUNCT6_VFRDIV: begin
-                produce_divide = {BASILISK_COMPUTE_WIDTH{1'b1}};
-            end
-            RV32V_FUNCT6_VFMUL: begin
-                produce_mult = {BASILISK_COMPUTE_WIDTH{1'b1}};
-            end
-            endcase
-            
-            next_vector_start += BASILISK_COMPUTE_WIDTH;
-            if (next_vector_start > BASILISK_VECTOR_WIDTH) begin
-                consume = 'b1;
-                next_vector_start = 'b0;
-            end
-        end
-        RV32V_FUNCT3_OP_IVI: begin // Integer Vector-Immediate (Slideup/Slidedown)
-            case (rv32v_funct6_t'(inst_fields.funct6))
-            RV32V_FUNCT6_VSLIDEUP, RV32V_FUNCT6_VSLIDEDOWN: begin
-                produce_add = {BASILISK_COMPUTE_WIDTH{1'b1}};
+                RV32V_FUNCT6_VFMACC: begin
+                    produce_mult = {BASILISK_COMPUTE_WIDTH{1'b1}};
+                end
+                RV32V_FUNCT6_VFNMACC: begin
+                    produce_mult = {BASILISK_COMPUTE_WIDTH{1'b1}};
+                    for (int i = 0; i < BASILISK_COMPUTE_WIDTH; i++) begin
+                        rs1_fields_vector[i].sign = ~rs1_fields_vector[i].sign;
+                        rs3_fields_vector[i].sign = ~rs3_fields_vector[i].sign;
+                    end
+                end
+                RV32V_FUNCT6_VFMSAC: begin
+                    produce_mult = {BASILISK_COMPUTE_WIDTH{1'b1}};
+                    for (int i = 0; i < BASILISK_COMPUTE_WIDTH; i++) begin
+                        rs3_fields_vector[i].sign = ~rs3_fields_vector[i].sign;
+                    end
+                end
+                RV32V_FUNCT6_VFNMSAC: begin
+                    produce_mult = {BASILISK_COMPUTE_WIDTH{1'b1}};
+                    for (int i = 0; i < BASILISK_COMPUTE_WIDTH; i++) begin
+                        rs1_fields_vector[i].sign = ~rs1_fields_vector[i].sign;
+                    end
+                end
+                endcase
+                
                 next_vector_start += BASILISK_COMPUTE_WIDTH;
-                if (next_vector_start > BASILISK_VECTOR_WIDTH) begin
+                if (next_vector_start >= BASILISK_VECTOR_WIDTH) begin
                     consume = 'b1;
                     next_vector_start = 'b0;
                 end
+            end
+            RV32V_FUNCT3_OP_FVF: begin // Floating Point Vector-Scalar
+                case (rv32v_funct6_t'(inst_fields.funct6))
+                RV32V_FUNCT6_VFADD: begin
+                    produce_add = {BASILISK_COMPUTE_WIDTH{1'b1}};
+                end
+                RV32V_FUNCT6_VFSUB: begin
+                    for (int i = 0; i < BASILISK_COMPUTE_WIDTH; i++) begin
+                        rs2_fields_vector[i].sign = ~rs2_fields_vector[i].sign;
+                    end
+                    produce_add = {BASILISK_COMPUTE_WIDTH{1'b1}};
+                end
+                RV32V_FUNCT6_VFDIV: begin
+                    produce_divide = {BASILISK_COMPUTE_WIDTH{1'b1}};
+                end
+                RV32V_FUNCT6_VFSQRT: begin
+                    produce_sqrt = {BASILISK_COMPUTE_WIDTH{1'b1}};
+                end
+                RV32V_FUNCT6_VFRDIV: begin
+                    produce_divide = {BASILISK_COMPUTE_WIDTH{1'b1}};
+                end
+                RV32V_FUNCT6_VFMUL: begin
+                    produce_mult = {BASILISK_COMPUTE_WIDTH{1'b1}};
+                end
+                endcase
+                
+                next_vector_start += BASILISK_COMPUTE_WIDTH;
+                if (next_vector_start >= BASILISK_VECTOR_WIDTH) begin
+                    consume = 'b1;
+                    next_vector_start = 'b0;
+                end
+            end
+            RV32V_FUNCT3_OP_IVI: begin // Integer Vector-Immediate (Slideup/Slidedown)
+                case (rv32v_funct6_t'(inst_fields.funct6))
+                RV32V_FUNCT6_VSLIDEUP, RV32V_FUNCT6_VSLIDEDOWN: begin
+                    produce_add = {BASILISK_COMPUTE_WIDTH{1'b1}};
+                    next_vector_start += BASILISK_COMPUTE_WIDTH;
+                    if (next_vector_start >= BASILISK_VECTOR_WIDTH) begin
+                        consume = 'b1;
+                        next_vector_start = 'b0;
+                    end
+                end
+                endcase
             end
             endcase
         end
@@ -733,38 +851,59 @@ module basilisk_decode
             end
         // Change status registers
         end else if (float_command.payload.enable_status_op) begin
-            // Only allow status updates when the register file is all valid
-            if (reg_file_clear) begin
-                consume = 'b1;
-                produce_encode = (float_command.payload.dest_reg_addr != 'b0); // Don't produce writeback to x0
-                produce_mult = 'b0;
-                produce_add = 'b0;
-                produce_sqrt = 'b0;
-                produce_divide = 'b0;
-                produce_convert = 'b0;
-                produce_memory = 'b0;
+            
+            consume = 'b1;
+            produce_encode = (float_command.payload.dest_reg_addr != 'b0); // Don't produce writeback to x0
+            produce_mult = 'b0;
+            produce_add = 'b0;
+            produce_sqrt = 'b0;
+            produce_divide = 'b0;
+            produce_convert = 'b0;
+            produce_memory = 'b0;
 
-                // Have CSR operation return proper flags
-                case (rv32_funct12_t'(float_command.payload.sys_csr))
-                RV32F_CSR_FRM: begin
-                    rs1_fields_scalar = fpu_decode_float({29'b0, outgoing_round_mode});
-                    rs1_fields_vector[0] = fpu_decode_float({29'b0, outgoing_round_mode});
-                    if (sys_write) begin
-                        next_round_mode = incoming_round_mode;
+            // Have CSR operation return proper flags
+            case (rv32_funct12_t'(float_command.payload.sys_csr))
+            RV32F_CSR_FRM: begin
+                rs1_fields_scalar = fpu_decode_float({29'b0, outgoing_round_mode});
+                rs1_fields_vector[0] = fpu_decode_float({29'b0, outgoing_round_mode});
+                if (sys_write) begin
+                    next_round_mode = incoming_round_mode;
+                end
+            end
+            RV32V_CSR_VL: begin
+                rs1_fields_scalar = fpu_decode_float(current_vector_length);
+                rs1_fields_vector[0] = fpu_decode_float(current_vector_length);
+                if (sys_write) begin
+                    next_vector_length = sys_value;
+                end
+            end
+            default: begin
+                rs1_fields_scalar = fpu_decode_float({32'b0});
+                rs1_fields_vector[0] = fpu_decode_float({32'b0});
+            end
+            endcase
+        end else begin
+            // Stall for register availability
+            if (basilisk_decode_depend_registers(inst_fields, 
+                    rd_vector_status, 
+                    rs1_vector_status, 
+                    rs2_vector_status, 
+                    rs3_vector_status) || 
+                    current_vector_progress) begin
+                if (basilisk_decode_depend_rd(inst_fields)) begin
+                    if (enable_vector) begin
+                        if (current_vector_start == 0) begin
+                            next_vector_progress = 'b1;
+                            rd_front_status_write_enable = '{BASILISK_VECTOR_WIDTH{'b1}};
+                        end
+
+                        if (current_vector_start >= BASILISK_VECTOR_WIDTH - BASILISK_COMPUTE_WIDTH) begin
+                            next_vector_progress = 'b0;
+                        end
+                    end else begin
+                        rd_front_status_write_enable[0] = 'b1;
                     end
                 end
-                RV32V_CSR_VL: begin
-                    rs1_fields_scalar = fpu_decode_float(current_vector_length);
-                    rs1_fields_vector[0] = fpu_decode_float(current_vector_length);
-                    if (sys_write) begin
-                        next_vector_length = sys_value;
-                    end
-                end
-                default: begin
-                    rs1_fields_scalar = fpu_decode_float({32'b0});
-                    rs1_fields_vector[0] = fpu_decode_float({32'b0});
-                end
-                endcase
             end else begin
                 consume = 'b0;
                 produce_encode = 'b0;
@@ -774,21 +913,9 @@ module basilisk_decode
                 produce_divide = 'b0;
                 produce_convert = 'b0;
                 produce_memory = 'b0;
+                next_vector_start = current_vector_start;
+                next_vector_progress = current_vector_progress;
             end
-        // Stall for register availability
-        end else if (!basilisk_decode_depend_registers(inst_fields, current_reg_status)) begin
-            consume = 'b0;
-            produce_encode = 'b0;
-            produce_mult = 'b0;
-            produce_add = 'b0;
-            produce_sqrt = 'b0;
-            produce_divide = 'b0;
-            produce_convert = 'b0;
-            produce_memory = 'b0;
-            next_vector_start = current_vector_start;
-        end else if (basilisk_decode_depend_rd(inst_fields)) begin
-            next_reg_status[inst_fields.rd] = BASILISK_DECODE_REG_STATUS_INVALID;
-            next_reg_status_count[inst_fields.rd] += 1;
         end
 
         next_encode_command.payload = '{
@@ -817,23 +944,18 @@ module basilisk_decode
         next_memory_command.payload = '{
             dest_reg_addr: inst_fields.rd,
             dest_offset_addr: 'b0,
-            a: {rs1_fields_vector[0].sign, rs1_fields_vector[0].exponent, rs1_fields_vector[0].mantissa},
+            a: {rs2_fields_vector[0].sign, rs2_fields_vector[0].exponent, rs2_fields_vector[0].mantissa},
             op: mem_op,
             mem_base_addr: float_command.payload.rs1_value,
             mem_offset_addr: immediate_value
         };
 
         for (int i = 0; i < BASILISK_COMPUTE_WIDTH; i++) begin
-            if (BASILISK_VECTOR_WIDTH == BASILISK_COMPUTE_WIDTH) begin
-                calc_vector_offset = 'b0;
+
+            if (enable_slideup) begin
+                calc_vector_offset = (BASILISK_VECTOR_WIDTH - BASILISK_COMPUTE_WIDTH - current_vector_start) / BASILISK_COMPUTE_WIDTH;
             end else begin
-                calc_vector_offset = current_vector_start[BASILISK_VECTOR_WIDTH-1:BASILISK_COMPUTE_WIDTH];
-            
-                if (i == 0 && enable_slideup) begin
-                    calc_vector_offset += 'b1;
-                end else if (i == (BASILISK_COMPUTE_WIDTH - 1) && enable_slidedown) begin
-                    calc_vector_offset -= 'b1;
-                end
+                calc_vector_offset = current_vector_start / BASILISK_COMPUTE_WIDTH;
             end
 
             next_mult_command_payload[i] = '{
@@ -880,6 +1002,8 @@ module basilisk_decode
 
         end
 
+        rd_write_enable = '{BASILISK_VECTOR_WIDTH{'b0}};
+
         // Handle writebacks
         for (int i = 0; i < BASILISK_COMPUTE_WIDTH; i++) begin
             writeback_result_ready[i] = (current_state == BASILISK_DECODE_STATE_NORMAL);
@@ -888,7 +1012,6 @@ module basilisk_decode
 
             // Set all addresses and data for that group
             for (int j = 0; j < (BASILISK_VECTOR_WIDTH/BASILISK_COMPUTE_WIDTH); j++) begin
-                rd_write_enable[(j * BASILISK_COMPUTE_WIDTH) + i] = 'b0;
                 if (current_state == BASILISK_DECODE_STATE_RESET) begin
                     rd_write_enable[(j * BASILISK_COMPUTE_WIDTH) + i] = 'b1;
                     rd_write_addr[(j * BASILISK_COMPUTE_WIDTH) + i] = current_reset_counter;
@@ -900,24 +1023,7 @@ module basilisk_decode
             end
 
             rd_write_enable[calc_vector_addr] = writeback_result_valid[i];
-
-            reg_status_writeback_enable = writeback_result_valid[i];
-            reg_status_writeback_addr = writeback_result_payload[i].dest_reg_addr;
         end
-
-        // // TODO: Allow vector file accesses
-        // rd_write_enable[0] = writeback_result_valid[0];
-        // rd_write_addr[0] = writeback_result_payload[0].dest_reg_addr;
-        // rd_write_value[0] = writeback_result_payload[0].result;
-
-        // reg_status_writeback_enable = rd_write_enable[0];
-        // reg_status_writeback_addr = rd_write_addr[0];
-
-        // if (current_state == BASILISK_DECODE_STATE_RESET) begin
-        //     rd_write_enable[0] = 'b1;
-        //     rd_write_addr[0] = current_reset_counter;
-        //     rd_write_value[0] = 'b0;
-        // end
     end
 
 endmodule
