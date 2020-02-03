@@ -1,33 +1,18 @@
-`ifndef __GECKO_DECODE_UTIL__
-`define __GECKO_DECODE_UTIL__
+//!import riscv/riscv_pkg
+//!import riscv/riscv32_pkg
+//!import riscv/riscv32i_pkg
+//!import riscv/riscv32f_pkg
+//!import riscv/riscv32v_pkg
+//!import gecko/gecko_pkg
 
-`ifdef __LINTER__
+package gecko_decode_util_pkg;
 
-`include "../isa/rv.svh"
-`include "../isa/rv32.svh"
-`include "../isa/rv32i.svh"
-`include "../isa/rv32f.svh"
-`include "../isa/rv32v.svh"
-`include "gecko.svh"
-
-`else
-
-`include "rv.svh"
-`include "rv32.svh"
-`include "rv32i.svh"
-`include "rv32f.svh"
-`include "rv32v.svh"
-`include "gecko.svh"
-
-`endif
-
-package gecko_decode_util;
-
-    import rv32::*;
-    import rv32i::*;
-    import rv32f::*;
-    import rv32v::*;
-    import gecko::*;
+    import riscv_pkg::*;
+    import riscv32_pkg::*;
+    import riscv32i_pkg::*;
+    import riscv32f_pkg::*;
+    import riscv32v_pkg::*;
+    import gecko_pkg::*;
 
     typedef gecko_reg_status_t gecko_decode_reg_file_status_t [32];
     typedef gecko_reg_status_t gecko_decode_reg_file_counter_t [32];
@@ -40,28 +25,28 @@ package gecko_decode_util;
         logic execute, system, float, error;
     } gecko_decode_opcode_status_t;
 
-    function automatic rv32_reg_addr_t update_execute_saved(
-            input rv32_fields_t instruction_fields,
-            input rv32_reg_addr_t current_execute_saved
+    function automatic riscv32_reg_addr_t update_execute_saved(
+            input riscv32_fields_t instruction_fields,
+            input riscv32_reg_addr_t current_execute_saved
     );
-        case (rv32i_opcode_t'(instruction_fields.opcode))
-        RV32I_OPCODE_OP, RV32I_OPCODE_IMM, 
-        RV32I_OPCODE_LUI, RV32I_OPCODE_AUIPC,
-        RV32I_OPCODE_JAL, RV32I_OPCODE_JALR: begin
+        case (riscv32i_opcode_t'(instruction_fields.opcode))
+        RISCV32I_OPCODE_OP, RISCV32I_OPCODE_IMM, 
+        RISCV32I_OPCODE_LUI, RISCV32I_OPCODE_AUIPC,
+        RISCV32I_OPCODE_JAL, RISCV32I_OPCODE_JALR: begin
             // Execute has new result
             return instruction_fields.rd;
         end
-        RV32I_OPCODE_LOAD: begin
+        RISCV32I_OPCODE_LOAD: begin
             // Execute result superceded
             if (current_execute_saved == instruction_fields.rd) begin
                 return 'b0;
             end
         end
-        RV32I_OPCODE_SYSTEM: begin
-            case (rv32i_funct3_sys_t'(instruction_fields.funct3))
-            RV32I_FUNCT3_SYS_CSRRW, RV32I_FUNCT3_SYS_CSRRS, 
-            RV32I_FUNCT3_SYS_CSRRC, RV32I_FUNCT3_SYS_CSRRWI, 
-            RV32I_FUNCT3_SYS_CSRRSI, RV32I_FUNCT3_SYS_CSRRCI: begin
+        RISCV32I_OPCODE_SYSTEM: begin
+            case (riscv32i_funct3_sys_t'(instruction_fields.funct3))
+            RISCV32I_FUNCT3_SYS_CSRRW, RISCV32I_FUNCT3_SYS_CSRRS, 
+            RISCV32I_FUNCT3_SYS_CSRRC, RISCV32I_FUNCT3_SYS_CSRRWI, 
+            RISCV32I_FUNCT3_SYS_CSRRSI, RISCV32I_FUNCT3_SYS_CSRRCI: begin
                 // Execute result superceded
                 if (current_execute_saved == instruction_fields.rd) begin
                     return 'b0;
@@ -70,10 +55,10 @@ package gecko_decode_util;
             endcase
         end
         endcase
-        case (rv32f_opcode_t'(instruction_fields.opcode))
-        RV32F_OPCODE_FP_OP_S: begin
-            case (rv32f_funct7_t'(instruction_fields.funct7))
-            RV32F_FUNCT7_FCVT_W_S, RV32F_FUNCT7_FMV_X_W, RV32F_FUNCT7_FCMP_S: begin
+        case (riscv32f_opcode_t'(instruction_fields.opcode))
+        RISCV32F_OPCODE_FP_OP_S: begin
+            case (riscv32f_funct7_t'(instruction_fields.funct7))
+            RISCV32F_FUNCT7_FCVT_W_S, RISCV32F_FUNCT7_FMV_X_W, RISCV32F_FUNCT7_FCMP_S: begin
                 // Execute result superceded
                 if (current_execute_saved == instruction_fields.rd) begin
                     return 'b0;
@@ -86,31 +71,31 @@ package gecko_decode_util;
     endfunction
 
     function automatic gecko_decode_opcode_status_t get_opcode_status(
-            input rv32_fields_t instruction_fields
+            input riscv32_fields_t instruction_fields
     );
         gecko_decode_opcode_status_t status = '{default: 'b0};
-        case (rv32i_opcode_t'(instruction_fields.opcode))
-        RV32I_OPCODE_OP, RV32I_OPCODE_IMM, RV32I_OPCODE_LUI, 
-        RV32I_OPCODE_AUIPC, RV32I_OPCODE_LOAD: begin
+        case (riscv32i_opcode_t'(instruction_fields.opcode))
+        RISCV32I_OPCODE_OP, RISCV32I_OPCODE_IMM, RISCV32I_OPCODE_LUI, 
+        RISCV32I_OPCODE_AUIPC, RISCV32I_OPCODE_LOAD: begin
             status.execute = (instruction_fields.rd != 'b0);
         end
-        RV32I_OPCODE_STORE, RV32I_OPCODE_JAL, 
-        RV32I_OPCODE_JALR, RV32I_OPCODE_BRANCH: begin
+        RISCV32I_OPCODE_STORE, RISCV32I_OPCODE_JAL, 
+        RISCV32I_OPCODE_JALR, RISCV32I_OPCODE_BRANCH: begin
             status.execute = 'b1;
         end
-        RV32I_OPCODE_SYSTEM: begin
-            case (rv32i_funct3_sys_t'(instruction_fields.funct3))
-            RV32I_FUNCT3_SYS_ENV: begin
+        RISCV32I_OPCODE_SYSTEM: begin
+            case (riscv32i_funct3_sys_t'(instruction_fields.funct3))
+            RISCV32I_FUNCT3_SYS_ENV: begin
             end
-            RV32I_FUNCT3_SYS_CSRRW, RV32I_FUNCT3_SYS_CSRRS, 
-            RV32I_FUNCT3_SYS_CSRRC, RV32I_FUNCT3_SYS_CSRRWI, 
-            RV32I_FUNCT3_SYS_CSRRSI, RV32I_FUNCT3_SYS_CSRRCI: begin
+            RISCV32I_FUNCT3_SYS_CSRRW, RISCV32I_FUNCT3_SYS_CSRRS, 
+            RISCV32I_FUNCT3_SYS_CSRRC, RISCV32I_FUNCT3_SYS_CSRRWI, 
+            RISCV32I_FUNCT3_SYS_CSRRSI, RISCV32I_FUNCT3_SYS_CSRRCI: begin
                 case (instruction_fields.funct12)
-                RV32I_CSR_CYCLE, RV32I_CSR_TIME, RV32I_CSR_INSTRET, 
-                RV32I_CSR_CYCLEH, RV32I_CSR_TIMEH, RV32I_CSR_INSTRETH: begin
+                RISCV32I_CSR_CYCLE, RISCV32I_CSR_TIME, RISCV32I_CSR_INSTRET, 
+                RISCV32I_CSR_CYCLEH, RISCV32I_CSR_TIMEH, RISCV32I_CSR_INSTRETH: begin
                     status.system = 'b1;
                 end
-                RV32F_CSR_FFLAGS, RV32F_CSR_FRM, RV32F_CSR_FCSR, RV32V_CSR_VL: begin
+                RISCV32F_CSR_FFLAGS, RISCV32F_CSR_FRM, RISCV32F_CSR_FCSR, RISCV32V_CSR_VL: begin
                     status.float = 'b1;
                 end
                 default: status.error = 'b1;
@@ -126,40 +111,40 @@ package gecko_decode_util;
         end
         endcase
 
-        case (rv32f_opcode_t'(instruction_fields.opcode))
-        RV32F_OPCODE_FLW, RV32F_OPCODE_FSW,
-        RV32F_OPCODE_FMADD_S, RV32F_OPCODE_FMSUB_S,
-        RV32F_OPCODE_FNMSUB_S, RV32F_OPCODE_FNMADD_S, RV32F_OPCODE_FP_OP_S: begin
+        case (riscv32f_opcode_t'(instruction_fields.opcode))
+        RISCV32F_OPCODE_FLW, RISCV32F_OPCODE_FSW,
+        RISCV32F_OPCODE_FMADD_S, RISCV32F_OPCODE_FMSUB_S,
+        RISCV32F_OPCODE_FNMSUB_S, RISCV32F_OPCODE_FNMADD_S, RISCV32F_OPCODE_FP_OP_S: begin
             status.float = 'b1;
             status.error = 'b0;
         end
         endcase
         
-        case (rv32v_opcode_t'(instruction_fields.opcode))
-        RV32V_OPCODE_OP: begin
-            case(rv32v_funct3_t'(instruction_fields.funct3))
-            RV32V_FUNCT3_OP_FVV: begin // Floating Point Vector-Vector
-                case (rv32v_funct6_t'(instruction_fields.funct6))
-                RV32V_FUNCT6_VFADD, RV32V_FUNCT6_VFSUB, RV32V_FUNCT6_VFDIV, 
-                RV32V_FUNCT6_VFSQRT, RV32V_FUNCT6_VFMUL, RV32V_FUNCT6_VFMACC,
-                RV32V_FUNCT6_VFNMACC, RV32V_FUNCT6_VFMSAC, RV32V_FUNCT6_VFNMSAC: begin
+        case (riscv32v_opcode_t'(instruction_fields.opcode))
+        RISCV32V_OPCODE_OP: begin
+            case(riscv32v_funct3_t'(instruction_fields.funct3))
+            RISCV32V_FUNCT3_OP_FVV: begin // Floating Point Vector-Vector
+                case (riscv32v_funct6_t'(instruction_fields.funct6))
+                RISCV32V_FUNCT6_VFADD, RISCV32V_FUNCT6_VFSUB, RISCV32V_FUNCT6_VFDIV, 
+                RISCV32V_FUNCT6_VFSQRT, RISCV32V_FUNCT6_VFMUL, RISCV32V_FUNCT6_VFMACC,
+                RISCV32V_FUNCT6_VFNMACC, RISCV32V_FUNCT6_VFMSAC, RISCV32V_FUNCT6_VFNMSAC: begin
                     status.float = 'b1;
                     status.error = 'b0;
                 end
                 endcase
             end
-            RV32V_FUNCT3_OP_FVF: begin // Floating Point Vector-Scalar
-                case (rv32v_funct6_t'(instruction_fields.funct6))
-                RV32V_FUNCT6_VFADD, RV32V_FUNCT6_VFSUB, RV32V_FUNCT6_VFDIV,
-                RV32V_FUNCT6_VFSQRT, RV32V_FUNCT6_VFRDIV, RV32V_FUNCT6_VFMUL: begin
+            RISCV32V_FUNCT3_OP_FVF: begin // Floating Point Vector-Scalar
+                case (riscv32v_funct6_t'(instruction_fields.funct6))
+                RISCV32V_FUNCT6_VFADD, RISCV32V_FUNCT6_VFSUB, RISCV32V_FUNCT6_VFDIV,
+                RISCV32V_FUNCT6_VFSQRT, RISCV32V_FUNCT6_VFRDIV, RISCV32V_FUNCT6_VFMUL: begin
                     status.float = 'b1;
                     status.error = 'b0;
                 end
                 endcase
             end
-            RV32V_FUNCT3_OP_IVI: begin // Integer Vector-Immediate (Slideup/Slidedown)
-                case (rv32v_funct6_t'(instruction_fields.funct6))
-                RV32V_FUNCT6_VSLIDEUP, RV32V_FUNCT6_VSLIDEDOWN: begin
+            RISCV32V_FUNCT3_OP_IVI: begin // Integer Vector-Immediate (Slideup/Slidedown)
+                case (riscv32v_funct6_t'(instruction_fields.funct6))
+                RISCV32V_FUNCT6_VSLIDEUP, RISCV32V_FUNCT6_VSLIDEDOWN: begin
                     status.float = 'b1;
                     status.error = 'b0;
                 end
@@ -173,28 +158,28 @@ package gecko_decode_util;
     endfunction
 
     function automatic logic is_opcode_control_flow(
-            input rv32_fields_t instruction_fields
+            input riscv32_fields_t instruction_fields
     );
-        case (rv32i_opcode_t'(instruction_fields.opcode))
-        RV32I_OPCODE_JAL, RV32I_OPCODE_JALR, 
-        RV32I_OPCODE_BRANCH: return 'b1;
+        case (riscv32i_opcode_t'(instruction_fields.opcode))
+        RISCV32I_OPCODE_JAL, RISCV32I_OPCODE_JALR, 
+        RISCV32I_OPCODE_BRANCH: return 'b1;
         default: return 'b0;
         endcase
     endfunction
 
     function automatic logic is_opcode_side_effects(
-            input rv32_fields_t instruction_fields
+            input riscv32_fields_t instruction_fields
     );
-        case (rv32i_opcode_t'(instruction_fields.opcode))
-        RV32I_OPCODE_OP, RV32I_OPCODE_IMM, 
-        RV32I_OPCODE_LUI, RV32I_OPCODE_AUIPC: return 'b0;
+        case (riscv32i_opcode_t'(instruction_fields.opcode))
+        RISCV32I_OPCODE_OP, RISCV32I_OPCODE_IMM, 
+        RISCV32I_OPCODE_LUI, RISCV32I_OPCODE_AUIPC: return 'b0;
         default: return 'b1;
         endcase
     endfunction
 
     function automatic logic is_register_readable(
-            input rv32_reg_addr_t reg_addr,
-            input rv32_reg_addr_t execute_saved_reg,
+            input riscv32_reg_addr_t reg_addr,
+            input riscv32_reg_addr_t execute_saved_reg,
             input gecko_reg_status_t reg_status
     );
         return (reg_addr == execute_saved_reg || reg_status == GECKO_REG_STATUS_VALID);
@@ -207,55 +192,55 @@ package gecko_decode_util;
     endfunction
 
     function automatic gecko_decode_operands_status_t gecko_decode_find_operand_status(
-            input rv32_fields_t instruction_fields,
-            input rv32_reg_addr_t ex_saved,
+            input riscv32_fields_t instruction_fields,
+            input riscv32_reg_addr_t ex_saved,
             input gecko_reg_status_t rd_status, rs1_status, rs2_status
             // input gecko_decode_reg_file_status_t rf_status
     );
-        rv32_reg_addr_t rd, rs1, rs2;
+        riscv32_reg_addr_t rd, rs1, rs2;
         rd = instruction_fields.rd;
         rs1 = instruction_fields.rs1;
         rs2 = instruction_fields.rs2;
 
-        case (rv32i_opcode_t'(instruction_fields.opcode))
-        RV32I_OPCODE_OP: begin // rd, rs1, rs2
+        case (riscv32i_opcode_t'(instruction_fields.opcode))
+        RISCV32I_OPCODE_OP: begin // rd, rs1, rs2
             return '{
                 rs1_valid: is_register_readable(rs1, ex_saved, rs1_status), 
                 rs2_valid: is_register_readable(rs2, ex_saved, rs2_status),
                 rd_valid: is_register_writeable(rd_status)
             };
         end
-        RV32I_OPCODE_IMM: begin // rd, rs1
+        RISCV32I_OPCODE_IMM: begin // rd, rs1
             return '{
                 rs1_valid: is_register_readable(rs1, ex_saved, rs1_status), 
                 rs2_valid: 'b1,
                 rd_valid: is_register_writeable(rd_status)
             };
         end
-        RV32I_OPCODE_LOAD, RV32I_OPCODE_JALR: begin // rd, rs1
+        RISCV32I_OPCODE_LOAD, RISCV32I_OPCODE_JALR: begin // rd, rs1
             return '{
                 rs1_valid: is_register_readable(rs1, ex_saved, rs1_status), 
                 rs2_valid: 'b1,
                 rd_valid: is_register_writeable(rd_status)
             };
         end
-        RV32I_OPCODE_STORE, RV32I_OPCODE_BRANCH: begin // rs1, rs2
+        RISCV32I_OPCODE_STORE, RISCV32I_OPCODE_BRANCH: begin // rs1, rs2
             return '{
                 rs1_valid: is_register_readable(rs1, ex_saved, rs1_status), 
                 rs2_valid: is_register_readable(rs2, ex_saved, rs2_status),
                 rd_valid: 'b1
             };
         end
-        RV32I_OPCODE_LUI, RV32I_OPCODE_AUIPC, RV32I_OPCODE_JAL: begin // rd
+        RISCV32I_OPCODE_LUI, RISCV32I_OPCODE_AUIPC, RISCV32I_OPCODE_JAL: begin // rd
             return '{
                 rs1_valid: 'b1, 
                 rs2_valid: 'b1,
                 rd_valid: is_register_writeable(rd_status)
             };
         end
-        RV32I_OPCODE_SYSTEM: begin // rd, rs1
-            case (rv32i_funct3_sys_t'(instruction_fields.funct3))
-            RV32I_FUNCT3_SYS_ENV: begin // a0, a1 (not from execute)
+        RISCV32I_OPCODE_SYSTEM: begin // rd, rs1
+            case (riscv32i_funct3_sys_t'(instruction_fields.funct3))
+            RISCV32I_FUNCT3_SYS_ENV: begin // a0, a1 (not from execute)
                 return '{
                     rs1_valid: is_register_readable(rs1, 'b0, rs1_status), 
                     rs2_valid: is_register_readable(rs2, 'b0, rs2_status),
@@ -273,24 +258,24 @@ package gecko_decode_util;
         end
         endcase
 
-        case (rv32f_opcode_t'(instruction_fields.opcode))
-        RV32F_OPCODE_FLW, RV32F_OPCODE_FSW: begin
+        case (riscv32f_opcode_t'(instruction_fields.opcode))
+        RISCV32F_OPCODE_FLW, RISCV32F_OPCODE_FSW: begin
             return '{
                 rs1_valid: is_register_readable(rs1, 'b0, rs1_status), 
                 rs2_valid: 'b1,
                 rd_valid: 'b1
             };
         end
-        RV32F_OPCODE_FP_OP_S: begin
-            case (rv32f_funct7_t'(instruction_fields.funct7))
-            RV32F_FUNCT7_FCVT_W_S, RV32F_FUNCT7_FMV_X_W, RV32F_FUNCT7_FCMP_S: begin
+        RISCV32F_OPCODE_FP_OP_S: begin
+            case (riscv32f_funct7_t'(instruction_fields.funct7))
+            RISCV32F_FUNCT7_FCVT_W_S, RISCV32F_FUNCT7_FMV_X_W, RISCV32F_FUNCT7_FCMP_S: begin
                 return '{
                     rs1_valid: 'b1, 
                     rs2_valid: 'b1,
                     rd_valid: is_register_writeable(rd_status)
                 };
             end
-            RV32F_FUNCT7_FCVT_S_W, RV32F_FUNCT7_FMV_W_X: begin
+            RISCV32F_FUNCT7_FCVT_S_W, RISCV32F_FUNCT7_FMV_W_X: begin
                 return '{
                     rs1_valid: is_register_readable(rs1, 'b0, rs1_status), 
                     rs2_valid: 'b1,
@@ -305,10 +290,10 @@ package gecko_decode_util;
     endfunction
 
     function automatic gecko_execute_operation_t create_execute_op(
-            input rv32_fields_t instruction_fields,
-            input rv32_reg_addr_t execute_saved_reg,
-            input rv32_reg_value_t rs1_value, rs2_value,
-            input rv32_reg_value_t pc
+            input riscv32_fields_t instruction_fields,
+            input riscv32_reg_addr_t execute_saved_reg,
+            input riscv32_reg_value_t rs1_value, rs2_value,
+            input riscv32_reg_value_t pc
     );
         gecko_execute_operation_t execute_op;
         execute_op.speculative = 'b0;
@@ -329,26 +314,26 @@ package gecko_decode_util;
         execute_op.immediate_value = instruction_fields.imm;
         execute_op.jump_value = pc;
 
-        case (rv32i_opcode_t'(instruction_fields.opcode))
-        RV32I_OPCODE_OP: begin
+        case (riscv32i_opcode_t'(instruction_fields.opcode))
+        RISCV32I_OPCODE_OP: begin
             execute_op.op_type = GECKO_EXECUTE_TYPE_EXECUTE;
             execute_op.op = instruction_fields.funct3;
-            execute_op.alu_alternate = (instruction_fields.funct7 == RV32I_FUNCT7_ALT_INT) ? 
+            execute_op.alu_alternate = (instruction_fields.funct7 == RISCV32I_FUNCT7_ALT_INT) ? 
                     GECKO_ALTERNATE : GECKO_NORMAL;
         end
-        RV32I_OPCODE_IMM: begin
+        RISCV32I_OPCODE_IMM: begin
             execute_op.op_type = GECKO_EXECUTE_TYPE_EXECUTE;
             execute_op.op = instruction_fields.funct3;
             // Only allow alternate modes for the ALU
-            execute_op.alu_alternate = (instruction_fields.funct7 == RV32I_FUNCT7_ALT_INT && 
-                    instruction_fields.funct3 == RV32I_FUNCT3_IR_SRL_SRA) ? GECKO_ALTERNATE : GECKO_NORMAL;
+            execute_op.alu_alternate = (instruction_fields.funct7 == RISCV32I_FUNCT7_ALT_INT && 
+                    instruction_fields.funct3 == RISCV32I_FUNCT3_IR_SRL_SRA) ? GECKO_ALTERNATE : GECKO_NORMAL;
             
             execute_op.rs2_value = instruction_fields.imm;
             execute_op.reuse_rs2 = 'b0; // rs2 will be an immediate
         end
-        RV32I_OPCODE_LUI: begin
+        RISCV32I_OPCODE_LUI: begin
             execute_op.op_type = GECKO_EXECUTE_TYPE_EXECUTE;
-            execute_op.op = RV32I_FUNCT3_IR_ADD_SUB;
+            execute_op.op = RISCV32I_FUNCT3_IR_ADD_SUB;
             execute_op.alu_alternate = GECKO_NORMAL;
             
             execute_op.rs1_value = 'b0;
@@ -356,9 +341,9 @@ package gecko_decode_util;
             execute_op.reuse_rs1 = 'b0;
             execute_op.reuse_rs2 = 'b0;
         end
-        RV32I_OPCODE_AUIPC: begin
+        RISCV32I_OPCODE_AUIPC: begin
             execute_op.op_type = GECKO_EXECUTE_TYPE_EXECUTE;
-            execute_op.op = RV32I_FUNCT3_IR_ADD_SUB;
+            execute_op.op = RISCV32I_FUNCT3_IR_ADD_SUB;
             execute_op.alu_alternate = GECKO_NORMAL;
 
             execute_op.rs1_value = pc;
@@ -366,7 +351,7 @@ package gecko_decode_util;
             execute_op.reuse_rs1 = 'b0;
             execute_op.reuse_rs2 = 'b0;
         end
-        RV32I_OPCODE_LOAD: begin
+        RISCV32I_OPCODE_LOAD: begin
             execute_op.op_type = GECKO_EXECUTE_TYPE_LOAD;
             execute_op.op = instruction_fields.funct3;
             execute_op.alu_alternate = GECKO_NORMAL;
@@ -374,7 +359,7 @@ package gecko_decode_util;
             execute_op.rs2_value = instruction_fields.imm;
             execute_op.reuse_rs2 = 'b0; // rs2 will be an immediate
         end
-        RV32I_OPCODE_STORE: begin
+        RISCV32I_OPCODE_STORE: begin
             execute_op.op_type = GECKO_EXECUTE_TYPE_STORE;
             execute_op.op = instruction_fields.funct3;
             execute_op.alu_alternate = GECKO_NORMAL;
@@ -382,9 +367,9 @@ package gecko_decode_util;
             execute_op.rs2_value = instruction_fields.imm;
             execute_op.reuse_rs2 = 'b0; // rs2 will be an immediate
         end
-        RV32I_OPCODE_JAL: begin // Jump
+        RISCV32I_OPCODE_JAL: begin // Jump
             execute_op.op_type = GECKO_EXECUTE_TYPE_JUMP;
-            execute_op.op = RV32I_FUNCT3_IR_ADD_SUB;
+            execute_op.op = RISCV32I_FUNCT3_IR_ADD_SUB;
             execute_op.alu_alternate = GECKO_NORMAL;
 
             execute_op.rs1_value = pc;
@@ -392,9 +377,9 @@ package gecko_decode_util;
             execute_op.reuse_rs1 = 'b0;
             execute_op.reuse_rs2 = 'b0;
         end
-        RV32I_OPCODE_JALR: begin // Jump
+        RISCV32I_OPCODE_JALR: begin // Jump
             execute_op.op_type = GECKO_EXECUTE_TYPE_JUMP;
-            execute_op.op = RV32I_FUNCT3_IR_ADD_SUB;
+            execute_op.op = RISCV32I_FUNCT3_IR_ADD_SUB;
             execute_op.alu_alternate = GECKO_NORMAL;
             
             execute_op.jump_value = rs1_value;
@@ -406,14 +391,14 @@ package gecko_decode_util;
             execute_op.reuse_rs1 = 'b0;
             execute_op.reuse_rs2 = 'b0;
         end
-        RV32I_OPCODE_BRANCH: begin // Conditional Jump
+        RISCV32I_OPCODE_BRANCH: begin // Conditional Jump
             execute_op.op_type = GECKO_EXECUTE_TYPE_BRANCH;
             execute_op.op = instruction_fields.funct3;
             execute_op.alu_alternate = GECKO_NORMAL;
         end
         default: begin // Invalid instruction
             execute_op.op_type = GECKO_EXECUTE_TYPE_EXECUTE;
-            execute_op.op = RV32I_FUNCT3_IR_ADD_SUB;
+            execute_op.op = RISCV32I_FUNCT3_IR_ADD_SUB;
             execute_op.alu_alternate = GECKO_NORMAL;
 
             execute_op.reg_addr = 'b0; // Write to x0, do nothing
@@ -424,39 +409,39 @@ package gecko_decode_util;
     endfunction
 
     function automatic gecko_system_operation_t create_system_op(
-            input rv32_fields_t instruction_fields,
-            input rv32_reg_addr_t execute_saved_reg,
-            input rv32_reg_value_t rs1_value, rs2_value
+            input riscv32_fields_t instruction_fields,
+            input riscv32_reg_addr_t execute_saved_reg,
+            input riscv32_reg_value_t rs1_value, rs2_value
     );
         gecko_system_operation_t system_op;
 
         system_op.imm_value = {{27{instruction_fields.rs1[4]}}, instruction_fields.rs1};
         system_op.rs1_value = rs1_value;
         system_op.reg_addr = instruction_fields.rd;
-        system_op.sys_op = rv32i_funct3_sys_t'(instruction_fields.funct3);
+        system_op.sys_op = riscv32i_funct3_sys_t'(instruction_fields.funct3);
         system_op.csr = instruction_fields.funct12;
 
         return system_op;
     endfunction
 
     function automatic logic does_opcode_writeback (
-            input rv32_fields_t instruction_fields
+            input riscv32_fields_t instruction_fields
     );
-        case (rv32i_opcode_t'(instruction_fields.opcode))
-        RV32I_OPCODE_OP, RV32I_OPCODE_IMM,
-        RV32I_OPCODE_LOAD, RV32I_OPCODE_LUI,
-        RV32I_OPCODE_AUIPC, RV32I_OPCODE_JAL,
-        RV32I_OPCODE_JALR, RV32I_OPCODE_FENCE: begin
+        case (riscv32i_opcode_t'(instruction_fields.opcode))
+        RISCV32I_OPCODE_OP, RISCV32I_OPCODE_IMM,
+        RISCV32I_OPCODE_LOAD, RISCV32I_OPCODE_LUI,
+        RISCV32I_OPCODE_AUIPC, RISCV32I_OPCODE_JAL,
+        RISCV32I_OPCODE_JALR, RISCV32I_OPCODE_FENCE: begin
             return (instruction_fields.rd != 'b0);
         end
-        RV32I_OPCODE_STORE, RV32I_OPCODE_BRANCH: begin
+        RISCV32I_OPCODE_STORE, RISCV32I_OPCODE_BRANCH: begin
             return 'b0;
         end
-        RV32I_OPCODE_SYSTEM: begin
-            case (rv32i_funct3_sys_t'(instruction_fields.funct3))
-            RV32I_FUNCT3_SYS_CSRRW, RV32I_FUNCT3_SYS_CSRRS, 
-            RV32I_FUNCT3_SYS_CSRRC, RV32I_FUNCT3_SYS_CSRRWI, 
-            RV32I_FUNCT3_SYS_CSRRSI, RV32I_FUNCT3_SYS_CSRRCI: begin
+        RISCV32I_OPCODE_SYSTEM: begin
+            case (riscv32i_funct3_sys_t'(instruction_fields.funct3))
+            RISCV32I_FUNCT3_SYS_CSRRW, RISCV32I_FUNCT3_SYS_CSRRS, 
+            RISCV32I_FUNCT3_SYS_CSRRC, RISCV32I_FUNCT3_SYS_CSRRWI, 
+            RISCV32I_FUNCT3_SYS_CSRRSI, RISCV32I_FUNCT3_SYS_CSRRCI: begin
                 return (instruction_fields.rd != 'b0);
             end
             default: return 'b0;
@@ -464,18 +449,18 @@ package gecko_decode_util;
         end
         endcase
 
-        case (rv32f_opcode_t'(instruction_fields.opcode))
-        RV32F_OPCODE_FP_OP_S: begin
-            case (rv32f_funct7_t'(instruction_fields.funct7))
-            RV32F_FUNCT7_FCVT_W_S, RV32F_FUNCT7_FMV_X_W, RV32F_FUNCT7_FCMP_S: begin
+        case (riscv32f_opcode_t'(instruction_fields.opcode))
+        RISCV32F_OPCODE_FP_OP_S: begin
+            case (riscv32f_funct7_t'(instruction_fields.funct7))
+            RISCV32F_FUNCT7_FCVT_W_S, RISCV32F_FUNCT7_FMV_X_W, RISCV32F_FUNCT7_FCMP_S: begin
                 return (instruction_fields.rd != 'b0);
             end
             default: return 'b0;
             endcase
         end
-        RV32F_OPCODE_FLW, RV32F_OPCODE_FSW,
-        RV32F_OPCODE_FMADD_S, RV32F_OPCODE_FMSUB_S,
-        RV32F_OPCODE_FNMSUB_S, RV32F_OPCODE_FNMADD_S: begin
+        RISCV32F_OPCODE_FLW, RISCV32F_OPCODE_FSW,
+        RISCV32F_OPCODE_FMADD_S, RISCV32F_OPCODE_FMSUB_S,
+        RISCV32F_OPCODE_FNMSUB_S, RISCV32F_OPCODE_FNMADD_S: begin
             return 'b0;
         end
         endcase
@@ -484,5 +469,3 @@ package gecko_decode_util;
     endfunction
 
 endpackage
-
-`endif
