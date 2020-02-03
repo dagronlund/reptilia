@@ -1,26 +1,18 @@
+//!import axi/axi4_lite_pkg
+
 `timescale 1ns/1ps
 
-`ifdef __LINTER__
-
-`include "../../lib/axi/axi4_lite.svh"
-
-`else 
-
-`include "axi4_lite.svh"
-
-`endif
-
 interface axi4_lite_ar_intf 
-    import axi4_lite::*;
+    import axi4_lite_pkg::*;
 #(
-    parameter ADDR_WIDTH = 32
+    parameter int ADDR_WIDTH = 32
 )(
-    input logic clk = 'b0, rst = 'b0
+    input wire clk = 'b0, rst = 'b0
 );
 
     logic                  arvalid, arready;
     logic [ADDR_WIDTH-1:0] araddr;
-    axi4_lite_prot_t    arprot;
+    axi4_lite_prot_t       arprot;
 
     modport out(
         output arvalid, 
@@ -67,17 +59,17 @@ interface axi4_lite_ar_intf
 
 endinterface
 
-interface axi4_lite_aw_intf 
-    import axi4_lite::*;
+interface axi4_lite_aw_intf
+    import axi4_lite_pkg::*;
 #(
-    parameter ADDR_WIDTH = 32
+    parameter int ADDR_WIDTH = 32
 )(
-    input logic clk = 'b0, rst = 'b0
+    input wire clk = 'b0, rst = 'b0
 );
 
     logic                  awvalid, awready;
     logic [ADDR_WIDTH-1:0] awaddr;
-    axi4_lite_prot_t    awprot;
+    axi4_lite_prot_t       awprot;
 
     modport out(
         output awvalid,
@@ -124,14 +116,14 @@ interface axi4_lite_aw_intf
 
 endinterface
 
-interface axi4_lite_b_intf 
-    import axi4_lite::*;
+interface axi4_lite_b_intf
+    import axi4_lite_pkg::*;
 #()(
-    input logic clk = 'b0, rst = 'b0
+    input wire clk = 'b0, rst = 'b0
 );    
 
     logic               bvalid, bready;
-    axi4_lite_resp_t bresp;
+    axi4_lite_resp_t    bresp;
 
     modport out(
         output bvalid,
@@ -174,17 +166,17 @@ interface axi4_lite_b_intf
 
 endinterface
 
-interface axi4_lite_r_intf 
-    import axi4_lite::*;
+interface axi4_lite_r_intf
+    import axi4_lite_pkg::*;
 #(
-    parameter DATA_WIDTH = 32
+    parameter int DATA_WIDTH = 32
 )(
-    input logic clk = 'b0, rst = 'b0
+    input wire clk = 'b0, rst = 'b0
 );
 
     logic                  rvalid, rready;
     logic [DATA_WIDTH-1:0] rdata;
-    axi4_lite_resp_t    rresp;
+    axi4_lite_resp_t       rresp;
 
     modport out(
         output rvalid,
@@ -231,13 +223,13 @@ interface axi4_lite_r_intf
 
 endinterface
 
-interface axi4_lite_w_intf 
-    import axi4_lite::*;
+interface axi4_lite_w_intf
+    import axi4_lite_pkg::*;
 #(
-    parameter DATA_WIDTH = 32,
-    parameter STROBE_WIDTH = DATA_WIDTH / 8
+    parameter int DATA_WIDTH = 32,
+    parameter int STROBE_WIDTH = DATA_WIDTH / 8
 )(
-    input logic clk = 'b0, rst = 'b0
+    input wire clk = 'b0, rst = 'b0
 );
 
     logic                    wvalid, wready;

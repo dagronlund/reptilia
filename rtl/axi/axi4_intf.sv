@@ -1,17 +1,9 @@
+//!import axi/axi4_pkg
+
 `timescale 1ns/1ps
 
-`ifdef __LINTER__
-
-`include "../../lib/axi/axi4.svh"
-
-`else 
-
-`include "axi4.svh"
-
-`endif
-
-interface axi4_ar_intf 
-    import axi4::*;
+interface axi4_ar_intf
+    import axi4_pkg::*;
 #(
     parameter ADDR_WIDTH = 32,
     parameter USER_WIDTH = 1,
@@ -110,7 +102,7 @@ interface axi4_ar_intf
 endinterface
 
 interface axi4_aw_intf 
-    import axi4::*;
+    import axi4_pkg::*;
 #(
     parameter ADDR_WIDTH = 32,
     parameter USER_WIDTH = 1,
@@ -209,7 +201,7 @@ interface axi4_aw_intf
 endinterface
 
 interface axi4_b_intf 
-    import axi4::*;
+    import axi4_pkg::*;
 #(
     parameter ID_WIDTH = 1
 )(
@@ -266,7 +258,7 @@ interface axi4_b_intf
 endinterface
 
 interface axi4_r_intf 
-    import axi4::*;
+    import axi4_pkg::*;
 #(
     parameter DATA_WIDTH = 32,
     parameter ID_WIDTH = 1
@@ -334,7 +326,7 @@ interface axi4_r_intf
 endinterface
 
 interface axi4_w_intf 
-    import axi4::*;
+    import axi4_pkg::*;
 #(
     parameter DATA_WIDTH = 32,
     parameter STROBE_WIDTH = DATA_WIDTH / 8
