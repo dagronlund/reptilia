@@ -1,10 +1,10 @@
-`timescale 1ns/1ps
-
 //!import std/std_pkg
+
+`timescale 1ns/1ps
 
 // I hope you hate how verbose this is just as much as I do
 module std_register 
-    import std_pkg.*;
+    import std_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter type T = logic,

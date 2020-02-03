@@ -1,10 +1,10 @@
-`timescale 1ns/1ps
-
 //!import std/std_pkg
 //!import std/std_register
 
+`timescale 1ns/1ps
+
 module std_counter 
-    import std_pkg.*;
+    import std_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter int WIDTH = 8,
