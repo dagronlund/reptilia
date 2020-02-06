@@ -124,5 +124,6 @@ module std_register
             end
         end
     end
+    endgenerate
 
 endmodule
