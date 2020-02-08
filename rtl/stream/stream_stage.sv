@@ -78,23 +78,6 @@ module stream_stage
             .value(stream_out.payload)
         );
 
-        // // Synchronously connect valid
-        // always_ff @(posedge clk) begin
-        //     if(rst) begin
-        //         stream_out.valid <= 'b0;
-        //     end else 
-
-        //     if (stream_in.valid && stream_in.ready) begin
-        //         stream_out.valid <= 'b1;
-        //     end else if (stream_out.ready) begin
-        //         stream_out.valid <= 'b0;
-        //     end
-
-        //     // if (stream_in.valid && stream_in.ready) begin
-        //     //     stream_out.payload <= stream_in.payload;
-        //     // end
-        // end
-
         // Combinationally connect ready
         always_comb begin
             stream_in.ready = stream_out.ready || !stream_out.valid;
@@ -181,39 +164,6 @@ module stream_stage
             .value(buffer1)
         );
 
-        // // Synchronously update the buffers
-        // always_ff @(posedge clk) begin
-        //     if (rst) begin
-        //         input_index <= 'b0;
-        //         output_index <= 'b0;
-        //     end else begin
-        //         if (stream_in.valid && stream_in.ready) begin
-        //             if (input_index) begin
-        //                 valid_buffer1 <= 'b1;
-        //             end else begin
-        //                 valid_buffer0 <= 'b1;
-        //             end
-        //             // input_index <= !input_index;
-        //         end
-        //         if (stream_out.valid && stream_out.ready) begin
-        //             if (output_index) begin
-        //                 valid_buffer1 <= 'b0;
-        //             end else begin
-        //                 valid_buffer0 <= 'b0;
-        //             end
-        //             // output_index <= !output_index;
-        //         end
-        //     end
-
-        //     // if (stream_in.valid && stream_in.ready) begin
-        //     //     if (input_index) begin
-        //     //         payload_buffer1 <= stream_in.payload;
-        //     //     end else begin
-        //     //         payload_buffer0 <= stream_in.payload;
-        //     //     end
-        //     // end
-        // end
-
         // Connect valid and ready through buffers
         always_comb begin
             stream_out.valid = output_index ? (valid1) : (valid0);
@@ -263,23 +213,6 @@ module stream_stage
             .next(stream_in.payload),
             .value(payload_buffer)
         );
-
-        // // Synchronously connect ready
-        // always_ff @(posedge clk) begin
-        //     if(rst) begin
-        //         stream_in.ready <= 'b1;
-        //     end else 
-
-        //     if (stream_in.valid && stream_in.ready && !stream_out.ready) begin
-        //         stream_in.ready <= 'b0;
-        //     end else if (stream_out.ready) begin
-        //         stream_in.ready <= 'b1;
-        //     end
-
-        //     // if (stream_in.valid && stream_in.ready && !stream_out.ready) begin
-        //     //     payload_buffer <= stream_in.payload;
-        //     // end
-        // end
 
         // Combinationally connect valid
         always_comb begin
