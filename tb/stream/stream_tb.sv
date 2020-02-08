@@ -81,37 +81,29 @@ module stream_tb
 
         fork
         // Send incrementing numbers
-        begin
-            for (int i = 0; i < NUM_TRIALS; i++) begin
-                stream_transparent_in.payload <= i;
+        for (int i = 0; i < NUM_TRIALS; i++) begin
+            stream_transparent_in.payload <= i;
+            @ (posedge clk);
+            while (!(stream_transparent_in.valid && stream_transparent_in.ready))
                 @ (posedge clk);
-                while (!(stream_transparent_in.valid && stream_transparent_in.ready))
-                    @ (posedge clk);
-            end
         end
-        begin
-            for (int i = 0; i < NUM_TRIALS; i++) begin
-                stream_registered_in.payload <= i;
+        for (int i = 0; i < NUM_TRIALS; i++) begin
+            stream_registered_in.payload <= i;
+            @ (posedge clk);
+            while (!(stream_registered_in.valid && stream_registered_in.ready))
                 @ (posedge clk);
-                while (!(stream_registered_in.valid && stream_registered_in.ready))
-                    @ (posedge clk);
-            end
         end
-        begin
-            for (int i = 0; i < NUM_TRIALS; i++) begin
-                stream_buffered_in.payload <= i;
+        for (int i = 0; i < NUM_TRIALS; i++) begin
+            stream_buffered_in.payload <= i;
+            @ (posedge clk);
+            while (!(stream_buffered_in.valid && stream_buffered_in.ready))
                 @ (posedge clk);
-                while (!(stream_buffered_in.valid && stream_buffered_in.ready))
-                    @ (posedge clk);
-            end
         end
-        begin
-            for (int i = 0; i < NUM_TRIALS; i++) begin
-                stream_elastic_in.payload <= i;
+        for (int i = 0; i < NUM_TRIALS; i++) begin
+            stream_elastic_in.payload <= i;
+            @ (posedge clk);
+            while (!(stream_elastic_in.valid && stream_elastic_in.ready))
                 @ (posedge clk);
-                while (!(stream_elastic_in.valid && stream_elastic_in.ready))
-                    @ (posedge clk);
-            end
         end
 
         // Recieve and check incrementing numbers
@@ -122,8 +114,7 @@ module stream_tb
                 while (!(stream_transparent_out.valid && stream_transparent_out.ready))
                     @ (posedge clk);
                 if (i != stream_transparent_out.payload) begin
-                    $display("Stream test failed! %d != %d", i, stream_transparent_out.payload);
-                    $finish();
+                    $fatal("Stream test failed! %d != %d", i, stream_transparent_out.payload);
                 end
             end
             for (int i = 0; i < NUM_TRIALS; i++) begin
@@ -131,8 +122,7 @@ module stream_tb
                 while (!(stream_registered_out.valid && stream_registered_out.ready))
                     @ (posedge clk);
                 if (i != stream_registered_out.payload) begin
-                    $display("Stream test failed! %d != %d", i, stream_registered_out.payload);
-                    $finish();
+                    $fatal("Stream test failed! %d != %d", i, stream_registered_out.payload);
                 end
             end
             for (int i = 0; i < NUM_TRIALS; i++) begin
@@ -140,8 +130,7 @@ module stream_tb
                 while (!(stream_buffered_out.valid && stream_buffered_out.ready))
                     @ (posedge clk);
                 if (i != stream_buffered_out.payload) begin
-                    $display("Stream test failed! %d != %d", i, stream_buffered_out.payload);
-                    $finish();
+                    $fatal("Stream test failed! %d != %d", i, stream_buffered_out.payload);
                 end
             end
             for (int i = 0; i < NUM_TRIALS; i++) begin
@@ -149,8 +138,7 @@ module stream_tb
                 while (!(stream_elastic_out.valid && stream_elastic_out.ready))
                     @ (posedge clk);
                 if (i != stream_elastic_out.payload) begin
-                    $display("Stream test failed! %d != %d", i, stream_elastic_out.payload);
-                    $finish();
+                    $fatal("Stream test failed! %d != %d", i, stream_elastic_out.payload);
                 end
             end
             join
@@ -160,18 +148,16 @@ module stream_tb
         end
 
         // Randomly set external valid and ready
-        begin
-            while ('b1) begin
-                @ (posedge clk);
-                stream_transparent_in.valid <= $urandom();
-                stream_transparent_out.ready <= $urandom();
-                stream_registered_in.valid <= $urandom();
-                stream_registered_out.ready <= $urandom();
-                stream_buffered_in.valid <= $urandom();
-                stream_buffered_out.ready <= $urandom();
-                stream_elastic_in.valid <= $urandom();
-                stream_elastic_out.ready <= $urandom();
-            end
+        while ('b1) begin
+            @ (posedge clk);
+            stream_transparent_in.valid <= $urandom();
+            stream_transparent_out.ready <= $urandom();
+            stream_registered_in.valid <= $urandom();
+            stream_registered_out.ready <= $urandom();
+            stream_buffered_in.valid <= $urandom();
+            stream_buffered_out.ready <= $urandom();
+            stream_elastic_in.valid <= $urandom();
+            stream_elastic_out.ready <= $urandom();
         end
         join
 

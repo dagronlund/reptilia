@@ -23,16 +23,16 @@ module stream_split
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
-    // parameter stream_select_mode_t STREAM_SELECT_MODE = STREAM_SELECT_MODE_ROUND_ROBIN,
+    parameter stream_select_mode_t STREAM_SELECT_MODE = STREAM_SELECT_MODE_ROUND_ROBIN, // Unused
     parameter int PORTS = 2,
     parameter int ID_WIDTH = $clog2(PORTS)
 )(
     input wire clk, rst,
 
-    std_stream_intf.in          stream_in,
+    stream_intf.in          stream_in,
     input wire [ID_WIDTH-1:0]   stream_in_id,
 
-    std_stream_intf.out         stream_out [PORTS],
+    stream_intf.out         stream_out [PORTS],
     output logic [ID_WIDTH-1:0] stream_out_id [PORTS]
 );
 
@@ -53,7 +53,7 @@ module stream_split
 
         `PROCEDURAL_ASSERT(PAYLOAD_WIDTH == $bits(stream_out[k].payload))
 
-        std_stream_intf #(.T(payload_t)) stream_out_next (.clk, .rst);
+        stream_intf #(.T(payload_t)) stream_out_next (.clk, .rst);
 
         always_comb begin
             stream_out_next.valid = stream_out_valid[k];
@@ -62,8 +62,9 @@ module stream_split
         end
 
         stream_stage #(
-            .T(payload_t),
-            .MODE(PIPELINE_MODE)
+            .CLOCK_INFO(CLOCK_INFO),
+            .PIPELINE_MODE(PIPELINE_MODE),
+            .T(payload_t)
         ) stream_stage_inst (
             .clk, .rst,
 
@@ -100,7 +101,7 @@ module stream_split
         produce[stream_in_id] = 'b1;
 
         for (i = 0; i < PORTS; i++) begin
-            stream_out_id = i;
+            stream_out_id[i] = i;
         end
     end
 

@@ -40,10 +40,10 @@ module stream_merge
 )(
     input wire clk, rst,
 
-    std_stream_intf.in          stream_in [PORTS],
-    input wire [ID_WIDTH-1:0]   stream_in_id,
+    stream_intf.in              stream_in [PORTS],
+    input wire [ID_WIDTH-1:0]   stream_in_id [PORTS],
 
-    std_stream_intf.out         stream_out,
+    stream_intf.out             stream_out,
     output logic [ID_WIDTH-1:0] stream_out_id
 );
 
@@ -114,10 +114,11 @@ module stream_merge
     index_t stream_out_id_next;
     index_t current_priority, next_priority;
 
-    std_flow_stage #(
-        .T(payload_id_t),
-        .MODE(PIPELINE_MODE)
-    ) std_flow_output_inst (
+    stream_stage #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .PIPELINE_MODE(PIPELINE_MODE),
+        .T(payload_id_t)
+    ) stream_stage_inst (
         .clk, .rst,
 
         .stream_in(stream_out_next),
