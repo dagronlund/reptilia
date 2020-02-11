@@ -32,4 +32,11 @@ package std_pkg;
         end
     endfunction
 
+    typedef enum logic [1:0] {
+        STD_TECHNOLOGY_FPGA_XILINX = 'h0,
+        STD_TECHNOLOGY_FPGA_INTEL = 'h1,
+        STD_TECHNOLOGY_ASIC_TSMC = 'h2,
+        STD_TECHNOLOGY_ASIC_INTEL = 'h3
+    } std_technology_t;
+
 endpackage

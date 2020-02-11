@@ -31,7 +31,8 @@ module stream_stage
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
     parameter type T = logic
 )(
-    input logic clk, rst,
+    input wire clk, 
+    input wire rst,
 
     stream_intf.in stream_in,
     stream_intf.out stream_out

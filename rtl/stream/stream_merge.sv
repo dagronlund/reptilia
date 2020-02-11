@@ -38,7 +38,8 @@ module stream_merge
     parameter int PORTS = 2,
     parameter int ID_WIDTH = $clog2(PORTS)
 )(
-    input wire clk, rst,
+    input wire clk, 
+    input wire rst,
 
     stream_intf.in              stream_in [PORTS],
     input wire [ID_WIDTH-1:0]   stream_in_id [PORTS],

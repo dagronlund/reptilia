@@ -8,7 +8,8 @@ module stream_controller #(
     parameter int NUM_INPUTS = 1, 
     parameter int NUM_OUTPUTS = 1
 )(
-    input wire clk, rst,
+    input wire clk, 
+    input wire rst,
 
     input wire [NUM_INPUTS-1:0] valid_input,
     output logic [NUM_INPUTS-1:0] ready_input,

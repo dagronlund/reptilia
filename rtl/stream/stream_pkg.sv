@@ -12,4 +12,15 @@ package stream_pkg;
         STREAM_SELECT_MODE_ORDERED = 'h1
     } stream_select_mode_t;
 
+    typedef enum logic [1:0] {
+        STREAM_FIFO_MODE_COMBINATIONAL = 'h0,
+        STREAM_FIFO_MODE_SEQUENTIAL = 'h1,
+        STREAM_FIFO_MODE_SEQUENTIAL_BUFFERED = 'h2
+    } stream_fifo_mode_t;
+
+    typedef enum logic {
+        STREAM_FIFO_ADDRESS_MODE_POINTERS = 'h0,
+        STREAM_FIFO_ADDRESS_MODE_FLAGS = 'h1
+    } stream_fifo_address_mode_t;
+
 endpackage
