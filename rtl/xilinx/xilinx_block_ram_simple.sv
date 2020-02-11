@@ -1,17 +1,16 @@
-`timescale 1ns/1ps
-
 //!import std/std_pkg
 //!import std/std_register
+
+`timescale 1ns/1ps
 
 // TODO: Support mask usage
 // TODO: Support asymmetric widths
 module xilinx_block_ram_simple
-    import std_pkg.*;
+    import std_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter int DATA_WIDTH = 32,
     parameter int ADDR_WIDTH = 10,
-    parameter int MASK_WIDTH = DATA_WIDTH / 8,
     parameter int ENABLE_OUTPUT_REG = 0,
     parameter HEX_FILE = ""
 )(
@@ -44,33 +43,31 @@ module xilinx_block_ram_simple
     logic [DATA_WIDTH-1:0] read_data_temp;
 
     generate
-    genvar k;
-    for (k = 0; k < MASK_WIDTH; k++) begin
-        if (CLOCK_INFO.clock_edge == STD_CLOCK_EDGE_RISING) begin
 
-            always_ff @(posedge clk) begin
-                if (write_enable) begin
-                    data[write_addr][((k+1)*8)-1:(k*8)] <= write_data[((k+1)*8)-1:(k*8)];
-                end
+    if (CLOCK_INFO.clock_edge == STD_CLOCK_EDGE_RISING) begin
 
-                if (read_enable) begin
-                    read_data_temp[((k+1)*8)-1:(k*8)] <= data[read_addr][((k+1)*8)-1:(k*8)];
-                end
+        always_ff @(posedge clk) begin
+            if (write_enable) begin
+                data[write_addr] <= write_data;
             end
 
-        end else begin
-
-            always_ff @(negedge clk) begin
-                if (write_enable) begin
-                    data[write_addr][((k+1)*8)-1:(k*8)] <= write_data[((k+1)*8)-1:(k*8)];
-                end
-
-                if (read_enable) begin
-                    read_data_temp[((k+1)*8)-1:(k*8)] <= data[read_addr][((k+1)*8)-1:(k*8)];
-                end
+            if (read_enable) begin
+                read_data_temp <= data[read_addr];
             end
-
         end
+
+    end else begin
+
+        always_ff @(negedge clk) begin
+            if (write_enable) begin
+                data[write_addr] <= write_data;
+            end
+
+            if (read_enable) begin
+                read_data_temp <= data[read_addr];
+            end
+        end
+
     end
 
     if (ENABLE_OUTPUT_REG) begin

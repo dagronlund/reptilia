@@ -1,9 +1,9 @@
-`timescale 1ns/1ps
-
 //!import std/std_pkg
 
+`timescale 1ns/1ps
+
 module xilinx_distributed_ram
-    import std_pkg.*;
+    import std_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter int DATA_WIDTH = 1,

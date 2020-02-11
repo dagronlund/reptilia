@@ -1,11 +1,11 @@
-`timescale 1ns/1ps
-
 //!import std/std_pkg
 //!import std/std_register
 
+`timescale 1ns/1ps
+
 // TODO: Add asymmetric data widths
 module xilinx_block_ram_double 
-    import std_pkg.*;
+    import std_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter int DATA_WIDTH = 32,
