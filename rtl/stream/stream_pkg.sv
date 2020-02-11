@@ -14,8 +14,9 @@ package stream_pkg;
 
     typedef enum logic [1:0] {
         STREAM_FIFO_MODE_COMBINATIONAL = 'h0,
-        STREAM_FIFO_MODE_SEQUENTIAL = 'h1,
-        STREAM_FIFO_MODE_SEQUENTIAL_BUFFERED = 'h2
+        STREAM_FIFO_MODE_COMBINATIONAL_REGISTERED = 'h1,
+        STREAM_FIFO_MODE_SEQUENTIAL = 'h2,
+        STREAM_FIFO_MODE_SEQUENTIAL_REGISTERED = 'h3
     } stream_fifo_mode_t;
 
     typedef enum logic {

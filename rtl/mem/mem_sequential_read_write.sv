@@ -18,7 +18,6 @@ module mem_sequential_read_write
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
     parameter int MANUAL_ADDR_WIDTH = 0, // Set other than zero to override
-    parameter int ADDR_BYTE_SHIFTED = 0,
     parameter int ENABLE_OUTPUT_REG = 0,
     parameter HEX_FILE = ""
 )(
@@ -33,7 +32,6 @@ module mem_sequential_read_write
 
     `STATIC_MATCH_MEM(mem_read_in, mem_read_out)
     `STATIC_MATCH_MEM(mem_read_in, mem_write_in)
-    `STATIC_ASSERT((ADDR_BYTE_SHIFTED == 0) || ($bits(mem_read_in.data) > 8))
 
     localparam int DATA_WIDTH = $bits(mem_read_in.data);
     localparam int ID_WIDTH = $bits(mem_read_in.id);
@@ -46,6 +44,7 @@ module mem_sequential_read_write
 
     // Nothing can backflow the write channel so its always ready
     assign mem_write_in.ready = 'b1;
+    assign write_enable = mem_write_in.valid;
 
     generate
     if (TECHNOLOGY == STD_TECHNOLOGY_FPGA_XILINX) begin
