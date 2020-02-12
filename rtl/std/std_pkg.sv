@@ -32,6 +32,17 @@ package std_pkg;
         end
     endfunction
 
+    function automatic logic std_get_reset(
+            input std_clock_info_t clk_info,
+            input logic is_active
+    );
+        if (clk_info.reset_polarity == STD_RESET_POLARITY_HIGH) begin
+            return is_active;
+        end else begin
+            return !is_active;
+        end
+    endfunction
+
     typedef enum logic [1:0] {
         STD_TECHNOLOGY_FPGA_XILINX = 'h0,
         STD_TECHNOLOGY_FPGA_INTEL = 'h1,

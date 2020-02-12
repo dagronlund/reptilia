@@ -74,7 +74,7 @@ module stream_stage
             .T(T),
             .RESET_VECTOR('b0)
         ) payload_register_inst (
-            .clk, .rst,
+            .clk, .rst(std_get_reset(CLOCK_INFO, 0)),
             .enable(payload_enable),
             .next(stream_in.payload),
             .value(stream_out.payload)
@@ -149,7 +149,7 @@ module stream_stage
             .T(T),
             .RESET_VECTOR('b0)
         ) buffer0_register_inst (
-            .clk, .rst,
+            .clk, .rst(std_get_reset(CLOCK_INFO, 0)),
             .enable(buffer0_enable),
             .next(stream_in.payload),
             .value(buffer0)
@@ -160,7 +160,7 @@ module stream_stage
             .T(T),
             .RESET_VECTOR('b0)
         ) buffer1_register_inst (
-            .clk, .rst,
+            .clk, .rst(std_get_reset(CLOCK_INFO, 0)),
             .enable(buffer1_enable),
             .next(stream_in.payload),
             .value(buffer1)
@@ -210,7 +210,7 @@ module stream_stage
             .T(T),
             .RESET_VECTOR('b0)
         ) payload_register_inst (
-            .clk, .rst,
+            .clk, .rst(std_get_reset(CLOCK_INFO, 0)),
             .enable(payload_enable),
             .next(stream_in.payload),
             .value(payload_buffer)
