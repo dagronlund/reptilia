@@ -12,91 +12,91 @@ interface axi4_ar_intf
     input logic clk = 'b0, rst = 'b0
 );
 
-    logic                  arvalid, arready;
-    logic [ADDR_WIDTH-1:0] araddr;
-    axi4_burst_t           arburst;
-    axi4_cache_t           arcache;
-    axi4_len_t             arlen;
-    axi4_lock_t            arlock;
-    axi4_prot_t            arprot;
-    axi4_qos_t             arqos;
-    axi4_size_t            arsize;
-    logic [USER_WIDTH-1:0] aruser;
-    logic [ID_WIDTH-1:0]   arid;
+    logic                  valid, ready;
+    logic [ADDR_WIDTH-1:0] addr;
+    axi4_burst_t           burst;
+    axi4_cache_t           cache;
+    axi4_len_t             len;
+    axi4_lock_t            lock;
+    axi4_prot_t            prot;
+    axi4_qos_t             qos;
+    axi4_size_t            size;
+    logic [USER_WIDTH-1:0] user;
+    logic [ID_WIDTH-1:0]   id;
 
     modport out(
-        output arvalid, 
-        input arready, 
-        output araddr, arburst, arcache, arlen, arlock, arprot, arqos, arsize, aruser, arid
+        output valid, 
+        input ready, 
+        output addr, burst, cache, len, lock, prot, qos, size, user, id
     );
 
     modport in(
-        input arvalid, 
-        output arready, 
-        input araddr, arburst, arcache, arlen, arlock, arprot, arqos, arsize, aruser, arid
+        input valid, 
+        output ready, 
+        input addr, burst, cache, len, lock, prot, qos, size, user, id
     );
 
     modport view(
-        input arvalid, arready,
-        input araddr, arburst, arcache, arlen, arlock, arprot, arqos, arsize, aruser, arid
+        input valid, ready,
+        input addr, burst, cache, len, lock, prot, qos, size, user, id
     );
 
     task send(
-        input logic [ADDR_WIDTH-1:0] araddr_in,
-        input axi4_burst_t           arburst_in,
-        input axi4_cache_t           arcache_in,
-        input axi4_len_t             arlen_in,
-        input axi4_lock_t            arlock_in,
-        input axi4_prot_t            arprot_in,
-        input axi4_qos_t             arqos_in,
-        input axi4_size_t            arsize_in,
-        input logic [USER_WIDTH-1:0] aruser_in,
-        input logic [ID_WIDTH-1:0]   arid_in
+        input logic [ADDR_WIDTH-1:0] addr_in,
+        input axi4_burst_t           burst_in,
+        input axi4_cache_t           cache_in,
+        input axi4_len_t             len_in,
+        input axi4_lock_t            lock_in,
+        input axi4_prot_t            prot_in,
+        input axi4_qos_t             qos_in,
+        input axi4_size_t            size_in,
+        input logic [USER_WIDTH-1:0] user_in,
+        input logic [ID_WIDTH-1:0]   id_in
     );
-        araddr <= araddr_in;
-        arburst <= arburst_in;
-        arcache <= arcache_in;
-        arlen <= arlen_in;
-        arlock <= arlock_in;
-        arprot <= arprot_in;
-        arqos <= arqos_in;
-        arsize <= arsize_in;
-        aruser <= aruser_in;
-        arid <= arid_in;
+        addr <= addr_in;
+        burst <= burst_in;
+        cache <= cache_in;
+        len <= len_in;
+        lock <= lock_in;
+        prot <= prot_in;
+        qos <= qos_in;
+        size <= size_in;
+        user <= user_in;
+        id <= id_in;
 
-        arvalid <= 1'b1;
+        valid <= 1'b1;
         @ (posedge clk);
-        while (!arready) @ (posedge clk);
-        arvalid <= 1'b0;
+        while (!ready) @ (posedge clk);
+        valid <= 1'b0;
     endtask
 
     task recv(
-        output logic [ADDR_WIDTH-1:0] araddr_out,
-        output axi4_burst_t           arburst_out,
-        output axi4_cache_t           arcache_out,
-        output axi4_len_t             arlen_out,
-        output axi4_lock_t            arlock_out,
-        output axi4_prot_t            arprot_out,
-        output axi4_qos_t             arqos_out,
-        output axi4_size_t            arsize_out,
-        output logic [USER_WIDTH-1:0] aruser_out,
-        output logic [ID_WIDTH-1:0]   arid_out
+        output logic [ADDR_WIDTH-1:0] addr_out,
+        output axi4_burst_t           burst_out,
+        output axi4_cache_t           cache_out,
+        output axi4_len_t             len_out,
+        output axi4_lock_t            lock_out,
+        output axi4_prot_t            prot_out,
+        output axi4_qos_t             qos_out,
+        output axi4_size_t            size_out,
+        output logic [USER_WIDTH-1:0] user_out,
+        output logic [ID_WIDTH-1:0]   id_out
     );
-        arready <= 1'b1;
+        ready <= 1'b1;
         @ (posedge clk);
-        while (!arvalid) @ (posedge clk);
-        arready <= 1'b0;
+        while (!valid) @ (posedge clk);
+        ready <= 1'b0;
 
-        araddr_out = araddr;
-        arburst_out = arburst;
-        arcache_out = arcache;
-        arlen_out = arlen;
-        arlock_out = arlock;
-        arprot_out = arprot;
-        arqos_out = arqos;
-        arsize_out = arsize;
-        aruser_out = aruser;
-        arid_out = arid;
+        addr_out = addr;
+        burst_out = burst;
+        cache_out = cache;
+        len_out = len;
+        lock_out = lock;
+        prot_out = prot;
+        qos_out = qos;
+        size_out = size;
+        user_out = user;
+        id_out = id;
     endtask
 
 endinterface
@@ -111,91 +111,91 @@ interface axi4_aw_intf
     input logic clk = 'b0, rst = 'b0
 );
 
-    logic                  awvalid, awready;
-    logic [ADDR_WIDTH-1:0] awaddr;
-    axi4_burst_t           awburst;
-    axi4_cache_t           awcache;
-    axi4_len_t             awlen;
-    axi4_lock_t            awlock;
-    axi4_prot_t            awprot;
-    axi4_qos_t             awqos;
-    axi4_size_t            awsize;
-    logic [USER_WIDTH-1:0] awuser;
-    logic [ID_WIDTH-1:0]   awid;
+    logic                  valid, ready;
+    logic [ADDR_WIDTH-1:0] addr;
+    axi4_burst_t           burst;
+    axi4_cache_t           cache;
+    axi4_len_t             len;
+    axi4_lock_t            lock;
+    axi4_prot_t            prot;
+    axi4_qos_t             qos;
+    axi4_size_t            size;
+    logic [USER_WIDTH-1:0] user;
+    logic [ID_WIDTH-1:0]   id;
 
     modport out(
-        output awvalid,
-        input awready,
-        output awaddr, awburst, awcache, awlen, awlock, awprot, awqos, awsize, awuser, awid
+        output valid,
+        input ready,
+        output addr, burst, cache, len, lock, prot, qos, size, user, id
     );
 
     modport in(
-        input awvalid,
-        output awready,
-        input awaddr, awburst, awcache, awlen, awlock, awprot, awqos, awsize, awuser, awid
+        input valid,
+        output ready,
+        input addr, burst, cache, len, lock, prot, qos, size, user, id
     );
 
     modport view(
-        input awvalid, awready,
-        input awaddr, awburst, awcache, awlen, awlock, awprot, awqos, awsize, awuser, awid
+        input valid, ready,
+        input addr, burst, cache, len, lock, prot, qos, size, user, id
     );
 
     task send(
-        input logic [ADDR_WIDTH-1:0] awaddr_in,
-        input axi4_burst_t           awburst_in,
-        input axi4_cache_t           awcache_in,
-        input axi4_len_t             awlen_in,
-        input axi4_lock_t            awlock_in,
-        input axi4_prot_t            awprot_in,
-        input axi4_qos_t             awqos_in,
-        input axi4_size_t            awsize_in,
-        input logic [USER_WIDTH-1:0] awuser_in,
-        input logic [ID_WIDTH-1:0]   awid_in
+        input logic [ADDR_WIDTH-1:0] addr_in,
+        input axi4_burst_t           burst_in,
+        input axi4_cache_t           cache_in,
+        input axi4_len_t             len_in,
+        input axi4_lock_t            lock_in,
+        input axi4_prot_t            prot_in,
+        input axi4_qos_t             qos_in,
+        input axi4_size_t            size_in,
+        input logic [USER_WIDTH-1:0] user_in,
+        input logic [ID_WIDTH-1:0]   id_in
     );
-        awaddr <= awaddr_in;
-        awburst <= awburst_in;
-        awcache <= awcache_in;
-        awlen <= awlen_in;
-        awlock <= awlock_in;
-        awprot <= awprot_in;
-        awqos <= awqos_in;
-        awsize <= awsize_in;
-        awuser <= awuser_in;
-        awid <= awid_in;
+        addr <= addr_in;
+        burst <= burst_in;
+        cache <= cache_in;
+        len <= len_in;
+        lock <= lock_in;
+        prot <= prot_in;
+        qos <= qos_in;
+        size <= size_in;
+        user <= user_in;
+        id <= id_in;
 
-        awvalid <= 1'b1;
+        valid <= 1'b1;
         @ (posedge clk);
-        while (!awready) @ (posedge clk);
-        awvalid <= 1'b0;
+        while (!ready) @ (posedge clk);
+        valid <= 1'b0;
     endtask
 
     task recv(
-        output logic [ADDR_WIDTH-1:0] awaddr_out,
-        output axi4_burst_t           awburst_out,
-        output axi4_cache_t           awcache_out,
-        output axi4_len_t             awlen_out,
-        output axi4_lock_t            awlock_out,
-        output axi4_prot_t            awprot_out,
-        output axi4_qos_t             awqos_out,
-        output axi4_size_t            awsize_out,
-        output logic [USER_WIDTH-1:0] awuser_out,
-        output logic [ID_WIDTH-1:0]   awid_out
+        output logic [ADDR_WIDTH-1:0] addr_out,
+        output axi4_burst_t           burst_out,
+        output axi4_cache_t           cache_out,
+        output axi4_len_t             len_out,
+        output axi4_lock_t            lock_out,
+        output axi4_prot_t            prot_out,
+        output axi4_qos_t             qos_out,
+        output axi4_size_t            size_out,
+        output logic [USER_WIDTH-1:0] user_out,
+        output logic [ID_WIDTH-1:0]   id_out
     );
-        awready <= 1'b1;
+        ready <= 1'b1;
         @ (posedge clk);
-        while (!awvalid) @ (posedge clk);
-        awready <= 1'b0;
+        while (!valid) @ (posedge clk);
+        ready <= 1'b0;
 
-        awaddr_out = awaddr;
-        awburst_out = awburst;
-        awcache_out = awcache;
-        awlen_out = awlen;
-        awlock_out = awlock;
-        awprot_out = awprot;
-        awqos_out = awqos;
-        awsize_out = awsize;
-        awuser_out = awuser;
-        awid_out = awid;
+        addr_out = addr;
+        burst_out = burst;
+        cache_out = cache;
+        len_out = len;
+        lock_out = lock;
+        prot_out = prot;
+        qos_out = qos;
+        size_out = size;
+        user_out = user;
+        id_out = id;
     endtask
 
 endinterface
@@ -208,51 +208,51 @@ interface axi4_b_intf
     input logic clk = 'b0, rst = 'b0
 );
 
-    logic                bvalid, bready;
-    axi4_resp_t          bresp;
-    logic [ID_WIDTH-1:0] bid;
+    logic                valid, ready;
+    axi4_resp_t          resp;
+    logic [ID_WIDTH-1:0] id;
 
     modport out(
-        output bvalid,
-        input bready,
-        output bresp, bid
+        output valid,
+        input ready,
+        output resp, id
     );
 
     modport in(
-        input bvalid,
-        output bready,
-        input bresp, bid
+        input valid,
+        output ready,
+        input resp, id
     );
 
     modport view(
-        input bvalid, bready,
-        input bresp, bid
+        input valid, ready,
+        input resp, id
     );
 
     task send(
-        input axi4_resp_t            bresp_in,
-        input logic [ID_WIDTH-1:0]   bid_in
+        input axi4_resp_t            resp_in,
+        input logic [ID_WIDTH-1:0]   id_in
     );
-        bresp <= bresp_in;
-        bid <= bid_in;
+        resp <= resp_in;
+        id <= id_in;
 
-        bvalid <= 1'b1;
+        valid <= 1'b1;
         @ (posedge clk);
-        while (!bready) @ (posedge clk);
-        bvalid <= 1'b0;
+        while (!ready) @ (posedge clk);
+        valid <= 1'b0;
     endtask
 
     task recv(
-        output axi4_resp_t            bresp_out,
-        output logic [ID_WIDTH-1:0]   bid_out
+        output axi4_resp_t            resp_out,
+        output logic [ID_WIDTH-1:0]   id_out
     );
-        bready <= 1'b1;
+        ready <= 1'b1;
         @ (posedge clk);
-        while (!bvalid) @ (posedge clk);
-        bready <= 1'b0;
+        while (!valid) @ (posedge clk);
+        ready <= 1'b0;
 
-        bresp_out = bresp;
-        bid_out = bid;
+        resp_out = resp;
+        id_out = id;
     endtask
 
 endinterface
@@ -266,61 +266,61 @@ interface axi4_r_intf
     input logic clk = 'b0, rst = 'b0
 );
 
-    logic                  rvalid, rready;
-    logic [DATA_WIDTH-1:0] rdata;
-    logic                  rlast;
-    axi4_resp_t            rresp;
-    logic [ID_WIDTH-1:0]   rid;
+    logic                  valid, ready;
+    logic [DATA_WIDTH-1:0] data;
+    logic                  last;
+    axi4_resp_t            resp;
+    logic [ID_WIDTH-1:0]   id;
 
     modport out(
-        output rvalid,
-        input rready,
-        output rdata, rlast, rresp, rid
+        output valid,
+        input ready,
+        output data, last, resp, id
     );
 
     modport in(
-        input rvalid,
-        output rready,
-        input rdata, rlast, rresp, rid
+        input valid,
+        output ready,
+        input data, last, resp, id
     );
 
     modport view(
-        input rvalid, rready,
-        input rdata, rlast, rresp, rid
+        input valid, ready,
+        input data, last, resp, id
     );
 
     task send(
-        input logic [DATA_WIDTH-1:0] rdata_in,
-        input logic                  rlast_in,
-        input axi4_resp_t            rresp_in,
-        input logic [ID_WIDTH-1:0]   rid_in
+        input logic [DATA_WIDTH-1:0] data_in,
+        input logic                  last_in,
+        input axi4_resp_t            resp_in,
+        input logic [ID_WIDTH-1:0]   id_in
     );
-        rdata <= rdata_in;
-        rlast <= rlast_in;
-        rresp <= rresp_in;
-        rid <= rid_in;
+        data <= data_in;
+        last <= last_in;
+        resp <= resp_in;
+        id <= id_in;
 
-        rvalid <= 1'b1;
+        valid <= 1'b1;
         @ (posedge clk);
-        while (!rready) @ (posedge clk);
-        rvalid <= 1'b0;
+        while (!ready) @ (posedge clk);
+        valid <= 1'b0;
     endtask
 
     task recv(
-        output logic [DATA_WIDTH-1:0] rdata_out,
-        output logic                  rlast_out,
-        output axi4_resp_t            rresp_out,
-        output logic [ID_WIDTH-1:0]   rid_out
+        output logic [DATA_WIDTH-1:0] data_out,
+        output logic                  last_out,
+        output axi4_resp_t            resp_out,
+        output logic [ID_WIDTH-1:0]   id_out
     );
-        rready <= 1'b1;
+        ready <= 1'b1;
         @ (posedge clk);
-        while (!rvalid) @ (posedge clk);
-        rready <= 1'b0;
+        while (!valid) @ (posedge clk);
+        ready <= 1'b0;
 
-        rdata_out = rdata;
-        rlast_out = rlast;
-        rresp_out = rresp;
-        rid_out = rid;
+        data_out = data;
+        last_out = last;
+        resp_out = resp;
+        id_out = id;
     endtask
 
 endinterface
@@ -334,56 +334,56 @@ interface axi4_w_intf
     input logic clk = 'b0, rst = 'b0
 );
 
-    logic                    wvalid, wready;
-    logic [DATA_WIDTH-1:0]   wdata;
-    logic [STROBE_WIDTH-1:0] wstrb;
-    logic                    wlast;
+    logic                    valid, ready;
+    logic [DATA_WIDTH-1:0]   data;
+    logic [STROBE_WIDTH-1:0] strb;
+    logic                    last;
 
     modport out(
-        output wvalid,
-        input wready,
-        output wdata, wstrb, wlast
+        output valid,
+        input ready,
+        output data, strb, last
     );
 
     modport in(
-        input wvalid,
-        output wready,
-        input wdata, wstrb, wlast
+        input valid,
+        output ready,
+        input data, strb, last
     );
 
     modport view(
-        input wvalid, wready,
-        input wdata, wstrb, wlast
+        input valid, ready,
+        input data, strb, last
     );
 
     task send(
-        input logic [DATA_WIDTH-1:0]   wdata_in,
-        input logic [STROBE_WIDTH-1:0] wstrb_in,
-        input logic                    wlast_in
+        input logic [DATA_WIDTH-1:0]   data_in,
+        input logic [STROBE_WIDTH-1:0] strb_in,
+        input logic                    last_in
     );
-        wdata <= wdata_in;
-        wstrb <= wstrb_in;
-        wlast <= wlast_in;
+        data <= data_in;
+        strb <= strb_in;
+        last <= last_in;
 
-        wvalid <= 1'b1;
+        valid <= 1'b1;
         @ (posedge clk);
-        while (!wready) @ (posedge clk);
-        wvalid <= 1'b0;
+        while (!ready) @ (posedge clk);
+        valid <= 1'b0;
     endtask
 
     task recv(
-        output logic [DATA_WIDTH-1:0]   wdata_out,
-        output logic [STROBE_WIDTH-1:0] wstrb_out,
-        output logic                    wlast_out
+        output logic [DATA_WIDTH-1:0]   data_out,
+        output logic [STROBE_WIDTH-1:0] strb_out,
+        output logic                    last_out
     );
-        wready <= 1'b1;
+        ready <= 1'b1;
         @ (posedge clk);
-        while (!wvalid) @ (posedge clk);
-        wready <= 1'b0;
+        while (!valid) @ (posedge clk);
+        ready <= 1'b0;
 
-        wdata_out = wdata;
-        wstrb_out = wstrb;
-        wlast_out = wlast;
+        data_out = data;
+        strb_out = strb;
+        last_out = last;
     endtask
 
 endinterface

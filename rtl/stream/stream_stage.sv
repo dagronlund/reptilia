@@ -11,18 +11,19 @@
 `endif
 
 /*
- * Implements a valid/ready controlled pipeline stage
- *
- * MODE:
- *  0 - TRANSPARENT 
- *      No logic between input values and output
- *  1 - REGISTERED 
- *      A single register stage, ready logic is still combinational
- *  2 - BUFFERED
- *      A double buffered register stage, ready logic is registered
- *  3 - ELASTIC
- *      An insertable register stage, valid logic is combinational but ready is registered
- */
+Implements a valid/ready controlled pipeline stage
+
+PIPELINE_MODE:
+    STREAM_PIPELINE_MODE_TRANSPARENT
+        No logic between input values and output
+    STREAM_PIPELINE_MODE_REGISTERED
+        A single register stage, ready logic is still combinational
+    STREAM_PIPELINE_MODE_BUFFERED
+        A double buffered register stage, ready logic is registered
+    STREAM_PIPELINE_MODE_ELASTIC
+        An insertable register stage, valid logic is combinational but ready is 
+        registered using an insertable register stage
+*/
 module stream_stage
     import std_pkg::*;
     import stream_pkg::*;
