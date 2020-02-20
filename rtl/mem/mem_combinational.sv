@@ -30,8 +30,8 @@ module mem_combinational
     input wire [DATA_WIDTH-1:0]   write_data_in,
     output logic [DATA_WIDTH-1:0] write_data_out,
 
-    input wire [ADDR_WIDTH-1:0]   read_addr [READ_PORTS],
-    output logic [DATA_WIDTH-1:0] read_data_out [READ_PORTS],
+    input wire [ADDR_WIDTH-1:0]   read_addr [READ_PORTS-1:0],
+    output logic [DATA_WIDTH-1:0] read_data_out [READ_PORTS-1:0],
 
     output logic reset_done
 );
