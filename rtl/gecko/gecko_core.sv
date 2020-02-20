@@ -27,7 +27,7 @@ module gecko_core
     parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
     parameter stream_pipeline_mode_t FETCH_PIPELINE_MODE = STREAM_PIPELINE_MODE_TRANSPARENT,
     parameter stream_pipeline_mode_t INST_MEMORY_PIPELINE_MODE = STREAM_PIPELINE_MODE_TRANSPARENT,
-    parameter stream_pipeline_mode_t DECODE_PIPELINE_MODE = STREAM_PIPELINE_MODE_BUFFERED,
+    parameter stream_pipeline_mode_t DECODE_PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
     parameter stream_pipeline_mode_t EXECUTE_PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
     parameter stream_pipeline_mode_t SYSTEM_PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
     parameter stream_pipeline_mode_t PRINT_PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
@@ -36,8 +36,8 @@ module gecko_core
     parameter int DATA_LATENCY = 1,
     parameter int FLOAT_LATENCY = 1,
     parameter gecko_pc_t START_ADDR = 'b0,
-    parameter int ENABLE_PERFORMANCE_COUNTERS = 1,
-    parameter int ENABLE_BRANCH_PREDICTOR = 1,
+    parameter int ENABLE_PERFORMANCE_COUNTERS = 0,
+    parameter int ENABLE_BRANCH_PREDICTOR = 0,
     parameter int BRANCH_PREDICTOR_ADDR_WIDTH = 5,
     parameter int ENABLE_PRINT = 1,
     parameter int ENABLE_FLOAT = 0,
@@ -266,10 +266,13 @@ module gecko_core
         .T(gecko_operation_t)
     ) stream_tie_inst0(.stream_in(execute_result), .stream_out(writeback_results_in[0]));
     
-    // stream_tie stream_tie_inst1(.stream_in(memory_result), .stream_out(writeback_results_in[1]));
-    assign writeback_results_in[1].valid = memory_result.valid;
-    assign writeback_results_in[1].payload = memory_result.payload;
-    assign memory_result.ready = writeback_results_in[1].ready;
+    stream_stage #(
+        .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT),
+        .T(gecko_operation_t)
+    ) stream_tie_inst1(.stream_in(memory_result), .stream_out(writeback_results_in[1]));
+    // assign writeback_results_in[1].valid = memory_result.valid;
+    // assign writeback_results_in[1].payload = memory_result.payload;
+    // assign memory_result.ready = writeback_results_in[1].ready;
 
     stream_stage #(
         .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT),
