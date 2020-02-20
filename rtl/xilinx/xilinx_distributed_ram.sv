@@ -13,13 +13,13 @@ module xilinx_distributed_ram
     input wire clk, 
     input wire rst,
 
-    input wire [DATA_WIDTH-1:0]   write_enable,
-    input wire [ADDR_WIDTH-1:0]   write_addr,
-    input wire [DATA_WIDTH-1:0]   write_data_in,
+    input  wire  [DATA_WIDTH-1:0] write_enable,
+    input  wire  [ADDR_WIDTH-1:0] write_addr,
+    input  wire  [DATA_WIDTH-1:0] write_data_in,
     output logic [DATA_WIDTH-1:0] write_data_out,
 
-    input wire [ADDR_WIDTH-1:0]   read_addr [READ_PORTS-1:0],
-    output logic [DATA_WIDTH-1:0] read_data_out [READ_PORTS-1:0]
+    input  wire  [READ_PORTS-1:0] [ADDR_WIDTH-1:0] read_addr,
+    output logic [READ_PORTS-1:0] [DATA_WIDTH-1:0] read_data_out
 );
 
     localparam DATA_LENGTH = 2**ADDR_WIDTH;

@@ -186,8 +186,8 @@ module stream_fifo
             .write_addr(write_pointer),
             .write_data_in(stream_in.payload),
 
-            .read_addr('{read_pointer}),
-            .read_data_out('{stream_next.payload})
+            .read_addr({read_pointer}),
+            .read_data_out({stream_next.payload})
         );
 
         always_comb begin

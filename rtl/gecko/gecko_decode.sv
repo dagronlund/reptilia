@@ -466,8 +466,8 @@ module gecko_decode
         .write_addr(register_write_addr),
         .write_data_in(register_write_value),
 
-        .read_addr('{register_read_addr0, register_read_addr1}),
-        .read_data_out('{register_read_value0, register_read_value1})
+        .read_addr({register_read_addr0, register_read_addr1}),
+        .read_data_out({register_read_value0, register_read_value1})
     );
 
     logic front_status_rd_write_enable, rear_status_writeback_enable;
@@ -493,8 +493,8 @@ module gecko_decode
         .write_data_in((state == GECKO_DECODE_RESET) ? 'b0 : (front_status_rd + 'b1)),
         .write_data_out(front_status_rd),
 
-        .read_addr('{reg_status_rs1_addr, reg_status_rs2_addr}),
-        .read_data_out('{front_status_rs1, front_status_rs2})
+        .read_addr({reg_status_rs1_addr, reg_status_rs2_addr}),
+        .read_data_out({front_status_rs1, front_status_rs2})
     );
 
     riscv32_reg_addr_t rear_status_writeback_addr;
@@ -517,8 +517,8 @@ module gecko_decode
         .write_data_in((state == GECKO_DECODE_RESET) ? 'b0 : (rear_status_writeback + 'b1)),
         .write_data_out(rear_status_writeback),
 
-        .read_addr('{reg_status_rd_addr, reg_status_rs1_addr, reg_status_rs2_addr}),
-        .read_data_out('{rear_status_rd, rear_status_rs1, rear_status_rs2})
+        .read_addr({reg_status_rd_addr, reg_status_rs1_addr, reg_status_rs2_addr}),
+        .read_data_out({rear_status_rd, rear_status_rs1, rear_status_rs2})
     );
 
     // (* mark_debug = "true" *) logic inst_valid, inst_ready;

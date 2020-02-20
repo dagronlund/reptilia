@@ -147,8 +147,8 @@ module gecko_fetch
         .write_addr(branch_table_write_addr),
         .write_data_in(branch_table_write_data),
 
-        .read_addr('{branch_table_read_addr}),
-        .read_data_out('{branch_table_read_data}),
+        .read_addr({branch_table_read_addr}),
+        .read_data_out({branch_table_read_data}),
 
         .reset_done(branch_table_reset_done)
     );
@@ -230,6 +230,8 @@ module gecko_fetch
         if (jump_command.valid && jump_command.payload.update_pc) begin
             next_pc = jump_command.payload.actual_next_pc;
             next_jump_flag = current_jump_flag + 'b1;
+        end else begin
+            next_jump_flag = current_jump_flag;
         end
 
         // Pass outputs to memory and command streams

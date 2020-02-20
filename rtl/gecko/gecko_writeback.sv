@@ -102,8 +102,8 @@ module gecko_writeback
     riscv32_reg_addr_t status_write_addr;
     gecko_reg_status_t status_write_value;
 
-    riscv32_reg_addr_t status_read_addr [PORTS];
-    gecko_reg_status_t reg_status [PORTS];
+    riscv32_reg_addr_t [PORTS-1:0] status_read_addr;
+    gecko_reg_status_t [PORTS-1:0] reg_status;
 
     // Local Register File Status
     localparam GECKO_REG_STATUS_WIDTH = $bits(gecko_reg_status_t);
