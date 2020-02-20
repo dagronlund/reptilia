@@ -176,7 +176,7 @@ module gecko_core
 
         .writeback_result,
 
-        .forwarded_results('{execute_forwarded, memory_forwarded, writeback_forwarded}),
+        .forwarded_results({execute_forwarded, memory_forwarded, writeback_forwarded}),
 
         .exit_flag, .exit_code,
         // .faulted_flag, .finished_flag, 

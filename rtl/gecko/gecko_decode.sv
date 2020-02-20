@@ -81,7 +81,7 @@ module gecko_decode
     stream_intf.in writeback_result, // gecko_operation_t
 
     // Vivado does not like zero-width arrays
-    input gecko_forwarded_t forwarded_results [NUM_FORWARDED == 0 ? 1 : NUM_FORWARDED],
+    input gecko_forwarded_t [(NUM_FORWARDED == 0 ? 0 : (NUM_FORWARDED - 1)):0] forwarded_results,
 
     output gecko_retired_count_t retired_instructions,
 
