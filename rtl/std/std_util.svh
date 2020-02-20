@@ -21,18 +21,22 @@ endfunction
 `define STRINGIFY(str) `"str`"
 
 `define STATIC_ASSERT(condition) \
+    `ifndef __SYNTH_ONLY__ \
     generate \
     if (!(condition)) begin \
         initial begin \
             $error("FAILED ASSERTION: %s:%d, %s", `__FILE__, `__LINE__, `STRINGIFY(condition)); \
         end \
     end \
-    endgenerate
+    endgenerate \
+    `endif
 
 `define PROCEDURAL_ASSERT(condition) \
+    `ifndef __SYNTH_ONLY__ \
     initial begin \
         assert (condition) else $error("FAILED ASSERTION: %s:%d, %s", `__FILE__, `__LINE__, `STRINGIFY(condition)); \
-    end
+    end \
+    `endif
 
 `define INLINE_ASSERT(condition) \
     assert (condition) else $error("FAILED ASSERTION: %s:%d, %s", `__FILE__, `__LINE__, `STRINGIFY(condition));
