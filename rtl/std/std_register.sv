@@ -13,8 +13,8 @@ module std_register
     input wire clk, 
     input wire rst,
 
-    input wire enable = 'b0,
-    input T next = 'b0,
+    input wire enable,
+    input T next,
     output T value
 );
 
