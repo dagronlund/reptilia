@@ -16,12 +16,12 @@ module std_shift_register
     input wire enable,
     output logic [WIDTH-1:0] value,
 
-    input wire shift_in = 1'b0,
+    input wire shift_in,
     output logic shift_out,
 
-    input wire clear = 1'b0,
-    input wire load_enable = 1'b0,
-    input wire [WIDTH-1:0] load_value = {WIDTH{1'b0}}
+    input wire clear,
+    input wire load_enable,
+    input wire [WIDTH-1:0] load_value
 );
 
     logic [WIDTH-1:0] next;

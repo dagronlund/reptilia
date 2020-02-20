@@ -16,11 +16,11 @@ module std_counter
     input wire enable,
     output logic [WIDTH-1:0] value,
 
-    input wire clear = 1'b0,
-    input wire load_enable = 1'b0,
-    input wire [WIDTH-1:0] load_value = 'b0,
+    input wire clear,
+    input wire load_enable,
+    input wire [WIDTH-1:0] load_value,
 
-    input wire [WIDTH-1:0] max = {WIDTH{1'b1}},
+    input wire [WIDTH-1:0] max,
     output logic complete
 );
 

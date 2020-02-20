@@ -13,8 +13,8 @@ module std_register_granular
     input wire clk, 
     input wire rst,
 
-    input T enable = 'b0,
-    input T next = 'b0,
+    input T enable,
+    input T next,
     output T value
 );
 
