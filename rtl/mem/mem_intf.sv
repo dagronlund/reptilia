@@ -18,7 +18,11 @@ interface mem_intf #(
     // Indicates that the bus only carries data (i.e. a read response)
     parameter int DATA_ONLY = 0
 )(
+`ifndef __SYNTH_ONLY__
     input wire clk = 'b0, rst = 'b0
+`else
+    input wire clk, rst
+`endif
 );
 
     logic valid, ready;
@@ -45,6 +49,8 @@ interface mem_intf #(
         input valid, ready,
         input read_enable, write_enable, addr, data, id
     );
+
+`ifndef __SYNTH_ONLY__
 
     task send(
         input logic                  read_enable_in,
@@ -83,5 +89,7 @@ interface mem_intf #(
         data_out = data;
         id_out = id;
     endtask
+
+`endif
 
 endinterface

@@ -1,7 +1,11 @@
 interface stream_intf #(
     parameter type T = logic
 )(
+`ifndef __SYNTH_ONLY__
     input wire clk = 'b0, rst = 'b0
+`else
+    input wire clk, rst
+`endif
 );
 
     logic valid, ready;
@@ -25,6 +29,8 @@ interface stream_intf #(
         input payload
     );
 
+`ifndef __SYNTH_ONLY__
+
     task send(
         input T payload_in
     );
@@ -46,5 +52,7 @@ interface stream_intf #(
 
         payload_out = payload;
     endtask
+
+`endif
 
 endinterface
