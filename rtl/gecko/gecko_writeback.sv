@@ -1,25 +1,19 @@
+//!import std/std_pkg
+//!import stream/stream_pkg
+//!import riscv/riscv_pkg
+//!import riscv/riscv32_pkg
+//!import riscv/riscv32i_pkg
+//!import gecko/gecko_pkg
+//!import gecko/gecko_decode_util_pkg
+
 `timescale 1ns/1ps
 
 `ifdef __LINTER__
-
-`include "../../lib/std/std_util.svh"
-`include "../../lib/std/std_mem.svh"
-`include "../../lib/isa/rv.svh"
-`include "../../lib/isa/rv32.svh"
-`include "../../lib/isa/rv32i.svh"
-`include "../../lib/gecko/gecko.svh"
-`include "../../lib/gecko/gecko_decode_util.svh"
-
+    `include "../std/std_util.svh"
+    `include "../mem/mem_util.svh"
 `else
-
-`include "std_util.svh"
-`include "std_mem.svh"
-`include "rv.svh"
-`include "rv32.svh"
-`include "rv32i.svh"
-`include "gecko.svh"
-`include "gecko_decode_util.svh"
-
+    `include "std_util.svh"
+    `include "mem_util.svh"
 `endif
 
 /*
@@ -32,29 +26,33 @@
  * reg_status for that result, in order to preserve ordering.
  */
 module gecko_writeback
-    import rv::*;
-    import rv32::*;
-    import rv32i::*;
-    import gecko::*;
-    import gecko_decode_util::*;
+    import std_pkg::*;
+    import stream_pkg::*;
+    import riscv_pkg::*;
+    import riscv32_pkg::*;
+    import riscv32i_pkg::*;
+    import gecko_pkg::*;
+    import gecko_decode_util_pkg::*;
 #(
+    parameter std_clock_info_t CLOCK_INFO = 'b0,
+    parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
+    parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
     parameter int PORTS = 1
 )(
-    input logic clk, rst,
-
-    std_stream_intf.in writeback_results_in [PORTS], // gecko_operation_t
-
-    std_stream_intf.out writeback_result // gecko_operation_t
+    input wire clk, 
+    input wire rst,
+    stream_intf.in writeback_results_in [PORTS], // gecko_operation_t
+    stream_intf.out writeback_result // gecko_operation_t
 );
 
     // Check that status counter can count up to the number
     // of independent input streams to the writeback module
     `STATIC_ASSERT($pow(2, $size(gecko_reg_status_t)) >= 3)
 
-    typedef enum logic {
-        GECKO_WRITEBACK_RESET = 1'b0,
-        GECKO_WRITEBACK_NORMAL = 1'b1
-    } gecko_writeback_state_t;
+    // typedef enum logic {
+    //     GECKO_WRITEBACK_RESET = 1'b0,
+    //     GECKO_WRITEBACK_NORMAL = 1'b1
+    // } gecko_writeback_state_t;
 
     logic [PORTS-1:0] results_in_valid, results_in_ready;
     gecko_operation_t results_in_operation [PORTS];
@@ -74,35 +72,52 @@ module gecko_writeback
     logic [PORTS-1:0] consume;
     logic produce;
 
-    // Flow Controller
-    std_flow #(
+    stream_intf #(.T(gecko_operation_t)) next_writeback_result (.clk, .rst);
+
+    stream_controller #(
         .NUM_INPUTS(PORTS),
         .NUM_OUTPUTS(1)
-    ) std_flow_inst (
+    ) stream_controller_inst (
         .clk, .rst,
 
         .valid_input(results_in_valid),
         .ready_input(results_in_ready),
 
-        .valid_output({writeback_result.valid}),
-        .ready_output({writeback_result.ready}),
+        .valid_output({next_writeback_result.valid}),
+        .ready_output({next_writeback_result.ready}),
 
         .produce, .consume, .enable
     );
 
+    stream_stage #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .PIPELINE_MODE(PIPELINE_MODE),
+        .T(gecko_operation_t)
+    ) writeback_result_stage_inst (
+        .clk, .rst,
+        .stream_in(next_writeback_result), .stream_out(writeback_result)
+    );
+
     logic status_write_enable;
-    rv32_reg_addr_t status_write_addr;
+    riscv32_reg_addr_t status_write_addr;
     gecko_reg_status_t status_write_value;
 
-    rv32_reg_addr_t status_read_addr [PORTS];
+    riscv32_reg_addr_t status_read_addr [PORTS];
     gecko_reg_status_t reg_status [PORTS];
 
     // Local Register File Status
-    localparam GECKO_REG_STATUS_WIDTH = $size(gecko_reg_status_t);
-    std_distributed_ram #(
+    localparam GECKO_REG_STATUS_WIDTH = $bits(gecko_reg_status_t);
+    localparam GECKO_REG_STATUS_DEPTH = $bits(riscv32_reg_addr_t);
+
+    logic reset_done;
+
+    mem_combinational #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .TECHNOLOGY(TECHNOLOGY),
         .DATA_WIDTH(GECKO_REG_STATUS_WIDTH),
-        .ADDR_WIDTH($size(rv32_reg_addr_t)),
-        .READ_PORTS(PORTS)
+        .ADDR_WIDTH(GECKO_REG_STATUS_DEPTH),
+        .READ_PORTS(PORTS),
+        .AUTO_RESET(1)
     ) register_status_counters_inst (
         .clk, .rst,
 
@@ -112,27 +127,35 @@ module gecko_writeback
         .write_data_in(status_write_value),
 
         .read_addr(status_read_addr),
-        .read_data_out(reg_status)
+        .read_data_out(reg_status),
+
+        .reset_done
     );
 
-    gecko_writeback_state_t current_state, next_state;
-    rv32_reg_addr_t current_counter, next_counter;
+    // gecko_writeback_state_t current_state, next_state;
+    riscv32_reg_addr_t current_counter, next_counter;
 
-    gecko_operation_t next_writeback_result;
+    // std_register #(
+    //     .CLOCK_INFO(CLOCK_INFO),
+    //     .T(gecko_writeback_state_t),
+    //     .RESET_VECTOR(GECKO_WRITEBACK_RESET)
+    // ) state_register_inst (
+    //     .clk, .rst,
+    //     .enable,
+    //     .next(next_state),
+    //     .value(current_state)
+    // );
 
-    always_ff @(posedge clk) begin
-        if(rst) begin
-            current_state <= GECKO_WRITEBACK_RESET;
-            current_counter <= 'b0;
-        end else if (enable) begin
-            current_state <= next_state;
-            current_counter <= next_counter;
-        end
-
-        if (enable) begin
-            writeback_result.payload <= next_writeback_result;
-        end
-    end
+    std_register #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .T(riscv32_reg_addr_t),
+        .RESET_VECTOR('b0)
+    ) counter_register_inst (
+        .clk, .rst,
+        .enable,
+        .next(next_counter),
+        .value(current_counter)
+    );
 
     always_comb begin
         automatic logic [PORTS-1:0] status_good;
@@ -147,7 +170,7 @@ module gecko_writeback
             status_good[i] = (reg_status[i] == results_in_operation[i].reg_status);
         end
 
-        next_state = current_state;
+        // next_state = current_state;
         next_counter = current_counter + 'b1;
 
         status_write_enable = 'b0;
@@ -155,37 +178,46 @@ module gecko_writeback
         status_write_value = 'b0;
 
         consume = 'b0;
+        next_writeback_result.payload = '{default: 'b0};
 
-        next_writeback_result = '{default: 'b0};
-
-        // Round-Robin input selection
-        case (current_state)
-        GECKO_WRITEBACK_RESET: begin
-            status_write_enable = 'b1;
-            if (next_counter == 'b0) begin
-                next_state = GECKO_WRITEBACK_NORMAL;
-            end else begin
-                next_state = GECKO_WRITEBACK_RESET;
-            end
-        end
-        GECKO_WRITEBACK_NORMAL: begin
+        if (reset_done) begin
             for (int i = 0; i < PORTS; i++) begin
                 if (results_in_valid[i] && status_good[i]) begin
                     consume[i] = 'b1;
-                    next_writeback_result = results_in_operation[i];
+                    next_writeback_result.payload = results_in_operation[i];
                     break;
                 end
             end
         end
-        endcase
+
+        // // Round-Robin input selection
+        // case (current_state)
+        // GECKO_WRITEBACK_RESET: begin
+        //     status_write_enable = 'b1;
+        //     if (next_counter == 'b0) begin
+        //         next_state = GECKO_WRITEBACK_NORMAL;
+        //     end else begin
+        //         next_state = GECKO_WRITEBACK_RESET;
+        //     end
+        // end
+        // GECKO_WRITEBACK_NORMAL: begin
+        //     for (int i = 0; i < PORTS; i++) begin
+        //         if (results_in_valid[i] && status_good[i]) begin
+        //             consume[i] = 'b1;
+        //             next_writeback_result.payload = results_in_operation[i];
+        //             break;
+        //         end
+        //     end
+        // end
+        // endcase
 
         produce = (|consume);
 
         // Update local register file status
         if (produce) begin
             status_write_enable = 'b1;
-            status_write_addr = next_writeback_result.addr;
-            status_write_value = next_writeback_result.reg_status + 'b1;
+            status_write_addr = next_writeback_result.payload.addr;
+            status_write_value = next_writeback_result.payload.reg_status + 'b1;
         end
     end
 

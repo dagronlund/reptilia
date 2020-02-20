@@ -1,48 +1,50 @@
+//!import std/std_pkg
+//!import stream/stream_pkg
+//!import riscv/riscv_pkg
+//!import riscv/riscv32_pkg
+//!import riscv/riscv32i_pkg
+//!import gecko/gecko_pkg
+
 `timescale 1ns/1ps
 
 `ifdef __LINTER__
-
-`include "../../lib/std/std_util.svh"
-`include "../../lib/std/std_mem.svh"
-`include "../../lib/isa/rv.svh"
-`include "../../lib/isa/rv32.svh"
-`include "../../lib/isa/rv32i.svh"
-`include "../../lib/gecko/gecko.svh"
-
+    `include "../std/std_util.svh"
+    `include "../mem/mem_util.svh"
 `else
-
-`include "std_util.svh"
-`include "std_mem.svh"
-`include "rv.svh"
-`include "rv32.svh"
-`include "rv32i.svh"
-`include "gecko.svh"
-
+    `include "std_util.svh"
+    `include "mem_util.svh"
 `endif
 
 module gecko_fetch
-    import rv::*;
-    import rv32::*;
-    import rv32i::*;
-    import gecko::*;
+    import std_pkg::*;
+    import stream_pkg::*;
+    import riscv_pkg::*;
+    import riscv32_pkg::*;
+    import riscv32i_pkg::*;
+    import gecko_pkg::*;
 #(
+    parameter std_clock_info_t CLOCK_INFO = 'b0,
+    parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
+    parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_TRANSPARENT,
     parameter gecko_pc_t START_ADDR = 'b0,
+    parameter logic ENABLE_BRANCH_PREDICTOR = 1,
     // How big is the branch-prediction table
-    parameter int BRANCH_ADDR_WIDTH = 5
+    parameter int BRANCH_PREDICTOR_ADDR_WIDTH = 5
 )(
-    input logic clk, rst,
+    input wire clk, 
+    input wire rst,
 
-    std_stream_intf.in jump_command, // gecko_jump_operation_t
+    stream_intf.in jump_command, // gecko_jump_operation_t
 
-    std_stream_intf.out instruction_command, // gecko_instruction_operation_t
-    std_mem_intf.out instruction_request
+    stream_intf.out instruction_command, // gecko_instruction_operation_t
+    mem_intf.out instruction_request
 );
 
-    localparam BRANCH_HISTORY_LENGTH = 2**BRANCH_ADDR_WIDTH;
+    localparam BRANCH_HISTORY_LENGTH = 2**BRANCH_PREDICTOR_ADDR_WIDTH;
     localparam BRANCH_HISTORY_WIDTH = $bits(gecko_prediction_history_t);
-    localparam BRANCH_TAG_WIDTH = $bits(gecko_pc_t) - BRANCH_ADDR_WIDTH - 2;
+    localparam BRANCH_TAG_WIDTH = $bits(gecko_pc_t) - BRANCH_PREDICTOR_ADDR_WIDTH - 2;
 
-    typedef logic [BRANCH_ADDR_WIDTH-1:0] gecko_fetch_table_addr_t;
+    typedef logic [BRANCH_PREDICTOR_ADDR_WIDTH-1:0] gecko_fetch_table_addr_t;
     typedef logic [BRANCH_TAG_WIDTH-1:0] gecko_fetch_tag_t;
 
     typedef struct packed {
@@ -82,67 +84,45 @@ module gecko_fetch
         endcase
     endfunction
 
-    typedef enum logic [1:0] {
-        GECKO_FETCH_STATE_RESET = 'b00,
-        GECKO_FETCH_STATE_NORMAL = 'b01,
-        GECKO_FETCH_STATE_HALT = 'b10
-    } gecko_fetch_state_t;
+    logic enable, produce, ready_input_null;
 
-    logic enable;
-    logic produce;
-    logic ready_input_null;
-    logic [1:0] enable_output_null;
-    std_flow #(
+    stream_intf #(.T(gecko_instruction_operation_t)) next_instruction_command (.clk, .rst);
+    mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) next_instruction_request (.clk, .rst);
+
+    stream_controller #(
         .NUM_INPUTS(1),
         .NUM_OUTPUTS(2)
-    ) std_flow_inst (
+    ) stream_controller_inst (
         .clk, .rst,
 
         .valid_input('b1),
         .ready_input(ready_input_null),
 
-        .valid_output({instruction_command.valid, instruction_request.valid}),
-        .ready_output({instruction_command.ready, instruction_request.ready}),
+        .valid_output({next_instruction_command.valid, next_instruction_request.valid}),
+        .ready_output({next_instruction_command.ready, next_instruction_request.ready}),
 
         .consume('b1),
         .produce({produce, produce}),
 
-        .enable(enable),
-        .enable_output(enable_output_null)
+        .enable
     );
 
-    logic halt_fetch;
-    gecko_fetch_state_t current_state, next_state;
-    gecko_fetch_table_addr_t current_reset_counter, next_reset_counter;
-    logic [BRANCH_HISTORY_LENGTH-1:0] branch_table_valid, next_branch_table_valid;
-    gecko_instruction_operation_t next_inst_cmd;
+    stream_stage #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .PIPELINE_MODE(PIPELINE_MODE),
+        .T(gecko_instruction_operation_t)
+    ) instruction_command_stage_inst (
+        .clk, .rst,
+        .stream_in(next_instruction_command), .stream_out(instruction_command)
+    );
 
-    always_ff @(posedge clk) begin
-        if (rst) begin
-            current_state <= GECKO_FETCH_STATE_RESET;
-            current_reset_counter <= 'b0;
-        end else if (halt_fetch) begin
-            current_state <= GECKO_FETCH_STATE_HALT;
-            current_reset_counter <= 'b0;
-        end else if (enable) begin
-            current_state <= next_state;
-            current_reset_counter <= next_reset_counter;
-        end
-        if (rst) begin
-            instruction_command.payload.pc <= (START_ADDR-4);
-            instruction_command.payload.jump_flag <= 'b0;
-            instruction_command.payload.prediction <= '{default: 'b0};
-        end else begin
-            instruction_command.payload.pc <= next_inst_cmd.pc;
-            instruction_command.payload.jump_flag <= next_inst_cmd.jump_flag;
-            instruction_command.payload.prediction <= next_inst_cmd.prediction;
-        end
-        if (rst) begin
-            branch_table_valid <= 'b0;
-        end else if (jump_command.valid) begin
-            branch_table_valid <= next_branch_table_valid;
-        end
-    end
+    mem_stage #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .PIPELINE_MODE(PIPELINE_MODE)
+    ) instruction_request_stage_inst (
+        .clk, .rst,
+        .mem_in(next_instruction_request), .mem_out(instruction_request)
+    );
 
     logic branch_table_write_enable;
     gecko_fetch_table_addr_t branch_table_write_addr;
@@ -151,11 +131,16 @@ module gecko_fetch
     gecko_fetch_table_addr_t branch_table_read_addr;
     gecko_fetch_table_entry_t branch_table_read_data;
 
-    std_distributed_ram #(
+    logic branch_table_reset_done;
+
+    mem_combinational #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .TECHNOLOGY(TECHNOLOGY),
         .DATA_WIDTH(BRANCH_ENTRY_WIDTH),
-        .ADDR_WIDTH(BRANCH_ADDR_WIDTH),
-        .READ_PORTS(1)
-    ) branch_table_inst (
+        .ADDR_WIDTH(BRANCH_PREDICTOR_ADDR_WIDTH),
+        .READ_PORTS(1),
+        .AUTO_RESET(1)
+    ) register_status_counters_inst (
         .clk, .rst,
 
         .write_enable({BRANCH_ENTRY_WIDTH{branch_table_write_enable}}),
@@ -163,122 +148,119 @@ module gecko_fetch
         .write_data_in(branch_table_write_data),
 
         .read_addr('{branch_table_read_addr}),
-        .read_data_out('{branch_table_read_data})
+        .read_data_out('{branch_table_read_data}),
+
+        .reset_done(branch_table_reset_done)
     );
 
-    (* mark_debug = "true" *) logic fetch_inst_command_valid, fetch_inst_command_ready;
-    (* mark_debug = "true" *) logic fetch_inst_request_valid, fetch_inst_request_ready;
-    (* mark_debug = "true" *) logic [31:0] fetch_inst_pc;
-    (* mark_debug = "true" *) logic fetch_inst_jump_flag;
+    logic enable_fetch_state;
 
-    always_comb begin
-        fetch_inst_command_valid = instruction_command.valid;
-        fetch_inst_command_ready = instruction_command.ready;
+    gecko_pc_t current_pc, next_pc;
+    gecko_jump_flag_t current_jump_flag, next_jump_flag;
+    logic halt_flag;
+    logic [BRANCH_HISTORY_LENGTH-1:0] current_branch_table_valid, next_branch_table_valid;
 
-        fetch_inst_request_valid = instruction_request.valid;
-        fetch_inst_request_ready = instruction_request.ready;
+    std_register #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .T(gecko_pc_t),
+        .RESET_VECTOR(START_ADDR)
+    ) pc_register_inst (
+        .clk, .rst,
+        .enable(enable_fetch_state),
+        .next(next_pc),
+        .value(current_pc)
+    );
 
-        fetch_inst_pc = instruction_command.payload.pc;
-        fetch_inst_jump_flag = instruction_command.payload.jump_flag;
-    end
+    std_register #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .T(gecko_jump_flag_t),
+        .RESET_VECTOR('b0)
+    ) prediction_register_inst (
+        .clk, .rst,
+        .enable(enable_fetch_state),
+        .next(next_jump_flag),
+        .value(current_jump_flag)
+    );
+
+    std_register #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .T(logic),
+        .RESET_VECTOR('b0)
+    ) halt_flag_register_inst (
+        .clk, .rst,
+        .enable(branch_table_write_enable),
+        .next(jump_command.payload.halt || halt_flag),
+        .value(halt_flag)
+    );
+
+    std_register #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .T(logic [BRANCH_HISTORY_LENGTH-1:0]),
+        .RESET_VECTOR('b0)
+    ) branch_table_valid_register_inst (
+        .clk, .rst,
+        .enable(branch_table_write_enable),
+        .next(next_branch_table_valid),
+        .value(current_branch_table_valid)
+    );
 
     always_comb begin
         automatic logic branch_table_hit;
-        automatic gecko_pc_t current_pc, next_pc, default_next_pc;
-        automatic gecko_instruction_operation_t inst_cmd;
-        automatic gecko_jump_operation_t jump_op;
 
-        inst_cmd = gecko_instruction_operation_t'(instruction_command.payload);
-        jump_op = gecko_jump_operation_t'(jump_command.payload);
-        current_pc = inst_cmd.pc;
-
-        // Default Values
-        instruction_request.read_enable = 'b1;
-        instruction_request.write_enable = 'b0;
-        instruction_request.data = 'b0;
-        instruction_request.addr = current_pc;
-
-        // Increment reset counter
-        produce = 'b0;
-        next_state = current_state;
-        next_reset_counter = current_reset_counter + 'b1;
-        case (current_state)
-        GECKO_FETCH_STATE_RESET: begin
-            if (next_reset_counter == 'b0) begin
-                next_state = GECKO_FETCH_STATE_NORMAL;
-            end
-        end
-        GECKO_FETCH_STATE_NORMAL: begin
-            produce = 'b1;
-        end
-        GECKO_FETCH_STATE_HALT: begin
-        end
-        endcase
-
-        // Default instruction increment
-        default_next_pc = current_pc + 'd4;
+        produce = !halt_flag && branch_table_reset_done;
+        enable_fetch_state = (produce && enable) || (jump_command.valid && jump_command.payload.update_pc);
 
         // Read from branch table
-        branch_table_read_addr = current_pc[(BRANCH_ADDR_WIDTH+2-1):2];
+        branch_table_read_addr = current_pc[(BRANCH_PREDICTOR_ADDR_WIDTH+2-1):2];
 
         // Determine if entry exists in branch table
-        branch_table_hit = branch_table_valid[branch_table_read_addr] && 
-                branch_table_read_data.tag == current_pc[31:BRANCH_ADDR_WIDTH+2];
+        branch_table_hit = current_branch_table_valid[branch_table_read_addr] && 
+                branch_table_read_data.tag == current_pc[31:BRANCH_PREDICTOR_ADDR_WIDTH+2];
 
         // Take branch if it is a jump instruction or branch predicted take
-        if (branch_table_hit && (branch_table_read_data.jump_instruction ||
+        if (ENABLE_BRANCH_PREDICTOR && branch_table_hit && 
+                (branch_table_read_data.jump_instruction ||
                 predict_branch(branch_table_read_data.history))) begin
             next_pc = branch_table_read_data.predicted_next;
         end else begin
-            next_pc = default_next_pc;
+            next_pc = current_pc + 'd4;
         end
 
-        // Set proper outputs
-        next_inst_cmd.pc = next_pc;
-        next_inst_cmd.jump_flag = inst_cmd.jump_flag;
-        next_inst_cmd.prediction.miss = !branch_table_hit;
-        next_inst_cmd.prediction.history = branch_table_read_data.history;
-
-        // DANGER: This only works since the instruction command is immediately buffered
-        //         by the next stage without any logic in front
-        instruction_command.payload.next_pc = next_pc;
-
-        // Gate flow-control logic with clock-enable
-        if (!enable || (current_state == GECKO_FETCH_STATE_RESET)) begin
-            next_inst_cmd = inst_cmd;
+        // Override next_pc decision if a jump command comes in
+        if (jump_command.valid && jump_command.payload.update_pc) begin
+            next_pc = jump_command.payload.actual_next_pc;
+            next_jump_flag = current_jump_flag + 'b1;
         end
 
-        // If a jump command actually needs to update the pc
-        if (jump_command.valid && jump_op.update_pc) begin
-            next_inst_cmd.pc = jump_op.actual_next_pc;
-            next_inst_cmd.jump_flag = next_inst_cmd.jump_flag + 'b1;
-        end
+        // Pass outputs to memory and command streams
+        next_instruction_command.payload.pc = current_pc;
+        next_instruction_command.payload.next_pc = next_pc;
+        next_instruction_command.payload.jump_flag = current_jump_flag;
+        next_instruction_command.payload.prediction.miss = !branch_table_hit;
+        next_instruction_command.payload.prediction.history = branch_table_read_data.history;
 
-        // Update branch table when a jump command is recieved
-        halt_fetch = 'b0;
-        branch_table_write_enable = jump_command.valid || (current_state == GECKO_FETCH_STATE_RESET);
-        if (current_state == GECKO_FETCH_STATE_RESET) begin
-            jump_command.ready = 'b0;
-            branch_table_write_enable = 'b0;
-            branch_table_write_addr = current_reset_counter;
-            branch_table_write_data = '{default: 'b0};
+        next_instruction_request.read_enable = 'b1;
+        next_instruction_request.write_enable = 'b0;
+        next_instruction_request.addr = current_pc;
+        next_instruction_request.data = 'b0;
+
+        // Update branch prediction table from jump commands (always accepts)
+        branch_table_write_enable = jump_command.valid;
+        branch_table_write_addr = jump_command.payload.current_pc[(BRANCH_PREDICTOR_ADDR_WIDTH+2-1):2];
+        branch_table_write_data.predicted_next = jump_command.payload.actual_next_pc;
+        branch_table_write_data.tag = jump_command.payload.current_pc[31:BRANCH_PREDICTOR_ADDR_WIDTH+2];
+        branch_table_write_data.jump_instruction = jump_command.payload.jumped;
+        if (jump_command.payload.prediction.miss) begin
+            branch_table_write_data.history = jump_command.payload.branched ? 
+                    DEFAULT_TAKEN_HISTORY : DEFAULT_NOT_TAKEN_HISTORY;
         end else begin
-            jump_command.ready = 'b1;
-            branch_table_write_enable = jump_command.valid;
-            branch_table_write_addr = jump_op.current_pc[(BRANCH_ADDR_WIDTH+2-1):2];
-            branch_table_write_data.predicted_next = jump_op.actual_next_pc;
-            branch_table_write_data.tag = jump_op.current_pc[31:BRANCH_ADDR_WIDTH+2];
-            branch_table_write_data.jump_instruction = jump_op.jumped;
-            if (jump_op.prediction.miss) begin
-                branch_table_write_data.history = jump_op.branched ? DEFAULT_TAKEN_HISTORY : DEFAULT_NOT_TAKEN_HISTORY;
-            end else begin
-                branch_table_write_data.history = update_history(jump_op.prediction.history, jump_op.branched);
-            end
-            halt_fetch = jump_op.halt && jump_command.valid;
+            branch_table_write_data.history = update_history(jump_command.payload.prediction.history, 
+                    jump_command.payload.branched);
         end
 
-        // Clock gated by jump_command.valid
-        next_branch_table_valid = branch_table_valid | (1'b1 << branch_table_write_addr);
+        // Updates branch prediction valid flags (always accepts)
+        next_branch_table_valid = current_branch_table_valid;
+        next_branch_table_valid[branch_table_write_addr] = 'b1;
     end
 
 endmodule
