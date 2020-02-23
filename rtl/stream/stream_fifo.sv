@@ -182,7 +182,7 @@ module stream_fifo
         ) mem_combinational_inst (
             .clk, .rst,
 
-            .write_enable({DATA_WIDTH{mem_write_enable}}),
+            .write_enable(mem_write_enable),
             .write_addr(write_pointer),
             .write_data_in(stream_in.payload),
 

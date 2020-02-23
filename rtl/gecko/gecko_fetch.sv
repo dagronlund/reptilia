@@ -143,7 +143,7 @@ module gecko_fetch
     ) register_status_counters_inst (
         .clk, .rst,
 
-        .write_enable({BRANCH_ENTRY_WIDTH{branch_table_write_enable}}),
+        .write_enable(branch_table_write_enable),
         .write_addr(branch_table_write_addr),
         .write_data_in(branch_table_write_data),
 

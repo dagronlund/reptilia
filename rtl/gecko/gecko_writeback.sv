@@ -122,7 +122,7 @@ module gecko_writeback
         .clk, .rst,
 
         // Always write to all bits in register, gate with state clock enable
-        .write_enable({GECKO_REG_STATUS_WIDTH{status_write_enable && enable}}),
+        .write_enable(status_write_enable && enable),
         .write_addr(status_write_addr),
         .write_data_in(status_write_value),
 

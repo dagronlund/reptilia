@@ -462,7 +462,7 @@ module gecko_decode
         .clk, .rst,
 
         // Always write to all bits in register
-        .write_enable({32{register_write_enable}}),
+        .write_enable(register_write_enable),
         .write_addr(register_write_addr),
         .write_data_in(register_write_value),
 
@@ -487,7 +487,7 @@ module gecko_decode
         .clk, .rst,
 
         // Always write to all bits in register, gate with state clock enable
-        .write_enable({GECKO_REG_STATUS_WIDTH{front_status_rd_write_enable && enable}}),
+        .write_enable(front_status_rd_write_enable && enable),
         .write_addr(reg_status_rd_addr),
         // Simply increment the status when written to
         .write_data_in((state == GECKO_DECODE_RESET) ? 'b0 : (front_status_rd + 'b1)),
@@ -511,7 +511,7 @@ module gecko_decode
         .clk, .rst,
 
         // Always write to all bits in register, gate with state clock enable
-        .write_enable({GECKO_REG_STATUS_WIDTH{rear_status_writeback_enable}}),
+        .write_enable(rear_status_writeback_enable),
         .write_addr(rear_status_writeback_addr),
         // Simply increment the status when written to
         .write_data_in((state == GECKO_DECODE_RESET) ? 'b0 : (rear_status_writeback + 'b1)),

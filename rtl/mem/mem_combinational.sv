@@ -25,7 +25,7 @@ module mem_combinational
     input wire clk, 
     input wire rst,
 
-    input  wire  [DATA_WIDTH-1:0] write_enable,
+    input  wire                   write_enable,
     input  wire  [ADDR_WIDTH-1:0] write_addr,
     input  wire  [DATA_WIDTH-1:0] write_data_in,
     output logic [DATA_WIDTH-1:0] write_data_out,
@@ -36,7 +36,7 @@ module mem_combinational
     output logic reset_done
 );
 
-    logic [DATA_WIDTH-1:0] write_enable_internal;
+    logic                  write_enable_internal;
     logic [ADDR_WIDTH-1:0] write_addr_internal;
     logic [DATA_WIDTH-1:0] write_data_in_internal;
 
@@ -98,14 +98,17 @@ module mem_combinational
     endgenerate
 
     generate
-    if (TECHNOLOGY == STD_TECHNOLOGY_FPGA_XILINX) begin
+    // Only try the latch-RAM if it is wide enough to justify it 
+    if ((TECHNOLOGY == STD_TECHNOLOGY_ASIC_TSMC || 
+            TECHNOLOGY == STD_TECHNOLOGY_ASIC_INTEL) &&
+            DATA_WIDTH > 8) begin
 
-        xilinx_distributed_ram #(
+        asic_latch_ram #(
             .CLOCK_INFO(CLOCK_INFO),
             .DATA_WIDTH(DATA_WIDTH),
             .ADDR_WIDTH(ADDR_WIDTH),
             .READ_PORTS(READ_PORTS)
-        ) xilinx_distributed_ram_inst (
+        ) asic_latch_ram_inst (
             .clk, .rst,
 
             .write_enable(write_enable_internal),
@@ -116,9 +119,29 @@ module mem_combinational
             .read_data_out
         );
 
-    end else begin
-        // TODO: Implement other memory technologies
-        `PROCEDURAL_ASSERT(0)
+    end else begin // TECHNOLOGY == STD_TECHNOLOGY_FPGA_XILINX
+
+        // Just use inferred distributed RAM for any FPGA technology
+        // TODO: Verify Intel FPGAs supports this format
+        xilinx_distributed_ram #(
+            .CLOCK_INFO(CLOCK_INFO),
+            .DATA_WIDTH(DATA_WIDTH),
+            .ADDR_WIDTH(ADDR_WIDTH),
+            .READ_PORTS(READ_PORTS)
+        ) xilinx_distributed_ram_inst (
+            .clk, .rst,
+
+            // Only using single-bit write enable for this module,
+            // manually use the distributed RAM module for more
+            // granularity
+            .write_enable({DATA_WIDTH{write_enable_internal}}),
+            .write_addr(write_addr_internal),
+            .write_data_in(write_data_in_internal),
+            .write_data_out,
+            .read_addr, 
+            .read_data_out
+        );
+
     end
     endgenerate
 
