@@ -29,8 +29,6 @@ module stream_stage_multiple
     `STATIC_ASSERT($bits(T) == $bits(stream_in.payload))
     `STATIC_ASSERT($bits(T) == $bits(stream_out.payload))
 
-
-
     genvar k;
     generate
     if (STAGES == 0) begin

@@ -4,7 +4,7 @@
 
 `ifdef __LINTER__
     `include "../std/std_util.svh"
-    `include "mem_util.svh"
+    `include "../mem/mem_util.svh"
 `else
     `include "std_util.svh"
     `include "mem_util.svh"
