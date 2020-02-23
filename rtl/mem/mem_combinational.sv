@@ -105,6 +105,7 @@ module mem_combinational
 
         asic_latch_ram #(
             .CLOCK_INFO(CLOCK_INFO),
+            .TECHNOLOGY(TECHNOLOGY),
             .DATA_WIDTH(DATA_WIDTH),
             .ADDR_WIDTH(ADDR_WIDTH),
             .READ_PORTS(READ_PORTS)
