@@ -136,7 +136,7 @@ module gecko_core
     mem_stage #(
         .CLOCK_INFO(CLOCK_INFO),
         .PIPELINE_MODE(INST_MEMORY_PIPELINE_MODE)
-    ) mem_request_output_stage (
+    ) instruction_result_output_stage_inst (
         .clk, .rst,
         .mem_in(inst_result), .mem_out(inst_result_break)
     );
@@ -145,7 +145,7 @@ module gecko_core
         .CLOCK_INFO(CLOCK_INFO),
         .PIPELINE_MODE(INST_MEMORY_PIPELINE_MODE),
         .T(gecko_instruction_operation_t)
-    ) std_flow_stage_inst (
+    ) instruction_command_output_stage_inst (
         .clk, .rst,
         .stream_in(instruction_command_out), .stream_out(instruction_command_break)
     );
@@ -270,9 +270,6 @@ module gecko_core
         .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT),
         .T(gecko_operation_t)
     ) stream_tie_inst1(.stream_in(memory_result), .stream_out(writeback_results_in[1]));
-    // assign writeback_results_in[1].valid = memory_result.valid;
-    // assign writeback_results_in[1].payload = memory_result.payload;
-    // assign memory_result.ready = writeback_results_in[1].ready;
 
     stream_stage #(
         .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT),

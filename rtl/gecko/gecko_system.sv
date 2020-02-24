@@ -36,8 +36,8 @@ module gecko_system
 );
 
     // Clock counter works for RDCYCLE and RDTIME
-    logic clock_counter_carry, instruction_counter_carry;
-    logic [31:0] clock_counter_partial, instruction_counter_partial;
+    logic [32:0] next_clock_counter_partial, next_instruction_counter_partial;
+    logic [32:0] clock_counter_partial, instruction_counter_partial;
     logic [63:0] next_clock_counter, next_instruction_counter;
     logic [63:0] clock_counter, instruction_counter;
 
@@ -78,9 +78,9 @@ module gecko_system
         .RESET_VECTOR('b0)
     ) clock_counter_partial_register_inst (
         .clk, .rst,
-        .enable,
-        .next(clock_counter_partial + 'b1),
-        .value({clock_counter_carry, clock_counter_partial})
+        .enable('b1),
+        .next(next_clock_counter_partial),
+        .value(clock_counter_partial)
     );
 
     std_register #(
@@ -89,29 +89,29 @@ module gecko_system
         .RESET_VECTOR('b0)
     ) instruction_counter_partial_register_inst (
         .clk, .rst,
-        .enable,
-        .next(instruction_counter_partial + 'b1),
-        .value({instruction_counter_carry, instruction_counter_partial})
+        .enable('b1),
+        .next(next_instruction_counter_partial),
+        .value(instruction_counter_partial)
     );
 
     std_register #(
         .CLOCK_INFO(CLOCK_INFO),
-        .T(logic [32:0]),
+        .T(logic [63:0]),
         .RESET_VECTOR('b0)
     ) clock_counter_register_inst (
         .clk, .rst,
-        .enable,
+        .enable('b1),
         .next(next_clock_counter),
         .value(clock_counter)
     );
 
     std_register #(
         .CLOCK_INFO(CLOCK_INFO),
-        .T(logic [32:0]),
+        .T(logic [63:0]),
         .RESET_VECTOR('b0)
     ) instruction_counter_register_inst (
         .clk, .rst,
-        .enable,
+        .enable('b1),
         .next(next_instruction_counter),
         .value(instruction_counter)
     );
@@ -119,11 +119,14 @@ module gecko_system
     always_comb begin
         automatic gecko_system_operation_t command_in;
 
-        next_clock_counter[31:0] <= clock_counter_partial;
-        next_clock_counter[63:32] <= clock_counter[63:32] + clock_counter_carry;
+        next_clock_counter_partial = {1'b0, clock_counter_partial[31:0]} + 'b1;
+        next_instruction_counter_partial = {1'b0, instruction_counter_partial[31:0]} + retired_instructions;
 
-        next_instruction_counter[31:0] <= instruction_counter_partial;
-        next_instruction_counter[63:32] <= instruction_counter[63:32] + instruction_counter_carry;
+        next_clock_counter[31:0] = clock_counter_partial[31:0];
+        next_clock_counter[63:32] = clock_counter[63:32] + clock_counter_partial[32];
+
+        next_instruction_counter[31:0] = instruction_counter_partial[31:0];
+        next_instruction_counter[63:32] = instruction_counter[63:32] + instruction_counter_partial[32];
 
         command_in = gecko_system_operation_t'(system_command.payload);
 
