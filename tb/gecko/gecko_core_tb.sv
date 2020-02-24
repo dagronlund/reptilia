@@ -53,11 +53,11 @@ module gecko_core_tb
         .FLOAT_LATENCY(1),
         .START_ADDR('b0),
         .ENABLE_PERFORMANCE_COUNTERS(1),
-        .ENABLE_BRANCH_PREDICTOR(1)
+        .ENABLE_BRANCH_PREDICTOR(1),
         // parameter int BRANCH_PREDICTOR_ADDR_WIDTH = 5,
         // parameter int ENABLE_PRINT = 1,
         // parameter int ENABLE_FLOAT = 0,
-        // parameter int ENABLE_INTEGER_MATH = 0
+        .ENABLE_INTEGER_MATH(1)
     ) gecko_core_inst (
         .clk, .rst,
 
@@ -73,7 +73,7 @@ module gecko_core_tb
     mem_sequential_double #(
         .CLOCK_INFO(CLOCK_INFO),
         .TECHNOLOGY(STD_TECHNOLOGY_FPGA_XILINX),
-        .MANUAL_ADDR_WIDTH(13),
+        .MANUAL_ADDR_WIDTH(15),
         .ADDR_BYTE_SHIFTED(1),
         .ENABLE_OUTPUT_REG0(0),
         .ENABLE_OUTPUT_REG1(0),

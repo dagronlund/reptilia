@@ -1,6 +1,7 @@
 //!import riscv/riscv_pkg
 //!import riscv/riscv32_pkg
 //!import riscv/riscv32i_pkg
+//!import riscv/riscv32m_pkg
 //!import riscv/riscv32f_pkg
 //!import riscv/riscv32v_pkg
 //!import gecko/gecko_pkg
@@ -10,6 +11,7 @@ package gecko_decode_util_pkg;
     import riscv_pkg::*;
     import riscv32_pkg::*;
     import riscv32i_pkg::*;
+    import riscv32m_pkg::*;
     import riscv32f_pkg::*;
     import riscv32v_pkg::*;
     import gecko_pkg::*;
@@ -316,7 +318,8 @@ package gecko_decode_util_pkg;
 
         case (riscv32i_opcode_t'(instruction_fields.opcode))
         RISCV32I_OPCODE_OP: begin
-            execute_op.op_type = GECKO_EXECUTE_TYPE_EXECUTE;
+            execute_op.op_type = (instruction_fields.funct7 == RISCV32M_FUNCT7_MUL_DIV) ? 
+                    GECKO_EXECUTE_TYPE_MUL_DIV : GECKO_EXECUTE_TYPE_EXECUTE;
             execute_op.op = instruction_fields.funct3;
             execute_op.alu_alternate = (instruction_fields.funct7 == RISCV32I_FUNCT7_ALT_INT) ? 
                     GECKO_ALTERNATE : GECKO_NORMAL;

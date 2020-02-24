@@ -159,7 +159,8 @@ module gecko_core
         .PIPELINE_MODE(DECODE_PIPELINE_MODE),
         .NUM_FORWARDED(3),
         .ENABLE_PRINT(ENABLE_PRINT),
-        .ENABLE_FLOAT(ENABLE_FLOAT)
+        .ENABLE_FLOAT(ENABLE_FLOAT),
+        .ENABLE_INTEGER_MATH(ENABLE_INTEGER_MATH)
     ) gecko_decode_inst (
         .clk, .rst,
 
@@ -179,7 +180,6 @@ module gecko_core
         .forwarded_results({execute_forwarded, memory_forwarded, writeback_forwarded}),
 
         .exit_flag, .exit_code,
-        // .faulted_flag, .finished_flag, 
         .retired_instructions
     );
 

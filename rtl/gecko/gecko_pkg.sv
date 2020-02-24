@@ -7,6 +7,7 @@ package gecko_pkg;
     import riscv_pkg::*;
     import riscv32_pkg::*;
     import riscv32i_pkg::*;
+    import riscv32m_pkg::*;
 
     typedef riscv32_reg_value_t gecko_pc_t;
 
@@ -114,25 +115,8 @@ package gecko_pkg;
         GECKO_EXECUTE_TYPE_STORE = 3'b010,
         GECKO_EXECUTE_TYPE_BRANCH = 3'b011,
         GECKO_EXECUTE_TYPE_JUMP = 3'b100,
-        GECKO_EXECUTE_TYPE_MULT = 3'b101,
-        GECKO_EXECUTE_TYPE_DIV = 3'b110
+        GECKO_EXECUTE_TYPE_MUL_DIV = 3'b101
     } gecko_execute_type_t;
-
-    typedef logic [1:0] gecko_execute_math_type_t;
-
-    typedef enum gecko_execute_math_type_t {
-        GECKO_EXECUTE_MULT_TYPE_MUL = 2'b00,
-        GECKO_EXECUTE_MULT_TYPE_MULH = 2'b01,
-        GECKO_EXECUTE_MULT_TYPE_MULHU = 2'b10,
-        GECKO_EXECUTE_MULT_TYPE_MULHSU = 2'b11
-    } gecko_execute_mult_type_t;
-
-    typedef enum gecko_execute_math_type_t {
-        GECKO_EXECUTE_DIV_TYPE_DIV = 2'b00,
-        GECKO_EXECUTE_DIV_TYPE_DIVU = 2'b01,
-        GECKO_EXECUTE_DIV_TYPE_REM = 2'b10,
-        GECKO_EXECUTE_DIV_TYPE_REMU = 2'b11
-    } gecko_execute_div_type_t;
 
     typedef struct packed {
         riscv32_reg_addr_t reg_addr;
@@ -142,7 +126,6 @@ package gecko_pkg;
         logic halt;
 
         gecko_execute_type_t op_type;
-        gecko_execute_math_type_t math_type;
         riscv32i_funct3_t op;
         gecko_alternate_t alu_alternate;
 
@@ -311,22 +294,87 @@ package gecko_pkg;
      * Gecko Integer Math Helpers                                            *
      *************************************************************************/
 
-    // typedef struct packed {
-    //     riscv32_reg_value_t result;
-    //     riscv32_reg_value_t partial;
-    // } gecko_multiply_result_t;
+    typedef struct packed {
+        riscv32m_funct3_t math_op;
+        riscv32_reg_value_t operand; // rs1, multiplicand, dividend
+        riscv32_reg_value_t operator; // rs2, multiplier, divisor
+        riscv32_reg_value_t result;
+    } gecko_math_operation_t;
 
-    // function automatic riscv32_reg_value_t gecko_multiply_lower(
-    //     input riscv32_reg_value_t current_result,
-    //     input riscv32_reg_value_t 
-    // );
+    function automatic gecko_math_operation_t gecko_math_operation_step(
+        input gecko_math_operation_t op,
+        logic [4:0] current_iteration
+    );
+        riscv32_reg_value_t temp;
 
-    // endfunction
+        unique case (op.math_op)
+        RISCV32M_FUNCT3_MUL: begin
+            if (op.operator[0]) begin
+                op.result = op.result + op.operand;
+            end
+            op.operand = {op.operand[30:0], 1'b0};
+            op.operator = {1'b0, op.operator[31:1]};
+            return op;
+        end
+        RISCV32M_FUNCT3_MULH: begin
+            op.result = {op.result[31], op.result[31:1]}; // Sign extend rs1
+            if (op.operator[0]) begin
+                if (current_iteration == 'd31) begin
+                    // Subtract if it is the last operation for sign extension
+                    op.result = op.result - op.operand;
+                end else begin
+                    op.result = op.result + op.operand;
+                end
+            end
+            op.operator = {1'b0, op.operator[31:1]};
+            return op;
+        end
+        RISCV32M_FUNCT3_MULHSU: begin
+            if (op.operator[0]) begin
+                op.result = op.result + op.operand;
+            end
+            op.operator = {1'b0, op.operator[31:1]};
+            op.result = {op.result[31], op.result[31:1]}; // Sign extend rs1
+            return op;
+        end
+        RISCV32M_FUNCT3_MULHU: begin
+            if (op.operator[0]) begin
+                op.result = op.result + op.operand;
+            end
+            op.operator = {1'b0, op.operator[31:1]};
+            op.result = {1'b0, op.result[31:1]};
+            return op;
+        end
+        // TODO: CRITICAL: Support signed division (I hate thinking about it)
+        RISCV32M_FUNCT3_DIV, RISCV32M_FUNCT3_REM,
+        RISCV32M_FUNCT3_DIVU, RISCV32M_FUNCT3_REMU: begin
+            // Left shift remainder, fill in with numerator MSB
+            op.result = {op.result[30:0], op.operand[31]};
+            // If remainder >= divisor (or fills in ones if division by zero)
+            if ((op.result >= op.operator) || (op.operator == 0)) begin
+                // Subtract divisor from remainder
+                op.result = op.result - op.operator;
+                // Fill in quotient with one (replaces operand lsb)
+                op.operand = {op.operand[30:0], 1'b1};
+            end else begin
+                // Fill in quotient with zero
+                op.operand = {op.operand[30:0], 1'b0};
+            end
 
-    // function automatic gecko_multiply_result_t gecko_multiply_upper(
+            // Q := 0, R := 0
+            // for i := n − 1 .. 0 do
+            //     R := R << 1           -- Left-shift R by 1 bit
+            //     R(0) := OPERAND(i)    -- Set the least-significant bit of R equal to bit i of the numerator
+            //     if R ≥ OPERATOR then
+            //         R := R − OPERATOR
+            //         Q(i) := 1
+            //     end
+            // end
 
-    // );
-    
-    // endfunction
+            return op;
+        end
+        endcase
+
+    endfunction
 
 endpackage

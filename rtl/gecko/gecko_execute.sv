@@ -3,6 +3,7 @@
 //!import riscv/riscv_pkg
 //!import riscv/riscv32_pkg
 //!import riscv/riscv32i_pkg
+//!import riscv/riscv32m_pkg
 //!import gecko/gecko_pkg
 
 `timescale 1ns/1ps
@@ -21,6 +22,7 @@ module gecko_execute
     import riscv_pkg::*;
     import riscv32_pkg::*;
     import riscv32i_pkg::*;
+    import riscv32m_pkg::*;
     import gecko_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
@@ -100,22 +102,10 @@ module gecko_execute
         .stream_in(next_jump_command), .stream_out(jump_command)
     );
 
-    riscv32_reg_value_t current_operand, next_operand;
-    riscv32_reg_value_t current_operator, next_operator;
-    logic [4:0] current_iteration, next_iteration;
-
     riscv32_reg_value_t current_execute_value;
 
-    // always_ff @(posedge clk) begin
-    //     if (enable) begin
-    //         current_iteration <= next_iteration;
-    //         current_operand <= next_operand;
-    //         current_operator <= next_operator;
-    //     end
-    //     // if (enable && produce_execute) begin
-    //     //     current_execute_value <= next_execute_result.payload.value;
-    //     // end
-    // end
+    logic [4:0] current_iteration, next_iteration;
+    gecko_math_operation_t current_math_op, next_math_op;
 
     std_register #(
         .CLOCK_INFO(CLOCK_INFO),
@@ -141,51 +131,38 @@ module gecko_execute
 
     std_register #(
         .CLOCK_INFO(CLOCK_INFO),
-        .T(riscv32_reg_value_t),
-        .RESET_VECTOR('b0)
-    ) operator_register (
+        .T(gecko_math_operation_t),
+        .RESET_VECTOR('{
+            math_op: RISCV32M_FUNCT3_MUL,
+            operand: 'b0,
+            operator: 'b0,
+            result: 'b0
+        })
+    ) math_op_register (
         .clk, .rst(std_get_reset(CLOCK_INFO, 0)), // No reset
         .enable,
-        .next(next_operator),
-        .value(current_operator)
-    );
-
-    std_register #(
-        .CLOCK_INFO(CLOCK_INFO),
-        .T(riscv32_reg_value_t),
-        .RESET_VECTOR('b0)
-    ) operand_register (
-        .clk, .rst(std_get_reset(CLOCK_INFO, 0)), // No reset
-        .enable,
-        .next(next_operand),
-        .value(current_operand)
+        .next(next_math_op),
+        .value(current_math_op)
     );
 
     always_comb begin
         automatic riscv32_reg_value_t a, b, c, d;
         automatic gecko_execute_operation_t cmd_in;
         automatic gecko_alternate_t alt;
-        automatic gecko_math_result_t result;
+        automatic gecko_math_result_t alu_result;
         automatic gecko_store_result_t store_result;
-        
         automatic logic take_branch;
+        automatic gecko_math_operation_t math_op;
 
         cmd_in = gecko_execute_operation_t'(execute_command.payload);
 
         next_iteration = current_iteration;
-        next_operand = current_operand;
-        next_operator = current_operator;
+        next_math_op = current_math_op;
 
         a = (cmd_in.reuse_rs1) ? current_execute_value : cmd_in.rs1_value;
         b = (cmd_in.reuse_rs2) ? current_execute_value : cmd_in.rs2_value;
         c = (cmd_in.reuse_mem) ? current_execute_value : cmd_in.mem_value;
         d = (cmd_in.reuse_jump) ? current_execute_value : cmd_in.jump_value;
-
-        consume = 'b1;
-        produce_mem_command = 'b0;
-        produce_mem_request = 'b0;
-        produce_execute = 'b0;
-        produce_jump = 'b0;
 
         // Sort out math with alternate flags
         case (cmd_in.op_type)
@@ -201,24 +178,15 @@ module gecko_execute
         GECKO_EXECUTE_TYPE_LOAD: alt = GECKO_NORMAL;
         GECKO_EXECUTE_TYPE_STORE: alt = GECKO_NORMAL;
         GECKO_EXECUTE_TYPE_BRANCH: alt = GECKO_ALTERNATE;
-        GECKO_EXECUTE_TYPE_MULT: begin
+        GECKO_EXECUTE_TYPE_MUL_DIV: begin
             alt = GECKO_NORMAL;
-            // if (current_iteration != 'b0) begin
-            //     a = current_operand;
-            //     b = current_operator;
-            // end else begin
-
-            // end
-        end
-        GECKO_EXECUTE_TYPE_DIV: begin
-            alt = GECKO_ALTERNATE;
         end
         default: alt = GECKO_NORMAL;
         endcase
 
-        result = gecko_get_full_math_result(a, b, alt);
+        alu_result = gecko_get_full_math_result(a, b, alt);
 
-        next_execute_result.payload.value = result.add_sub_result;
+        next_execute_result.payload.value = alu_result.add_sub_result;
         next_execute_result.payload.addr = cmd_in.reg_addr;
         next_execute_result.payload.speculative = cmd_in.speculative;
         next_execute_result.payload.reg_status = cmd_in.reg_status;
@@ -239,77 +207,119 @@ module gecko_execute
         next_mem_request.addr = 'b0;
         next_mem_request.data = 'b0;
 
-        case (cmd_in.op_type)
-        GECKO_EXECUTE_TYPE_EXECUTE: begin
-            produce_execute = 'b1;
+        produce_mem_command = 'b0;
+        produce_mem_request = 'b0;
+        produce_execute = 'b0;
+        produce_jump = 'b0;
 
-            case (cmd_in.op.ir)
-            RISCV32I_FUNCT3_IR_ADD_SUB: next_execute_result.payload.value = result.add_sub_result;
-            RISCV32I_FUNCT3_IR_SLL: next_execute_result.payload.value = result.lshift_result;
-            RISCV32I_FUNCT3_IR_SLT: next_execute_result.payload.value = result.lt ? 32'b1 : 32'b0;
-            RISCV32I_FUNCT3_IR_SLTU: next_execute_result.payload.value = result.ltu ? 32'b1 : 32'b0;
-            RISCV32I_FUNCT3_IR_XOR: next_execute_result.payload.value = result.xor_result;
-            RISCV32I_FUNCT3_IR_SRL_SRA: next_execute_result.payload.value = result.rshift_result;
-            RISCV32I_FUNCT3_IR_OR: next_execute_result.payload.value = result.or_result;
-            RISCV32I_FUNCT3_IR_AND: next_execute_result.payload.value = result.and_result;
+        if ((current_iteration != 'b0) && ENABLE_INTEGER_MATH) begin // Math loop iterations
+            
+            if (current_iteration == 'd31) begin
+                next_iteration = 'b0;
+                produce_execute = 'b1;
+                consume = 'b1;
+            end else begin
+                next_iteration = current_iteration + 'b1;
+                consume = 'b0;
+            end
+
+            // Perform math operation
+            next_math_op = gecko_math_operation_step(current_math_op, current_iteration);
+
+            // Only for division is the result stored in the operand
+            // Use the next values so we can fully run 32 cycles
+            case (current_math_op.math_op)
+            RISCV32M_FUNCT3_DIV, RISCV32M_FUNCT3_DIVU: next_execute_result.payload.value = next_math_op.operand;
+            default: next_execute_result.payload.value = next_math_op.result;
+            endcase
+
+        end else begin // Normal ALU operations
+            consume = 'b1;
+
+            case (cmd_in.op_type)
+            GECKO_EXECUTE_TYPE_EXECUTE: begin
+                produce_execute = 'b1;
+
+                case (cmd_in.op.ir)
+                RISCV32I_FUNCT3_IR_ADD_SUB: next_execute_result.payload.value = alu_result.add_sub_result;
+                RISCV32I_FUNCT3_IR_SLL: next_execute_result.payload.value = alu_result.lshift_result;
+                RISCV32I_FUNCT3_IR_SLT: next_execute_result.payload.value = alu_result.lt ? 32'b1 : 32'b0;
+                RISCV32I_FUNCT3_IR_SLTU: next_execute_result.payload.value = alu_result.ltu ? 32'b1 : 32'b0;
+                RISCV32I_FUNCT3_IR_XOR: next_execute_result.payload.value = alu_result.xor_result;
+                RISCV32I_FUNCT3_IR_SRL_SRA: next_execute_result.payload.value = alu_result.rshift_result;
+                RISCV32I_FUNCT3_IR_OR: next_execute_result.payload.value = alu_result.or_result;
+                RISCV32I_FUNCT3_IR_AND: next_execute_result.payload.value = alu_result.and_result;
+                endcase
+            end
+            GECKO_EXECUTE_TYPE_LOAD: begin
+                produce_mem_request = 'b1;
+                produce_mem_command = 'b1;
+
+                next_mem_request.addr = alu_result.add_sub_result;
+                next_mem_request.read_enable = 'b1;
+
+                next_mem_command.payload.offset = alu_result.add_sub_result[1:0];
+            end
+            GECKO_EXECUTE_TYPE_STORE: begin
+                produce_mem_request = 'b1;
+
+                store_result = gecko_get_store_result(c, alu_result.add_sub_result[1:0], cmd_in.op.ls);
+
+                next_mem_request.addr = alu_result.add_sub_result;
+                next_mem_request.data = store_result.value;
+                next_mem_request.write_enable = store_result.mask;
+            end
+            GECKO_EXECUTE_TYPE_BRANCH: begin
+                produce_jump = 'b1;
+                
+                take_branch = gecko_evaluate_branch(alu_result, cmd_in.op);
+
+                if (take_branch) begin
+                    next_jump_command.payload.branched = 'b1;
+                    next_jump_command.payload.actual_next_pc = cmd_in.current_pc + cmd_in.immediate_value;
+                end else begin
+                    next_jump_command.payload.branched = 'b0;
+                    next_jump_command.payload.actual_next_pc = cmd_in.current_pc + 'd4;
+                end
+
+                next_jump_command.payload.update_pc = (next_jump_command.payload.actual_next_pc != cmd_in.next_pc);
+            end
+            GECKO_EXECUTE_TYPE_JUMP: begin
+                produce_execute = (cmd_in.reg_addr != 'b0) && !cmd_in.halt;
+                produce_jump = 'b1;
+
+                next_jump_command.payload.halt = cmd_in.halt;
+                next_jump_command.payload.actual_next_pc = d + cmd_in.immediate_value;
+                next_jump_command.payload.jumped = 'b1;
+                next_jump_command.payload.update_pc = (next_jump_command.payload.actual_next_pc != cmd_in.next_pc);
+            end
+            GECKO_EXECUTE_TYPE_MUL_DIV: begin
+                if (ENABLE_INTEGER_MATH) begin
+                    // Do not consume the input stream until operation is done
+                    consume = 'b0;
+
+                    // Only start operation is the command is actually valid
+                    if (execute_command.valid) begin
+
+                        // Perform math operation
+                        next_math_op = gecko_math_operation_step('{
+                            math_op: riscv32m_funct3_t'(cmd_in.op),
+                            operand: a,
+                            operator: b,
+                            result: 'b0
+                        }, current_iteration);
+
+                        // Start iteration counter
+                        next_iteration = 'b1;
+
+                    end
+                end else begin
+                    produce_execute = 'b1;
+                    next_execute_result.payload.value = 'b0;
+                end
+            end
             endcase
         end
-        GECKO_EXECUTE_TYPE_LOAD: begin
-            produce_mem_request = 'b1;
-            produce_mem_command = 'b1;
-
-            next_mem_request.addr = result.add_sub_result;
-            next_mem_request.read_enable = 'b1;
-
-            next_mem_command.payload.offset = result.add_sub_result[1:0];
-        end
-        GECKO_EXECUTE_TYPE_STORE: begin
-            produce_mem_request = 'b1;
-
-            store_result = gecko_get_store_result(c, result.add_sub_result[1:0], cmd_in.op.ls);
-
-            next_mem_request.addr = result.add_sub_result;
-            next_mem_request.data = store_result.value;
-            next_mem_request.write_enable = store_result.mask;
-        end
-        GECKO_EXECUTE_TYPE_BRANCH: begin
-            produce_jump = 'b1;
-            
-            take_branch = gecko_evaluate_branch(result, cmd_in.op);
-
-            if (take_branch) begin
-                next_jump_command.payload.branched = 'b1;
-                next_jump_command.payload.actual_next_pc = cmd_in.current_pc + cmd_in.immediate_value;
-            end else begin
-                next_jump_command.payload.branched = 'b0;
-                next_jump_command.payload.actual_next_pc = cmd_in.current_pc + 'd4;
-            end
-
-            next_jump_command.payload.update_pc = (next_jump_command.payload.actual_next_pc != cmd_in.next_pc);
-        end
-        GECKO_EXECUTE_TYPE_JUMP: begin
-            produce_execute = (cmd_in.reg_addr != 'b0) && !cmd_in.halt;
-            produce_jump = 'b1;
-
-            next_jump_command.payload.halt = cmd_in.halt;
-            next_jump_command.payload.actual_next_pc = d + cmd_in.immediate_value;
-            next_jump_command.payload.jumped = 'b1;
-            next_jump_command.payload.update_pc = (next_jump_command.payload.actual_next_pc != cmd_in.next_pc);
-        end
-        GECKO_EXECUTE_TYPE_MULT, GECKO_EXECUTE_TYPE_DIV: begin
-            if (ENABLE_INTEGER_MATH) begin
-                if (current_iteration == 'd31) begin
-                    consume = 'b1;
-                    produce_execute = 'b1;
-                end else begin
-                    consume  = 'b0;
-                end
-            end else begin
-                produce_execute = 'b1;
-                next_execute_result.payload.value = 'b0;
-            end
-        end
-        endcase
     end
 
 endmodule

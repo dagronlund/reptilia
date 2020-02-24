@@ -19,7 +19,7 @@ package riscv32m_pkg;
 
     typedef enum riscv32_funct7_t {
         RISCV32M_FUNCT7_MUL_DIV = 'h01,
-        RISCV32M_FUNCT7_UNDEF = 'hXX
+        RISCV32M_FUNCT7_UNDEF
     } riscv32m_funct7_t;
 
 endpackage
