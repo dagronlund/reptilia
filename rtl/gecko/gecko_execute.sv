@@ -136,6 +136,7 @@ module gecko_execute
             math_op: RISCV32M_FUNCT3_MUL,
             operand: 'b0,
             operator: 'b0,
+            previous_multiplier_lsb: 'b0,
             result: 'b0
         })
     ) math_op_register (
@@ -306,6 +307,7 @@ module gecko_execute
                             math_op: riscv32m_funct3_t'(cmd_in.op),
                             operand: a,
                             operator: b,
+                            previous_multiplier_lsb: 'b0,
                             result: 'b0
                         }, current_iteration);
 

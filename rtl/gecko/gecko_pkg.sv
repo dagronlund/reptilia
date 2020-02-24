@@ -299,13 +299,14 @@ package gecko_pkg;
         riscv32_reg_value_t operand; // rs1, multiplicand, dividend
         riscv32_reg_value_t operator; // rs2, multiplier, divisor
         riscv32_reg_value_t result;
+        logic previous_multiplier_lsb;
     } gecko_math_operation_t;
 
     function automatic gecko_math_operation_t gecko_math_operation_step(
         input gecko_math_operation_t op,
         logic [4:0] current_iteration
     );
-        riscv32_reg_value_t temp;
+        logic carry = 1'b0;
 
         unique case (op.math_op)
         RISCV32M_FUNCT3_MUL: begin
@@ -317,16 +318,15 @@ package gecko_pkg;
             return op;
         end
         RISCV32M_FUNCT3_MULH: begin
-            op.result = {op.result[31], op.result[31:1]}; // Sign extend rs1
-            if (op.operator[0]) begin
-                if (current_iteration == 'd31) begin
-                    // Subtract if it is the last operation for sign extension
-                    op.result = op.result - op.operand;
-                end else begin
-                    op.result = op.result + op.operand;
-                end
+            // Use Booth's Algorithm
+            if (!op.operator[0] && op.previous_multiplier_lsb) begin
+                op.result = op.result + op.operand;
+            end else if (op.operator[0] && !op.previous_multiplier_lsb) begin
+                op.result = op.result - op.operand;
             end
+            op.previous_multiplier_lsb = op.operator[0];
             op.operator = {1'b0, op.operator[31:1]};
+            op.result = {op.result[31], op.result[31:1]};
             return op;
         end
         RISCV32M_FUNCT3_MULHSU: begin
@@ -339,10 +339,10 @@ package gecko_pkg;
         end
         RISCV32M_FUNCT3_MULHU: begin
             if (op.operator[0]) begin
-                op.result = op.result + op.operand;
+                {carry, op.result} = op.result + op.operand;
             end
             op.operator = {1'b0, op.operator[31:1]};
-            op.result = {1'b0, op.result[31:1]};
+            op.result = {carry, op.result[31:1]};
             return op;
         end
         // TODO: CRITICAL: Support signed division (I hate thinking about it)
