@@ -300,6 +300,7 @@ package gecko_pkg;
         riscv32_reg_value_t operator; // rs2, multiplier, divisor
         riscv32_reg_value_t result;
         logic flag;
+        logic done;
     } gecko_math_operation_t;
 
     function automatic gecko_math_operation_t gecko_math_operation_step(
@@ -307,14 +308,34 @@ package gecko_pkg;
         logic [5:0] current_iteration
     );
         logic carry = 1'b0;
+        int i;
 
         unique case (op.math_op)
         RISCV32M_FUNCT3_MUL: begin
-            if (op.operator[0]) begin
-                op.result = op.result + op.operand;
+
+            // // Does single cycle multiplication change anything?
+            // for (i = 0; i < 32; i++) begin
+            //     if (op.operator[0]) begin
+            //         op.result = op.result + op.operand;
+            //     end
+            //     op.operand = {op.operand[30:0], 1'b0};
+            //     op.operator = {1'b0, op.operator[31:1]};
+            // end
+            // op.done = 'b1;
+
+            if (current_iteration == 'b0) begin
+                // Swap lesser value into operator to save cycles
+                if (op.operand < op.operator) begin
+                    {op.operand, op.operator} = {op.operator, op.operand};
+                end
+            end else begin
+                if (op.operator[0]) begin
+                    op.result = op.result + op.operand;
+                end
+                op.operand = {op.operand[30:0], 1'b0};
+                op.operator = {1'b0, op.operator[31:1]};
+                op.done = (op.operator == 'b0);
             end
-            op.operand = {op.operand[30:0], 1'b0};
-            op.operator = {op.operator[31], op.operator[31:1]};
             return op;
         end
         RISCV32M_FUNCT3_MULH: begin
@@ -325,10 +346,12 @@ package gecko_pkg;
                 op.result = op.result - op.operand;
             end
             op.flag = op.operator[0];
-            op.operator = {1'b0, op.operator[31:1]};
             op.result = {op.result[31], op.result[31:1]};
+            op.operator = {1'b0, op.operator[31:1]};
+            op.done = (op.operator == 'b0);
             return op;
         end
+        // TODO: Fix performance of MULHSU (does not always need 34 cycles)
         RISCV32M_FUNCT3_MULHSU: begin
             if (current_iteration == 'b0) begin // ABS operand and record
                 if (op.operand[31]) begin // Flip sign
@@ -344,6 +367,7 @@ package gecko_pkg;
                         op.result = op.result + 'b1;
                     end
                 end
+                op.done = 'b1;
             end else begin // iterations 1...31
                 if (op.operator[0]) begin
                     {carry, op.result} = op.result + op.operand;
@@ -365,13 +389,48 @@ package gecko_pkg;
             if (op.operator[0]) begin
                 {carry, op.result} = op.result + op.operand;
             end
-            op.operator = {1'b0, op.operator[31:1]};
             op.result = {carry, op.result[31:1]};
+            op.operator = {1'b0, op.operator[31:1]};
+            op.done = (op.operator == 'b0);
             return op;
         end
         // TODO: CRITICAL: Support signed division (I hate thinking about it)
         RISCV32M_FUNCT3_DIV, RISCV32M_FUNCT3_REM,
+        // : begin
+        //     if (current_iteration == 'd0) begin // Find ABS of first arg
+        //         if (op.operand[31]) begin
+        //             op.flag = 'b1;
+        //             op.operand = 'b0 - op.operand;
+        //         end
+        //     end else if (current_iteration == 'd1) begin // Find ABS of second arg
+        //         if (op.operator[31]) begin
+        //             op.flag = ~op.flag; // Make flag zero again if both negative
+        //             op.operator = 'b0 = op.operator;
+        //         end
+        //     end else if (current_iteration == 'd34) begin // Invert result if necessary
+        //         if (op.flag) begin
+
+        //         end
+        //     end else begin
+        //         // Left shift remainder, fill in with numerator MSB
+        //         op.result = {op.result[30:0], op.operand[31]};
+        //         // If remainder >= divisor (or fills in ones if division by zero)
+        //         if ((op.result >= op.operator) || (op.operator == 0)) begin
+        //             // Subtract divisor from remainder
+        //             op.result = op.result - op.operator;
+        //             // Fill in quotient with one (replaces operand lsb)
+        //             op.operand = {op.operand[30:0], 1'b1};
+        //         end else begin
+        //             // Fill in quotient with zero
+        //             op.operand = {op.operand[30:0], 1'b0};
+        //         end
+        //     end
+        // end
         RISCV32M_FUNCT3_DIVU, RISCV32M_FUNCT3_REMU: begin
+
+            // // Does single cycle division change anything?
+            // for (i = 0; i < 32; i++) begin
+
             // Left shift remainder, fill in with numerator MSB
             op.result = {op.result[30:0], op.operand[31]};
             // If remainder >= divisor (or fills in ones if division by zero)
@@ -384,6 +443,12 @@ package gecko_pkg;
                 // Fill in quotient with zero
                 op.operand = {op.operand[30:0], 1'b0};
             end
+
+            // end
+            // op.done = 'b1;
+
+            // TODO: Fix division performance, does not have to run all cycles
+            op.done = (current_iteration == 'd31);
 
             // Q := 0, R := 0
             // for i := n − 1 .. 0 do
@@ -402,20 +467,3 @@ package gecko_pkg;
     endfunction
 
 endpackage
-
-
-/*
-
--1 * 15 = 
-
-(-1 * 1) + (-1 * 2) + (-1 * 4) + (-1 * 8) =
-
-((((((0xF >>> 1) + 0xF) >>> 1) + 0xF) >>> 1) + 0xF) >>> 1 
-
-7 * 7 = 
-
-(7 * 1) + (7 * 2) + (7 * 4) = 
-
-5 + 7
-
-*/

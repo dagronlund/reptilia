@@ -139,6 +139,7 @@ module gecko_execute
             operand: 'b0,
             operator: 'b0,
             flag: 'b0,
+            done: 'b0,
             result: 'b0
         })
     ) math_op_register (
@@ -216,31 +217,19 @@ module gecko_execute
         produce_jump = 'b0;
 
         if ((current_iteration != 'b0) && ENABLE_INTEGER_MATH) begin // Math loop iterations
-            
-            if (current_math_op.math_op == RISCV32M_FUNCT3_MULHSU) begin
-                if (current_iteration == 'd33) begin
-                    next_iteration = 'b0;
-                    produce_execute = 'b1;
-                    consume = 'b1;
-                end else begin
-                    next_iteration = current_iteration + 'b1;
-                    consume = 'b0;
-                end
-            end else begin
-                if (current_iteration == 'd31) begin
-                    next_iteration = 'b0;
-                    produce_execute = 'b1;
-                    consume = 'b1;
-                end else begin
-                    next_iteration = current_iteration + 'b1;
-                    consume = 'b0;
-                end
-            end
-
-            
 
             // Perform math operation
             next_math_op = gecko_math_operation_step(current_math_op, current_iteration);
+
+            // If operation signals it is done
+            if (next_math_op.done) begin
+                next_iteration = 'b0;
+                produce_execute = 'b1;
+                consume = 'b1;
+            end else begin
+                next_iteration = current_iteration + 'b1;
+                consume = 'b0;
+            end
 
             // Only for division is the result stored in the operand
             // Use the next values so we can fully run 32 cycles
@@ -323,12 +312,28 @@ module gecko_execute
                             operand: a,
                             operator: b,
                             flag: 'b0,
+                            done: 'b0,
                             result: 'b0
                         }, current_iteration);
 
                         // Start iteration counter
                         next_iteration = 'b1;
 
+                        // // TODO: Remove this, just for testing
+                        // if (next_math_op.done) begin
+                        //     next_iteration = 'b0;
+                        //     produce_execute = 'b1;
+                        //     consume = 'b1;
+
+                        //     case (next_math_op.math_op)
+                        //     RISCV32M_FUNCT3_DIV, RISCV32M_FUNCT3_DIVU: 
+                        //         next_execute_result.payload.value = 
+                        //             next_math_op.operand;
+                        //     default: 
+                        //         next_execute_result.payload.value = 
+                        //             next_math_op.result;
+                        //     endcase
+                        // end
                     end
                 end else begin
                     produce_execute = 'b1;
