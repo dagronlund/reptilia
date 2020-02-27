@@ -41,6 +41,8 @@ module gecko_execute
     stream_intf.out jump_command // gecko_jump_operation_t
 );
 
+    typedef logic [5:0] iteration_t;
+
     stream_intf #(.T(gecko_mem_operation_t)) next_mem_command (.clk, .rst);
     mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) next_mem_request (.clk, .rst);
     stream_intf #(.T(gecko_operation_t)) next_execute_result (.clk, .rst);
@@ -104,7 +106,7 @@ module gecko_execute
 
     riscv32_reg_value_t current_execute_value;
 
-    logic [4:0] current_iteration, next_iteration;
+    iteration_t current_iteration, next_iteration;
     gecko_math_operation_t current_math_op, next_math_op;
 
     std_register #(
@@ -120,7 +122,7 @@ module gecko_execute
 
     std_register #(
         .CLOCK_INFO(CLOCK_INFO),
-        .T(logic [4:0]),
+        .T(iteration_t),
         .RESET_VECTOR('b0)
     ) iteration_register (
         .clk, .rst,
@@ -136,7 +138,7 @@ module gecko_execute
             math_op: RISCV32M_FUNCT3_MUL,
             operand: 'b0,
             operator: 'b0,
-            previous_multiplier_lsb: 'b0,
+            flag: 'b0,
             result: 'b0
         })
     ) math_op_register (
@@ -215,14 +217,27 @@ module gecko_execute
 
         if ((current_iteration != 'b0) && ENABLE_INTEGER_MATH) begin // Math loop iterations
             
-            if (current_iteration == 'd31) begin
-                next_iteration = 'b0;
-                produce_execute = 'b1;
-                consume = 'b1;
+            if (current_math_op.math_op == RISCV32M_FUNCT3_MULHSU) begin
+                if (current_iteration == 'd33) begin
+                    next_iteration = 'b0;
+                    produce_execute = 'b1;
+                    consume = 'b1;
+                end else begin
+                    next_iteration = current_iteration + 'b1;
+                    consume = 'b0;
+                end
             end else begin
-                next_iteration = current_iteration + 'b1;
-                consume = 'b0;
+                if (current_iteration == 'd31) begin
+                    next_iteration = 'b0;
+                    produce_execute = 'b1;
+                    consume = 'b1;
+                end else begin
+                    next_iteration = current_iteration + 'b1;
+                    consume = 'b0;
+                end
             end
+
+            
 
             // Perform math operation
             next_math_op = gecko_math_operation_step(current_math_op, current_iteration);
@@ -307,7 +322,7 @@ module gecko_execute
                             math_op: riscv32m_funct3_t'(cmd_in.op),
                             operand: a,
                             operator: b,
-                            previous_multiplier_lsb: 'b0,
+                            flag: 'b0,
                             result: 'b0
                         }, current_iteration);
 

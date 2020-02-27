@@ -299,12 +299,12 @@ package gecko_pkg;
         riscv32_reg_value_t operand; // rs1, multiplicand, dividend
         riscv32_reg_value_t operator; // rs2, multiplier, divisor
         riscv32_reg_value_t result;
-        logic previous_multiplier_lsb;
+        logic flag;
     } gecko_math_operation_t;
 
     function automatic gecko_math_operation_t gecko_math_operation_step(
         input gecko_math_operation_t op,
-        logic [4:0] current_iteration
+        logic [5:0] current_iteration
     );
         logic carry = 1'b0;
 
@@ -314,27 +314,51 @@ package gecko_pkg;
                 op.result = op.result + op.operand;
             end
             op.operand = {op.operand[30:0], 1'b0};
-            op.operator = {1'b0, op.operator[31:1]};
+            op.operator = {op.operator[31], op.operator[31:1]};
             return op;
         end
         RISCV32M_FUNCT3_MULH: begin
             // Use Booth's Algorithm
-            if (!op.operator[0] && op.previous_multiplier_lsb) begin
+            if (!op.operator[0] && op.flag) begin
                 op.result = op.result + op.operand;
-            end else if (op.operator[0] && !op.previous_multiplier_lsb) begin
+            end else if (op.operator[0] && !op.flag) begin
                 op.result = op.result - op.operand;
             end
-            op.previous_multiplier_lsb = op.operator[0];
+            op.flag = op.operator[0];
             op.operator = {1'b0, op.operator[31:1]};
             op.result = {op.result[31], op.result[31:1]};
             return op;
         end
         RISCV32M_FUNCT3_MULHSU: begin
-            if (op.operator[0]) begin
-                op.result = op.result + op.operand;
+            if (current_iteration == 'b0) begin // ABS operand and record
+                if (op.operand[31]) begin // Flip sign
+                    op.flag = 'b1;
+                    op.operand = 'b0 - op.operand;
+                end
+            end else if (current_iteration == 'd33) begin // Flip sign if necessary
+                if (op.flag) begin
+                    op.result = ~op.result;
+                    // Only perform the increment if the zeros flag remained active,
+                    // otherwise the addition would get "eaten" by LSBs
+                    if (op.operator[31]) begin
+                        op.result = op.result + 'b1;
+                    end
+                end
+            end else begin // iterations 1...31
+                if (op.operator[0]) begin
+                    {carry, op.result} = op.result + op.operand;
+                end
+                if (current_iteration == 'b1) begin
+                    // Shift operator and use msb to store if the
+                    // shifted out result was a zero
+                    op.operator = {!op.result[0], op.operator[31:1]};
+                end else begin
+                    // Continue shifting operator and record if
+                    // shifted out result was all zeros
+                    op.operator = {!op.result[0] && op.operator[31], op.operator[31:1]};
+                end
+                op.result = {carry, op.result[31:1]};
             end
-            op.operator = {1'b0, op.operator[31:1]};
-            op.result = {op.result[31], op.result[31:1]}; // Sign extend rs1
             return op;
         end
         RISCV32M_FUNCT3_MULHU: begin
@@ -378,3 +402,20 @@ package gecko_pkg;
     endfunction
 
 endpackage
+
+
+/*
+
+-1 * 15 = 
+
+(-1 * 1) + (-1 * 2) + (-1 * 4) + (-1 * 8) =
+
+((((((0xF >>> 1) + 0xF) >>> 1) + 0xF) >>> 1) + 0xF) >>> 1 
+
+7 * 7 = 
+
+(7 * 1) + (7 * 2) + (7 * 4) = 
+
+5 + 7
+
+*/
