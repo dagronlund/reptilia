@@ -2,7 +2,6 @@
 
 module asic_latch_ram_tb
     import std_pkg::*;
-    import stream_pkg::*;
 #()();
 
     localparam std_clock_info_t CLOCK_INFO = 'b0;
