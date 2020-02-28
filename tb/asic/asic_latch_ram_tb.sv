@@ -38,11 +38,7 @@ module asic_latch_ram_tb
         .read_data_out
     );
 
-
     initial begin
-        $dumpfile("asic_latch_ram_tb.sv");
-        $dumpvars(4); // ?
-
         write_enable = 'b0;
         write_addr = 'b0;
         write_data_in = 'b0;
@@ -58,6 +54,7 @@ module asic_latch_ram_tb
         write_data_in <= 'h42;
 
         @ (posedge clk);
+        @ (posedge clk);
         write_enable <= 'b1;
         write_addr <= 'd2;
         write_data_in <= 'h69;
@@ -67,10 +64,20 @@ module asic_latch_ram_tb
         write_addr <= 'd3;
         write_data_in <= 'h420;
 
+        // Test to make sure we don't overwrite something
+        // when the address is there but not write enabled
         @ (posedge clk);
         write_enable <= 'b0;
+        write_addr <= 'd1;
+        write_data_in <= 'h420;
+
+        @ (posedge clk);
+        write_enable <= 'b0;
+
+        @ (posedge clk);
         read_addr[0] = 'd3;
         read_addr[1] = 'd2;
+        #1; // This is disgusting
         $display("Read Data out (should be 'h420, 'h69) %h, %h", 
                 read_data_out[0], read_data_out[1]);
 
