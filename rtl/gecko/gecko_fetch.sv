@@ -41,6 +41,8 @@ module gecko_fetch
     mem_intf.out instruction_request
 );
 
+    // Type Definitions --------------------------------------------------------
+
     localparam BRANCH_HISTORY_LENGTH = 2**BRANCH_PREDICTOR_TARGET_ADDR_WIDTH;
     localparam BRANCH_HISTORY_WIDTH = $bits(gecko_prediction_history_t);
     localparam BRANCH_TAG_WIDTH = $bits(gecko_pc_t) - BRANCH_PREDICTOR_TARGET_ADDR_WIDTH - 2;
@@ -49,6 +51,7 @@ module gecko_fetch
     typedef logic [BRANCH_TAG_WIDTH-1:0] gecko_fetch_tag_t;
 
     typedef struct packed {
+        logic valid;
         gecko_pc_t predicted_next;
         gecko_fetch_tag_t tag;
         logic jump_instruction;
@@ -84,6 +87,8 @@ module gecko_fetch
         STRONG_NOT_TAKEN: return branched ? NOT_TAKEN : STRONG_NOT_TAKEN;
         endcase
     endfunction
+
+    // Stream Logic ------------------------------------------------------------
 
     logic enable, produce, ready_input_null;
 
@@ -125,6 +130,8 @@ module gecko_fetch
         .mem_in(next_instruction_request), .mem_out(instruction_request)
     );
 
+    // State Logic -------------------------------------------------------------
+
     logic branch_table_write_enable;
     gecko_fetch_table_addr_t branch_table_write_addr;
     gecko_fetch_table_entry_t branch_table_write_data;
@@ -159,7 +166,6 @@ module gecko_fetch
     gecko_pc_t current_pc, next_pc;
     gecko_jump_flag_t current_jump_flag, next_jump_flag;
     logic halt_flag;
-    logic [BRANCH_HISTORY_LENGTH-1:0] current_branch_table_valid, next_branch_table_valid;
 
     std_register #(
         .CLOCK_INFO(CLOCK_INFO),
@@ -194,17 +200,6 @@ module gecko_fetch
         .value(halt_flag)
     );
 
-    std_register #(
-        .CLOCK_INFO(CLOCK_INFO),
-        .T(logic [BRANCH_HISTORY_LENGTH-1:0]),
-        .RESET_VECTOR('b0)
-    ) branch_table_valid_register_inst (
-        .clk, .rst,
-        .enable(branch_table_write_enable),
-        .next(next_branch_table_valid),
-        .value(current_branch_table_valid)
-    );
-
     always_comb begin
         automatic logic branch_table_hit;
 
@@ -214,8 +209,8 @@ module gecko_fetch
         // Read from branch table
         branch_table_read_addr = current_pc[(BRANCH_PREDICTOR_TARGET_ADDR_WIDTH+2-1):2];
 
-        // Determine if entry exists in branch table
-        branch_table_hit = current_branch_table_valid[branch_table_read_addr] && 
+        // Determine if entry exists in branch table and has matching address
+        branch_table_hit = branch_table_read_data.valid && 
                 branch_table_read_data.tag == current_pc[31:BRANCH_PREDICTOR_TARGET_ADDR_WIDTH+2];
 
         // Take branch if it is a jump instruction or branch predicted take
@@ -250,6 +245,7 @@ module gecko_fetch
         // Update branch prediction table from jump commands (always accepts)
         branch_table_write_enable = jump_command.valid;
         branch_table_write_addr = jump_command.payload.current_pc[(BRANCH_PREDICTOR_TARGET_ADDR_WIDTH+2-1):2];
+        branch_table_write_data.valid = 'b1;
         branch_table_write_data.predicted_next = jump_command.payload.actual_next_pc;
         branch_table_write_data.tag = jump_command.payload.current_pc[31:BRANCH_PREDICTOR_TARGET_ADDR_WIDTH+2];
         branch_table_write_data.jump_instruction = jump_command.payload.jumped;
@@ -260,10 +256,6 @@ module gecko_fetch
             branch_table_write_data.history = update_history(jump_command.payload.prediction.history, 
                     jump_command.payload.branched);
         end
-
-        // Updates branch prediction valid flags (always accepts)
-        next_branch_table_valid = current_branch_table_valid;
-        next_branch_table_valid[branch_table_write_addr] = 'b1;
     end
 
 endmodule
