@@ -1,3 +1,4 @@
+import hex_converter
 import os
 import sys
 from subprocess import call
@@ -21,7 +22,7 @@ call(["C:/gnu_riscv/bin/riscv-none-embed-gcc.exe",
       "-nostdlib",
       "-nostartfiles",
       "-Wl,--no-relax",
-      "-march=rv32i",
+      "-march=rv32im",
       "-mabi=ilp32",
       input_file,
       "-o", filename_base + ".o"]) # Assembler
@@ -29,4 +30,9 @@ call(["C:/gnu_riscv/bin/riscv-none-embed-objcopy.exe",
       "-O", "binary",
       filename_base + ".o",
       filename_base + ".bin"]) # Symbol Removal
-call(["python", "hex_converter.py", filename_base + ".bin", "test.mem"]) # Hex Conversion
+
+mem_size_bytes = hex_converter.convert_file(
+    os.path.join(os.getcwd(), filename_base + ".bin"),
+    os.path.join(os.getcwd(), "test.mem"))
+print("Compiled: %d bytes, Minimum Address Width: %d" %
+      (mem_size_bytes, hex_converter.calculate_address_width(mem_size_bytes)))
