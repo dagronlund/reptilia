@@ -3,6 +3,26 @@
 #include <fenv.h>
 #include <math.h>
 
+uint32_t isqrt_test(uint32_t num) {
+    uint32_t res = 0;
+    uint32_t bit = 1 << 30; // The second-to-top bit is set: 1 << 30 for 32 bits
+ 
+    // "bit" starts at the highest power of four <= the argument.
+    while (bit > num)
+        bit >>= 2;
+        
+    while (bit != 0) {
+        if (num >= res + bit) {
+            num -= res + bit;
+            res += bit << 1;
+        }
+        
+        res >>= 1;
+        bit >>= 2;
+    }
+    return res;
+}
+
 typedef struct {
     uint32_t sign;
     uint32_t exp;
@@ -98,8 +118,8 @@ int main(int argc, char** argv) {
     // }
 
     fields.sign = 0;
-    fields.exp = 0;
-    fields.mant = 1;
+    fields.exp = 1;
+    fields.mant = 0x10000;
 
     uint32_t bits = construct_float_bits(fields);
     
@@ -113,11 +133,17 @@ int main(int argc, char** argv) {
     fields = deconstruct_float_bits(bits);
 
     // printf("%8x\n", bits);
-    // printf("%8x\n", fields.sign);
-    // printf("%8x\n", fields.exp);
-    // printf("%8x\n", fields.mant);
+    printf("%8x\n", fields.sign);
+    printf("%8x\n", fields.exp);
+    printf("%8x\n", fields.mant);
 
     print_float_info(fields);
+
+    printf("%8x\n", isqrt_test(1));
+    printf("%8x\n", isqrt_test(4));
+    printf("%8x\n", isqrt_test(20));
+    printf("%8x\n", isqrt_test(-1));
+    printf("%8x\n", isqrt_test(1<<30));
 
     // printf("args: %d\n", argc);
 
