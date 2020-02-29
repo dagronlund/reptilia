@@ -43,10 +43,9 @@ module gecko_fetch
 
     // Type Definitions --------------------------------------------------------
 
-    localparam BRANCH_HISTORY_LENGTH = 2**BRANCH_PREDICTOR_TARGET_ADDR_WIDTH;
-    localparam BRANCH_HISTORY_WIDTH = $bits(gecko_prediction_history_t);
     localparam BRANCH_TAG_WIDTH = $bits(gecko_pc_t) - BRANCH_PREDICTOR_TARGET_ADDR_WIDTH - 2;
 
+    typedef logic [BRANCH_PREDICTOR_HISTORY_WIDTH-1:0] gecko_fetch_branch_history_t;
     typedef logic [BRANCH_PREDICTOR_TARGET_ADDR_WIDTH-1:0] gecko_fetch_table_addr_t;
     typedef logic [BRANCH_TAG_WIDTH-1:0] gecko_fetch_tag_t;
 
@@ -55,38 +54,10 @@ module gecko_fetch
         gecko_pc_t predicted_next;
         gecko_fetch_tag_t tag;
         logic jump_instruction;
-        gecko_prediction_history_t history;
+        gecko_branch_predictor_history_t history;
     } gecko_fetch_table_entry_t;
 
     localparam BRANCH_ENTRY_WIDTH = $bits(gecko_fetch_table_entry_t);
-
-    typedef enum logic [1:0] {
-        STRONG_TAKEN = 'h0,
-        TAKEN = 'h1,
-        NOT_TAKEN = 'h2,
-        STRONG_NOT_TAKEN = 'h3
-    } branch_prediction_state_t;
-
-    parameter gecko_prediction_history_t DEFAULT_TAKEN_HISTORY = TAKEN;
-    parameter gecko_prediction_history_t DEFAULT_NOT_TAKEN_HISTORY = NOT_TAKEN;
-
-    function automatic logic predict_branch(
-            input gecko_prediction_history_t history
-    );
-        return history[1:0] == STRONG_TAKEN || history[1:0] == TAKEN;
-    endfunction
-
-    function automatic gecko_prediction_history_t update_history(
-            input gecko_prediction_history_t history,
-            input logic branched
-    );
-        case (history[1:0])
-        STRONG_TAKEN: return branched ? STRONG_TAKEN : TAKEN;
-        TAKEN: return branched ? STRONG_TAKEN : STRONG_NOT_TAKEN;
-        NOT_TAKEN: return branched ? STRONG_TAKEN : STRONG_NOT_TAKEN;
-        STRONG_NOT_TAKEN: return branched ? NOT_TAKEN : STRONG_NOT_TAKEN;
-        endcase
-    endfunction
 
     // Stream Logic ------------------------------------------------------------
 
@@ -148,7 +119,7 @@ module gecko_fetch
         .ADDR_WIDTH(BRANCH_PREDICTOR_TARGET_ADDR_WIDTH),
         .READ_PORTS(1),
         .AUTO_RESET(1)
-    ) register_status_counters_inst (
+    ) branch_target_table_inst (
         .clk, .rst,
 
         .write_enable(branch_table_write_enable),
@@ -216,7 +187,7 @@ module gecko_fetch
         // Take branch if it is a jump instruction or branch predicted take
         if ((BRANCH_PREDICTOR_TYPE == GECKO_BRANCH_PREDICTOR_SIMPLE) && branch_table_hit && 
                 (branch_table_read_data.jump_instruction ||
-                predict_branch(branch_table_read_data.history))) begin
+                gecko_branch_predictor_is_taken(branch_table_read_data.history))) begin
             next_pc = branch_table_read_data.predicted_next;
         end else begin
             next_pc = current_pc + 'd4;
@@ -231,11 +202,15 @@ module gecko_fetch
         end
 
         // Pass outputs to memory and command streams
-        next_instruction_command.payload.pc = current_pc;
-        next_instruction_command.payload.next_pc = next_pc;
-        next_instruction_command.payload.jump_flag = current_jump_flag;
-        next_instruction_command.payload.prediction.miss = !branch_table_hit;
-        next_instruction_command.payload.prediction.history = branch_table_read_data.history;
+        next_instruction_command.payload = '{
+            pc: current_pc,
+            next_pc: next_pc,
+            jump_flag: current_jump_flag,
+            prediction: '{
+                miss: !branch_table_hit,
+                history: branch_table_read_data.history
+            }
+        };
 
         next_instruction_request.read_enable = 'b1;
         next_instruction_request.write_enable = 'b0;
@@ -245,17 +220,16 @@ module gecko_fetch
         // Update branch prediction table from jump commands (always accepts)
         branch_table_write_enable = jump_command.valid;
         branch_table_write_addr = jump_command.payload.current_pc[(BRANCH_PREDICTOR_TARGET_ADDR_WIDTH+2-1):2];
-        branch_table_write_data.valid = 'b1;
-        branch_table_write_data.predicted_next = jump_command.payload.actual_next_pc;
-        branch_table_write_data.tag = jump_command.payload.current_pc[31:BRANCH_PREDICTOR_TARGET_ADDR_WIDTH+2];
-        branch_table_write_data.jump_instruction = jump_command.payload.jumped;
-        if (jump_command.payload.prediction.miss) begin
-            branch_table_write_data.history = jump_command.payload.branched ? 
-                    DEFAULT_TAKEN_HISTORY : DEFAULT_NOT_TAKEN_HISTORY;
-        end else begin
-            branch_table_write_data.history = update_history(jump_command.payload.prediction.history, 
-                    jump_command.payload.branched);
-        end
+        branch_table_write_data = '{
+            valid: 'b1,
+            predicted_next: jump_command.payload.actual_next_pc,
+            tag: jump_command.payload.current_pc[31:BRANCH_PREDICTOR_TARGET_ADDR_WIDTH+2],
+            jump_instruction: jump_command.payload.jumped,
+            history: gecko_branch_predictor_update_history(
+                    jump_command.payload.prediction.history, 
+                    jump_command.payload.branched)
+        };
+
     end
 
 endmodule

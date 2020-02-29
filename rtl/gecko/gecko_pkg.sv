@@ -28,6 +28,40 @@ package gecko_pkg;
         GECKO_BRANCH_PREDICTOR_LOCAL = 'h3
     } gecko_branch_predictor_t;
 
+    typedef enum logic [1:0] {
+        GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN = 'h0,
+        GECKO_BRANCH_PREDICTOR_HISTORY_TAKEN = 'h1,
+        GECKO_BRANCH_PREDICTOR_HISTORY_NOT_TAKEN = 'h2,
+        GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_NOT_TAKEN = 'h3
+    } gecko_branch_predictor_history_t;
+
+    function automatic logic gecko_branch_predictor_is_taken(
+            input gecko_branch_predictor_history_t history
+    );
+        return history == GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN || 
+                history == GECKO_BRANCH_PREDICTOR_HISTORY_TAKEN;
+    endfunction
+
+    function automatic gecko_branch_predictor_history_t gecko_branch_predictor_update_history(
+            input gecko_branch_predictor_history_t history,
+            input logic took_branch
+    );
+        unique case (history)
+        GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN: 
+            return took_branch ? GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN : 
+                    GECKO_BRANCH_PREDICTOR_HISTORY_TAKEN;
+        GECKO_BRANCH_PREDICTOR_HISTORY_TAKEN: 
+            return took_branch ? GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN : 
+                    GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_NOT_TAKEN;
+        GECKO_BRANCH_PREDICTOR_HISTORY_NOT_TAKEN: 
+            return took_branch ? GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN : 
+                    GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_NOT_TAKEN;
+        GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_NOT_TAKEN: 
+            return took_branch ? GECKO_BRANCH_PREDICTOR_HISTORY_NOT_TAKEN : 
+                    GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_NOT_TAKEN;
+        endcase
+    endfunction
+
     parameter gecko_reg_status_t GECKO_REG_STATUS_VALID = 'b0;
     parameter gecko_reg_status_t GECKO_REG_STATUS_FULL = (-1);
 
@@ -62,7 +96,7 @@ package gecko_pkg;
 
     typedef struct packed {
         logic miss;
-        gecko_prediction_history_t history;
+        gecko_branch_predictor_history_t history;
     } gecko_prediction_t;
 
     /*************************************************************************
