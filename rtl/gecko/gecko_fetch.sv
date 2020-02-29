@@ -27,9 +27,10 @@ module gecko_fetch
     parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_TRANSPARENT,
     parameter gecko_pc_t START_ADDR = 'b0,
-    parameter logic ENABLE_BRANCH_PREDICTOR = 1,
-    // How big is the branch-prediction table
-    parameter int BRANCH_PREDICTOR_ADDR_WIDTH = 5
+    parameter gecko_branch_predictor_t BRANCH_PREDICTOR_TYPE = GECKO_BRANCH_PREDICTOR_NONE,
+    parameter int BRANCH_PREDICTOR_TARGET_ADDR_WIDTH = 5,
+    parameter int BRANCH_PREDICTOR_HISTORY_WIDTH = BRANCH_PREDICTOR_TARGET_ADDR_WIDTH,
+    parameter int BRANCH_PREDICTOR_LOCAL_ADDR_WIDTH = BRANCH_PREDICTOR_TARGET_ADDR_WIDTH
 )(
     input wire clk, 
     input wire rst,
@@ -40,11 +41,11 @@ module gecko_fetch
     mem_intf.out instruction_request
 );
 
-    localparam BRANCH_HISTORY_LENGTH = 2**BRANCH_PREDICTOR_ADDR_WIDTH;
+    localparam BRANCH_HISTORY_LENGTH = 2**BRANCH_PREDICTOR_TARGET_ADDR_WIDTH;
     localparam BRANCH_HISTORY_WIDTH = $bits(gecko_prediction_history_t);
-    localparam BRANCH_TAG_WIDTH = $bits(gecko_pc_t) - BRANCH_PREDICTOR_ADDR_WIDTH - 2;
+    localparam BRANCH_TAG_WIDTH = $bits(gecko_pc_t) - BRANCH_PREDICTOR_TARGET_ADDR_WIDTH - 2;
 
-    typedef logic [BRANCH_PREDICTOR_ADDR_WIDTH-1:0] gecko_fetch_table_addr_t;
+    typedef logic [BRANCH_PREDICTOR_TARGET_ADDR_WIDTH-1:0] gecko_fetch_table_addr_t;
     typedef logic [BRANCH_TAG_WIDTH-1:0] gecko_fetch_tag_t;
 
     typedef struct packed {
@@ -137,7 +138,7 @@ module gecko_fetch
         .CLOCK_INFO(CLOCK_INFO),
         .TECHNOLOGY(TECHNOLOGY),
         .DATA_WIDTH(BRANCH_ENTRY_WIDTH),
-        .ADDR_WIDTH(BRANCH_PREDICTOR_ADDR_WIDTH),
+        .ADDR_WIDTH(BRANCH_PREDICTOR_TARGET_ADDR_WIDTH),
         .READ_PORTS(1),
         .AUTO_RESET(1)
     ) register_status_counters_inst (
@@ -211,14 +212,14 @@ module gecko_fetch
         enable_fetch_state = (produce && enable) || (jump_command.valid && jump_command.payload.update_pc);
 
         // Read from branch table
-        branch_table_read_addr = current_pc[(BRANCH_PREDICTOR_ADDR_WIDTH+2-1):2];
+        branch_table_read_addr = current_pc[(BRANCH_PREDICTOR_TARGET_ADDR_WIDTH+2-1):2];
 
         // Determine if entry exists in branch table
         branch_table_hit = current_branch_table_valid[branch_table_read_addr] && 
-                branch_table_read_data.tag == current_pc[31:BRANCH_PREDICTOR_ADDR_WIDTH+2];
+                branch_table_read_data.tag == current_pc[31:BRANCH_PREDICTOR_TARGET_ADDR_WIDTH+2];
 
         // Take branch if it is a jump instruction or branch predicted take
-        if (ENABLE_BRANCH_PREDICTOR && branch_table_hit && 
+        if ((BRANCH_PREDICTOR_TYPE == GECKO_BRANCH_PREDICTOR_SIMPLE) && branch_table_hit && 
                 (branch_table_read_data.jump_instruction ||
                 predict_branch(branch_table_read_data.history))) begin
             next_pc = branch_table_read_data.predicted_next;
@@ -248,9 +249,9 @@ module gecko_fetch
 
         // Update branch prediction table from jump commands (always accepts)
         branch_table_write_enable = jump_command.valid;
-        branch_table_write_addr = jump_command.payload.current_pc[(BRANCH_PREDICTOR_ADDR_WIDTH+2-1):2];
+        branch_table_write_addr = jump_command.payload.current_pc[(BRANCH_PREDICTOR_TARGET_ADDR_WIDTH+2-1):2];
         branch_table_write_data.predicted_next = jump_command.payload.actual_next_pc;
-        branch_table_write_data.tag = jump_command.payload.current_pc[31:BRANCH_PREDICTOR_ADDR_WIDTH+2];
+        branch_table_write_data.tag = jump_command.payload.current_pc[31:BRANCH_PREDICTOR_TARGET_ADDR_WIDTH+2];
         branch_table_write_data.jump_instruction = jump_command.payload.jumped;
         if (jump_command.payload.prediction.miss) begin
             branch_table_write_data.history = jump_command.payload.branched ? 

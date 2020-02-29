@@ -21,6 +21,13 @@ package gecko_pkg;
     typedef logic [4:0] gecko_retired_count_t;
     typedef logic [7:0] gecko_prediction_history_t;
 
+    typedef enum logic [1:0] {
+        GECKO_BRANCH_PREDICTOR_NONE = 'h0,
+        GECKO_BRANCH_PREDICTOR_SIMPLE = 'h1,
+        GECKO_BRANCH_PREDICTOR_GLOBAL = 'h2,
+        GECKO_BRANCH_PREDICTOR_LOCAL = 'h3
+    } gecko_branch_predictor_t;
+
     parameter gecko_reg_status_t GECKO_REG_STATUS_VALID = 'b0;
     parameter gecko_reg_status_t GECKO_REG_STATUS_FULL = (-1);
 

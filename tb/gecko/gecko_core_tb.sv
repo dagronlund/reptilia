@@ -52,11 +52,11 @@ module gecko_core_tb
         .DATA_LATENCY(1),
         .FLOAT_LATENCY(1),
         .START_ADDR('b0),
-        .ENABLE_PERFORMANCE_COUNTERS(1),
-        .ENABLE_BRANCH_PREDICTOR(1),
-        // parameter int BRANCH_PREDICTOR_ADDR_WIDTH = 5,
+        .BRANCH_PREDICTOR_TYPE(GECKO_BRANCH_PREDICTOR_SIMPLE),
+        .BRANCH_PREDICTOR_TARGET_ADDR_WIDTH(5),
         // parameter int ENABLE_PRINT = 1,
         // parameter int ENABLE_FLOAT = 0,
+        .ENABLE_PERFORMANCE_COUNTERS(1),
         .ENABLE_INTEGER_MATH(1)
     ) gecko_core_inst (
         .clk, .rst,
