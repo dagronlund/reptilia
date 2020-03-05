@@ -15,6 +15,31 @@
     `include "mem_util.svh"
 `endif
 
+/*
+The fetch stage can implement a variety of branch predictors with performance
+depending on how they are configured as well as the rest of the core. Using
+default gecko_core parameters + integer math, the following Dhrystone scores
+were found:
+
+GECKO_BRANCH_PREDICTOR_NONE:
+    TARGET_ADDR_WIDTH = 0,              Dhrystones/s: 1886 (1.07 DMIPs/MHz)
+GECKO_BRANCH_PREDICTOR_SIMPLE:
+    TARGET_ADDR_WIDTH = 4,              Dhrystones/s: 1901 (1.08 DMIPs/MHz)
+    TARGET_ADDR_WIDTH = 5,              Dhrystones/s: 1962 (1.12 DMIPs/MHz)
+    TARGET_ADDR_WIDTH = 6,              Dhrystones/s: 2021 (1.15 DMIPs/MHz)
+    TARGET_ADDR_WIDTH = 7,              Dhrystones/s: 2066 (1.18 DMIPs/MHz)
+GECKO_BRANCH_PREDICTOR_GLOBAL (TARGET_ADDR_WIDTH = 5):
+    BRANCH_PREDICTOR_HISTORY_WIDTH = 4, Dhrystones/s:
+    BRANCH_PREDICTOR_HISTORY_WIDTH = 5, Dhrystones/s:
+    BRANCH_PREDICTOR_HISTORY_WIDTH = 6, Dhrystones/s:
+    BRANCH_PREDICTOR_HISTORY_WIDTH = 7, Dhrystones/s: 
+GECKO_BRANCH_PREDICTOR_LOCAL (TARGET_ADDR_WIDTH = 5):
+    BRANCH_PREDICTOR_HISTORY_WIDTH = 4, Dhrystones/s:
+    BRANCH_PREDICTOR_HISTORY_WIDTH = 5, Dhrystones/s:
+    BRANCH_PREDICTOR_HISTORY_WIDTH = 6, Dhrystones/s:
+    BRANCH_PREDICTOR_HISTORY_WIDTH = 7, Dhrystones/s:
+    BRANCH_PREDICTOR_HISTORY_WIDTH = 8, Dhrystones/s:
+*/
 module gecko_fetch
     import std_pkg::*;
     import stream_pkg::*;
@@ -43,10 +68,24 @@ module gecko_fetch
 
     // Type Definitions --------------------------------------------------------
 
+    function automatic int get_history_table_addr_width(
+            input gecko_branch_predictor_t prediction_type
+    );
+        unique case (prediction_type)
+        GECKO_BRANCH_PREDICTOR_NONE: return BRANCH_PREDICTOR_TARGET_ADDR_WIDTH;
+        GECKO_BRANCH_PREDICTOR_SIMPLE: return BRANCH_PREDICTOR_TARGET_ADDR_WIDTH;
+        GECKO_BRANCH_PREDICTOR_GLOBAL: return BRANCH_PREDICTOR_HISTORY_WIDTH;
+        GECKO_BRANCH_PREDICTOR_LOCAL: return BRANCH_PREDICTOR_HISTORY_WIDTH;
+        endcase
+    endfunction
+
     localparam BRANCH_TAG_WIDTH = $bits(gecko_pc_t) - BRANCH_PREDICTOR_TARGET_ADDR_WIDTH - 2;
 
-    typedef logic [BRANCH_PREDICTOR_HISTORY_WIDTH-1:0] gecko_fetch_branch_history_t;
+    typedef logic [BRANCH_PREDICTOR_HISTORY_WIDTH-1:0] gecko_fetch_global_history_t;
+    typedef logic [BRANCH_PREDICTOR_HISTORY_WIDTH-1:0] gecko_fetch_local_history_t;
+    typedef logic [BRANCH_PREDICTOR_LOCAL_ADDR_WIDTH-1:0] gecko_fetch_local_history_addr_t;
     typedef logic [BRANCH_PREDICTOR_TARGET_ADDR_WIDTH-1:0] gecko_fetch_table_addr_t;
+    typedef logic [get_history_table_addr_width(BRANCH_PREDICTOR_TYPE)-1:0] gecko_fetch_history_addr_t;
     typedef logic [BRANCH_TAG_WIDTH-1:0] gecko_fetch_tag_t;
 
     typedef struct packed {
@@ -54,7 +93,6 @@ module gecko_fetch
         gecko_pc_t predicted_next;
         gecko_fetch_tag_t tag;
         logic jump_instruction;
-        gecko_branch_predictor_history_t history;
     } gecko_fetch_table_entry_t;
 
     localparam BRANCH_ENTRY_WIDTH = $bits(gecko_fetch_table_entry_t);
@@ -171,8 +209,67 @@ module gecko_fetch
         .value(halt_flag)
     );
 
+    // Predictor State Logic ---------------------------------------------------
+
+    gecko_fetch_global_history_t current_global_history, next_global_history;
+
+    gecko_fetch_local_history_addr_t local_history_normal_read_addr, local_history_update_addr;
+    gecko_fetch_local_history_t local_history_update_read_data, local_history_update_write_data;
+    gecko_fetch_local_history_t local_history_normal_read_data;
+
+    gecko_fetch_history_addr_t history_table_update_addr, history_table_addr;
+    gecko_branch_predictor_history_t history_table_update_data, history_table_data;
+
+    std_register #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .T(gecko_fetch_global_history_t),
+        .RESET_VECTOR('b0)
+    ) global_history_register_inst (
+        .clk, .rst,
+        .enable(branch_table_write_enable),
+        .next(next_global_history),
+        .value(current_global_history)
+    );
+
+    mem_combinational #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .TECHNOLOGY(TECHNOLOGY),
+        .DATA_WIDTH($bits(gecko_fetch_local_history_t)),
+        .ADDR_WIDTH(BRANCH_PREDICTOR_LOCAL_ADDR_WIDTH),
+        .READ_PORTS(1)
+    ) local_history_table_inst (
+        .clk, .rst,
+
+        .write_enable(branch_table_write_enable),
+        .write_addr(local_history_update_addr),
+        .write_data_in(local_history_update_write_data),
+        .write_data_out(local_history_update_read_data),
+
+        .read_addr({local_history_normal_read_addr}),
+        .read_data_out({local_history_normal_read_data})
+    );
+
+    mem_combinational #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .TECHNOLOGY(TECHNOLOGY),
+        .DATA_WIDTH($bits(gecko_branch_predictor_history_t)),
+        .ADDR_WIDTH($bits(gecko_fetch_history_addr_t)),
+        .READ_PORTS(1)
+    ) branch_history_table_inst (
+        .clk, .rst,
+
+        .write_enable(branch_table_write_enable),
+        .write_addr(history_table_update_addr),
+        .write_data_in(history_table_update_data),
+
+        .read_addr({history_table_addr}),
+        .read_data_out({history_table_data})
+    );
+
+    logic branch_table_hit, predicted_taken;
+
     always_comb begin
-        automatic logic branch_table_hit;
+        // automatic logic branch_table_hit, predicted_taken;
 
         produce = !halt_flag && branch_table_reset_done;
         enable_fetch_state = (produce && enable) || (jump_command.valid && jump_command.payload.update_pc);
@@ -182,12 +279,34 @@ module gecko_fetch
 
         // Determine if entry exists in branch table and has matching address
         branch_table_hit = branch_table_read_data.valid && 
-                branch_table_read_data.tag == current_pc[31:BRANCH_PREDICTOR_TARGET_ADDR_WIDTH+2];
+                (branch_table_read_data.tag == current_pc[31:BRANCH_PREDICTOR_TARGET_ADDR_WIDTH+2]);
 
-        // Take branch if it is a jump instruction or branch predicted take
-        if ((BRANCH_PREDICTOR_TYPE == GECKO_BRANCH_PREDICTOR_SIMPLE) && branch_table_hit && 
-                (branch_table_read_data.jump_instruction ||
-                gecko_branch_predictor_is_taken(branch_table_read_data.history))) begin
+        // Determine if branch is predicted taken
+        local_history_normal_read_addr = current_pc[(BRANCH_PREDICTOR_LOCAL_ADDR_WIDTH+2-1):2];
+        unique case (BRANCH_PREDICTOR_TYPE)
+        GECKO_BRANCH_PREDICTOR_NONE: begin
+            history_table_addr = 'b0;
+            predicted_taken = 'b0;
+        end
+        GECKO_BRANCH_PREDICTOR_SIMPLE: begin
+            `INLINE_ASSERT($bits(history_table_addr) == $bits(current_pc[(BRANCH_PREDICTOR_TARGET_ADDR_WIDTH+2-1):2]))
+            history_table_addr = current_pc[(BRANCH_PREDICTOR_TARGET_ADDR_WIDTH+2-1):2];
+            predicted_taken = gecko_branch_predictor_is_taken(history_table_data) || branch_table_read_data.jump_instruction;
+        end
+        GECKO_BRANCH_PREDICTOR_GLOBAL: begin
+            `INLINE_ASSERT($bits(history_table_addr) == $bits(current_global_history))
+            history_table_addr = current_global_history;
+            predicted_taken = gecko_branch_predictor_is_taken(history_table_data) || branch_table_read_data.jump_instruction;
+        end
+        GECKO_BRANCH_PREDICTOR_LOCAL: begin
+            `INLINE_ASSERT($bits(history_table_addr) == $bits(local_history_normal_read_data))
+            history_table_addr = local_history_normal_read_data;
+            predicted_taken = gecko_branch_predictor_is_taken(history_table_data) || branch_table_read_data.jump_instruction;
+        end
+        endcase
+
+        // Take branch if a prediction target exists and we are predicted to take it
+        if (branch_table_hit && predicted_taken) begin
             next_pc = branch_table_read_data.predicted_next;
         end else begin
             next_pc = current_pc + 'd4;
@@ -207,8 +326,8 @@ module gecko_fetch
             next_pc: next_pc,
             jump_flag: current_jump_flag,
             prediction: '{
-                miss: !branch_table_hit,
-                history: branch_table_read_data.history
+                miss: !branch_table_hit, // TODO: Consider removing this flag, it is not used
+                history: history_table_data
             }
         };
 
@@ -217,18 +336,46 @@ module gecko_fetch
         next_instruction_request.addr = current_pc;
         next_instruction_request.data = 'b0;
 
-        // Update branch prediction table from jump commands (always accepts)
+        // Update branch target table from jump commands (always accepts)
         branch_table_write_enable = jump_command.valid;
         branch_table_write_addr = jump_command.payload.current_pc[(BRANCH_PREDICTOR_TARGET_ADDR_WIDTH+2-1):2];
         branch_table_write_data = '{
             valid: 'b1,
             predicted_next: jump_command.payload.actual_next_pc,
             tag: jump_command.payload.current_pc[31:BRANCH_PREDICTOR_TARGET_ADDR_WIDTH+2],
-            jump_instruction: jump_command.payload.jumped,
-            history: gecko_branch_predictor_update_history(
-                    jump_command.payload.prediction.history, 
-                    jump_command.payload.branched)
+            jump_instruction: jump_command.payload.jumped
         };
+
+        // Update global history
+        next_global_history = {
+                current_global_history[BRANCH_PREDICTOR_HISTORY_WIDTH-2:0], 
+                jump_command.payload.branched};
+
+        // Update local history table
+        local_history_update_addr = jump_command.payload.current_pc[(BRANCH_PREDICTOR_LOCAL_ADDR_WIDTH+2-1):2];
+        local_history_update_write_data = {
+                local_history_update_read_data[BRANCH_PREDICTOR_HISTORY_WIDTH-2:0],
+                jump_command.payload.branched};
+
+        // Update history table
+        unique case (BRANCH_PREDICTOR_TYPE)
+        GECKO_BRANCH_PREDICTOR_NONE, GECKO_BRANCH_PREDICTOR_SIMPLE: begin
+            `INLINE_ASSERT($bits(history_table_update_addr) == $bits(branch_table_write_addr))
+            history_table_update_addr = branch_table_write_addr;
+        end
+        GECKO_BRANCH_PREDICTOR_GLOBAL: begin
+            `INLINE_ASSERT($bits(history_table_update_addr) == $bits(current_global_history))
+            history_table_update_addr = current_global_history;
+        end
+        GECKO_BRANCH_PREDICTOR_LOCAL: begin
+            `INLINE_ASSERT($bits(history_table_update_addr) == $bits(local_history_update_read_data))
+            history_table_update_addr = local_history_update_read_data;
+        end
+        endcase
+        // I have some questions about two adjacent jumps stepping on each other
+        // but this is the simplest version to implement
+        history_table_update_data = gecko_branch_predictor_update_history(
+                jump_command.payload.prediction.history, jump_command.payload.branched);
 
     end
 

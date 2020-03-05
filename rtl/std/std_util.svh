@@ -39,7 +39,9 @@ endfunction
     `endif
 
 `define INLINE_ASSERT(condition) \
-    assert (condition) else $error("FAILED ASSERTION: %s:%d, %s", `__FILE__, `__LINE__, `STRINGIFY(condition));
+    `ifndef __SYNTH_ONLY__ \
+    assert (condition) else $error("FAILED ASSERTION: %s:%d, %s", `__FILE__, `__LINE__, `STRINGIFY(condition)); \
+    `endif
 
 `define BUILD_STREAM_INTF_EXPLICIT(FULL_NAME, PREFIX, DATA_TYPE) \
     `ifndef __``FULL_NAME``_STREAM_INTF__ \

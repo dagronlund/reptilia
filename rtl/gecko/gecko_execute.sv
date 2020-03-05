@@ -155,7 +155,6 @@ module gecko_execute
         automatic gecko_alternate_t alt;
         automatic gecko_math_result_t alu_result;
         automatic gecko_store_result_t store_result;
-        automatic logic take_branch;
         automatic gecko_math_operation_t math_op;
 
         cmd_in = gecko_execute_operation_t'(execute_command.payload);
@@ -277,9 +276,7 @@ module gecko_execute
             GECKO_EXECUTE_TYPE_BRANCH: begin
                 produce_jump = 'b1;
                 
-                take_branch = gecko_evaluate_branch(alu_result, cmd_in.op);
-
-                if (take_branch) begin
+                if (gecko_evaluate_branch(alu_result, cmd_in.op)) begin
                     next_jump_command.payload.branched = 'b1;
                     next_jump_command.payload.actual_next_pc = cmd_in.current_pc + cmd_in.immediate_value;
                 end else begin
