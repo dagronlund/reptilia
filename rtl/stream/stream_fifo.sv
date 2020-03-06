@@ -1,6 +1,6 @@
 //!import std/std_pkg
 //!import std/std_register
-//!import std/std_register_granular
+//!import std/std_register_masked
 //!import stream/stream_pkg
 
 `timescale 1ns/1ps
@@ -129,7 +129,7 @@ module stream_fifo
 
         flag_t next_flags, current_flags, enable_flags;
 
-        std_register_granular #(
+        std_register_masked #(
             .CLOCK_INFO(CLOCK_INFO),
             .T(flag_t),
             .RESET_VECTOR('b0)

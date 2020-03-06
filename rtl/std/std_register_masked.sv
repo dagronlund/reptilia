@@ -3,7 +3,7 @@
 
 `timescale 1ns/1ps
 
-module std_register_granular
+module std_register_masked
     import std_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
