@@ -6,7 +6,7 @@
 //!import riscv/riscv32m_pkg
 //!import riscv/riscv32f_pkg
 //!import gecko/gecko_pkg
-//!import gecko/gecko_decode_util_pkg
+//!import gecko/gecko_decode_pkg
 
 `timescale 1ns/1ps
 
@@ -19,36 +19,33 @@
 `endif
 
 /*
- * Decode State:
- *      RESET - Clearing all register values coming out of reset, all writebacks accepted
- *      NORMAL - All branches resolved, normally executing, all writebacks accepted
- *      SPECULATIVE - Only issue register-file instructions, non-speculative writebacks accepted
- *      MISPREDICTED - Normally executing, throw away speculative writebacks
- *
- * Execute Saved Result:
- *      Flag for which register is currently is stored in the execute stage,
- *      should be x0 if no valid result exists.
- *
- * Jump Flag: (Configurable Width)
- *      A counter which is used to keep jumps in sync with the other stages
- *
- * Speculative Counter: (Configurable Width)
- *      A counter for how many instructions were issued while in the speculative state
- *
- * While in the speculative state, the jump counter cannot be incremented until
- * the branch is indicated that it was resolved. Only instructions with
- * side-effects only on the register-file are allowed to pass, and a counter
- * is incremented to indicate how many speculated instructions exist.
- * 
- *      If the branch wasn't taken, then the state moves back to normal, and
- *      the speculative counter is cleared.
- *
- *      If the branch was taken, then the state moves to mispredicted, and the
- *      execute saved result is cleared, and the jump flag is incremented.
- *
- * Incoming instructions are thrown away if their jump flag does not match the
- * current jump flag.
- */
+Decode State:
+    RESET - Clearing all necessary register values coming out of reset
+    NORMAL - Normal decode stage operations
+    DEBUG - Inspect the internal state of the core through an external interface
+    EXIT - An instruction has caused the core to stop running
+
+Execute Saved Result:
+    Flag for which register is currently is stored in the execute stage,
+    should be x0 if no valid result exists.
+
+Jump Flag: (Configurable Width)
+    A counter describing which branch epoch the decode stage thinks it is on, 
+    this is incremented when branches are resolved. Incoming instructions that 
+    do not match the current jump flag are thrown out.
+
+Speculative Flag (Front/Rear): (Configurable Width)
+    Two counters that keep track of which speculative counter is currently
+    correct. The rear counter is incremented whenever a branch is resolved,
+    and the front counter whenever a branch instruction is decoded.
+
+Speculative Status Table:
+    A table of counters and mispredicted flags that indicate how many
+    instructions have been decoded speculatively and if those instructions
+    where executed incorrectly and their writeback results should be thrown
+    out. Only instructions with register-file only side-effects (no system or
+    memory instructions) are allowed to be decoded while speculating.
+*/
 module gecko_decode
     import std_pkg::*;
     import stream_pkg::*;
@@ -58,7 +55,7 @@ module gecko_decode
     import riscv32m_pkg::*;
     import riscv32f_pkg::*;
     import gecko_pkg::*;
-    import gecko_decode_util_pkg::*;
+    import gecko_decode_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
@@ -98,6 +95,7 @@ module gecko_decode
     typedef enum logic [1:0] {
         GECKO_DECODE_RESET,
         GECKO_DECODE_NORMAL,
+        GECKO_DECODE_DEBUG,
         GECKO_DECODE_EXIT
     } gecko_decode_state_t;
 
@@ -125,11 +123,13 @@ module gecko_decode
 
         // Find forwarded results
         for (int i = 0; i < NUM_FORWARDED; i++) begin
+            forwarded_status_plus = forwarded_results[i].reg_status + 'b1;
+
             if (forwarded_results[i].valid) begin
+                // Take the forward if it is not speculative itself, or if we are not currently
+                // speculating and the last speculation this forward belongs to was not mispredicted
                 if (!forwarded_results[i].speculative || (!during_speculation && 
                         !speculative_status[forwarded_results[i].jump_flag].mispredicted)) begin
-
-                    forwarded_status_plus = forwarded_results[i].reg_status + 'b1;
 
                     // Check forwarding for result of rs1
                     if (forwarded_results[i].addr == instruction_fields.rs1 &&
@@ -579,28 +579,37 @@ module gecko_decode
         clear_speculative_mispredict = 'b0;
         case (state)
         GECKO_DECODE_NORMAL: begin
+            // Throw away instructions that were misfetched
             if (instruction_op.jump_flag != next_jump_flag) begin
                 consume_instruction = 'b1;
                 flush_instruction = 'b1;
-            end else if (operands_status.rs1_valid && operands_status.rs2_valid && operands_status.rd_valid) begin
-                // Only execute non side effect instructions in speculative
-                if (current_speculative_flag_front != next_speculative_flag_rear) begin
-                    // Make sure speculative counter still has room
-                    if (!is_opcode_side_effects(instruction_fields) && 
-                            speculative_status[next_speculative_flag_rear].count != GECKO_SPECULATIVE_FULL) begin
-                        consume_instruction = 'b1;
-                        increment_speculative_counter = (instruction_fields.rd != 'b0);
-                    end
-                end else if (is_opcode_control_flow(instruction_fields)) begin
-                    if (speculative_status[next_speculative_flag_rear].count == 'b0) begin
-                        consume_instruction = 'b1;
-                        enable_speculative_flag_front = 'b1;
-                        // Set mispredicted to zero by default
-                        clear_speculative_mispredict = 'b1;
-                    end
-                end else begin
+            // Wait if instruction registers are not ready yet
+            end else if (!operands_status.rs1_valid || !operands_status.rs2_valid || !operands_status.rd_valid) begin
+                consume_instruction = 'b0;
+                flush_instruction = 'b0;
+            // Only execute non-side-effect instructions while speculating
+            end else if (during_speculation) begin
+                // Make sure speculative counter still has room
+                if (!is_opcode_side_effects(instruction_fields) && 
+                        speculative_status[next_speculative_flag_rear].count != GECKO_SPECULATIVE_FULL) begin
                     consume_instruction = 'b1;
+                    // Indicate another instruction has been run speculatively
+                    increment_speculative_counter = does_opcode_writeback(instruction_fields);
+                end else begin
+                    consume_instruction = 'b0;
                 end
+            // Only execute control
+            end else if (is_opcode_control_flow(instruction_fields)) begin
+                if (speculative_status[next_speculative_flag_rear].count == 'b0) begin
+                    consume_instruction = 'b1;
+                    enable_speculative_flag_front = 'b1;
+                    // Set mispredicted to zero by default
+                    clear_speculative_mispredict = 'b1;
+                end else begin
+                    consume_instruction = 'b0;
+                end
+            end else begin
+                consume_instruction = 'b1;
             end
         end
         GECKO_DECODE_EXIT: begin
@@ -616,26 +625,16 @@ module gecko_decode
             decode_exit |= (ENABLE_FLOAT == 0) && opcode_status.float;
             decode_exit |= (ENABLE_INTEGER_MATH == 0) && opcode_status.execute && 
                     next_execute_command.payload.op_type == GECKO_EXECUTE_TYPE_MUL_DIV;
-            decode_exit |= (instruction_fields.opcode == RISCV32I_OPCODE_SYSTEM) &&
-                    (instruction_fields.funct3 == RISCV32I_FUNCT3_SYS_ENV) &&
-                    (instruction_fields.funct12 == RISCV32I_CSR_EBREAK);
+            decode_exit |= is_instruction_ebreak(instruction_fields);
 
-            if (decode_exit) begin
-                next_exit_code = rs1_value[7:0];
-            end
-
-            produce_print = (instruction_fields.opcode == RISCV32I_OPCODE_SYSTEM) &&
-                    (instruction_fields.funct3 == RISCV32I_FUNCT3_SYS_ENV) &&
-                    (instruction_fields.funct12 == RISCV32I_CSR_ECALL) &&
-                    ENABLE_PRINT;
-
+            produce_print = is_instruction_ecall(instruction_fields) && ENABLE_PRINT;
             next_execute_saved = update_execute_saved(instruction_fields, next_execute_saved);
-
             front_status_rd_write_enable |= does_opcode_writeback(instruction_fields);
 
             if (decode_exit) begin
                 next_execute_command.payload.halt = 'b1;
                 next_execute_command.payload.op_type = GECKO_EXECUTE_TYPE_JUMP;
+                next_exit_code = rs1_value[7:0];
                 produce_execute = 'b1;
                 produce_system = 'b0;
                 produce_float = 'b0;

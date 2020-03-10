@@ -353,17 +353,6 @@ package gecko_pkg;
 
         unique case (op.math_op)
         RISCV32M_FUNCT3_MUL: begin
-
-            // // Does single cycle multiplication change anything?
-            // for (i = 0; i < 32; i++) begin
-            //     if (op.operator[0]) begin
-            //         op.result = op.result + op.operand;
-            //     end
-            //     op.operand = {op.operand[30:0], 1'b0};
-            //     op.operator = {1'b0, op.operator[31:1]};
-            // end
-            // op.done = 'b1;
-
             if (current_iteration == 'b0) begin
                 // Swap lesser value into operator to save cycles
                 if (op.operand < op.operator) begin
@@ -468,10 +457,6 @@ package gecko_pkg;
         //     end
         // end
         RISCV32M_FUNCT3_DIVU, RISCV32M_FUNCT3_REMU: begin
-
-            // // Does single cycle division change anything?
-            // for (i = 0; i < 32; i++) begin
-
             // Left shift remainder, fill in with numerator MSB
             op.result = {op.result[30:0], op.operand[31]};
             // If remainder >= divisor (or fills in ones if division by zero)
@@ -484,9 +469,6 @@ package gecko_pkg;
                 // Fill in quotient with zero
                 op.operand = {op.operand[30:0], 1'b0};
             end
-
-            // end
-            // op.done = 'b1;
 
             // TODO: Fix division performance, does not have to run all cycles
             op.done = (current_iteration == 'd31);

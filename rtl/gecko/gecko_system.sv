@@ -15,6 +15,54 @@
     `include "mem_util.svh"
 `endif
 
+/*
+This module contains all the basic RISC-V performance counters, plus support for 
+limited (custom) timer interrupts starting at 0xCA0. Right now those timers are 
+(two-ish) general purpose counter timers that can be used for a normal timer or 
+as a watchdog timer. If two or more timers go off at the same time the lowest 
+number timer address will be the one jumped to, so in most situations timer zero
+should be used for a watchdog if the system needs one. When interrupts are
+encountered they cause the processor to jump to the vector table, which is a
+configurable memory base address, and every timer is assigned an entry in the
+vector table.
+
+VECTOR_TABLE + (0 to 15 words): Reserved
+VECTOR_TABLE + (16 to 31 words): Timers 0 through n
+
+The enable register is set to one in order to start the timer, and can be 
+toggled to reset the timer (ideally use the status/reset register). When the 
+timer does expire and the vector table is jumped to, the timer will change the 
+enable  bit to zero. This is to prevent the user from accidentally creating a 
+timer that  triggers every couple cycles or so and prevents any user code from 
+ever turning it off.
+
+Reading from the status register will show if the timer has been triggered in 
+bit zero. This is only really useful if a lower priority timer was triggered and 
+the program wants to see if any other timers went off at the same time. Writing 
+to the status register will reset the timer counter to the duration last written
+to the duration register. This is most useful in the case of a watchdog timer
+where the timer must be reset before the watchdog duration expires. Resetting a
+timer that is not currently enabled will have no effect.
+
+The duration register when written to will change the default duration for the 
+timer when it is reset, but will not change the current countdown until such a 
+reset occurs. Likewise reading from the duration register will report the 
+current countdown of the timer and not the duration last written. 
+
+The return address register is read-only and contains the program counter of the
+instruction that was going to be executed if the counter interrupt did not
+occur. The interrupt handler when it is complete should restore the normal
+program registers before then jumping to this address. In order to not pollute
+the registers once they have been restored, a special ECALL instruction can be
+used to jump directly to this address.
+
+0xCA0: Timer0 Enable (1-bit)
+0xCA1: Timer0 Status/Reset (1-bit)
+0xCA2: Timer0 Duration (32-bits)
+0xCA3: Timer0 Return Address (32-bits)
+...
+
+*/
 module gecko_system
     import std_pkg::*;
     import stream_pkg::*;
@@ -35,7 +83,7 @@ module gecko_system
     stream_intf.out system_result // gecko_operation_t
 );
 
-    // Clock counter works for RDCYCLE and RDTIME
+    // TODO: Use different counters for RDCYCLE and RDTIME to support processor pausing
     logic [32:0] next_clock_counter_partial, next_instruction_counter_partial;
     logic [32:0] clock_counter_partial, instruction_counter_partial;
     logic [63:0] next_clock_counter, next_instruction_counter;

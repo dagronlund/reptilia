@@ -6,7 +6,7 @@
 //!import riscv/riscv32v_pkg
 //!import gecko/gecko_pkg
 
-package gecko_decode_util_pkg;
+package gecko_decode_pkg;
 
     import riscv_pkg::*;
     import riscv32_pkg::*;
@@ -179,6 +179,22 @@ package gecko_decode_util_pkg;
         endcase
     endfunction
 
+    function automatic logic is_instruction_ecall(
+            input riscv32_fields_t instruction_fields
+    );
+        return (instruction_fields.opcode == RISCV32I_OPCODE_SYSTEM) &&
+                (instruction_fields.funct3 == RISCV32I_FUNCT3_SYS_ENV) &&
+                (instruction_fields.funct12 == RISCV32I_CSR_ECALL);
+    endfunction
+
+    function automatic logic is_instruction_ebreak(
+            input riscv32_fields_t instruction_fields
+    );
+        return (instruction_fields.opcode == RISCV32I_OPCODE_SYSTEM) &&
+                (instruction_fields.funct3 == RISCV32I_FUNCT3_SYS_ENV) &&
+                (instruction_fields.funct12 == RISCV32I_CSR_EBREAK);
+    endfunction
+
     function automatic logic does_opcode_writeback (
             input riscv32_fields_t instruction_fields
     );
@@ -186,12 +202,8 @@ package gecko_decode_util_pkg;
         RISCV32I_OPCODE_OP, RISCV32I_OPCODE_IMM,
         RISCV32I_OPCODE_LOAD, RISCV32I_OPCODE_LUI,
         RISCV32I_OPCODE_AUIPC, RISCV32I_OPCODE_JAL,
-        RISCV32I_OPCODE_JALR, RISCV32I_OPCODE_FENCE: begin
-            return (instruction_fields.rd != 'b0);
-        end
-        RISCV32I_OPCODE_STORE, RISCV32I_OPCODE_BRANCH: begin
-            return 'b0;
-        end
+        RISCV32I_OPCODE_JALR, RISCV32I_OPCODE_FENCE: return (instruction_fields.rd != 'b0);
+        RISCV32I_OPCODE_STORE, RISCV32I_OPCODE_BRANCH: return 'b0;
         RISCV32I_OPCODE_SYSTEM: begin
             case (riscv32i_funct3_sys_t'(instruction_fields.funct3))
             RISCV32I_FUNCT3_SYS_CSRRW, RISCV32I_FUNCT3_SYS_CSRRS, 
@@ -207,17 +219,16 @@ package gecko_decode_util_pkg;
         case (riscv32f_opcode_t'(instruction_fields.opcode))
         RISCV32F_OPCODE_FP_OP_S: begin
             case (riscv32f_funct7_t'(instruction_fields.funct7))
-            RISCV32F_FUNCT7_FCVT_W_S, RISCV32F_FUNCT7_FMV_X_W, RISCV32F_FUNCT7_FCMP_S: begin
-                return (instruction_fields.rd != 'b0);
-            end
+            RISCV32F_FUNCT7_FCVT_W_S, RISCV32F_FUNCT7_FMV_X_W, 
+            RISCV32F_FUNCT7_FCMP_S: return (instruction_fields.rd != 'b0);
             default: return 'b0;
             endcase
         end
-        RISCV32F_OPCODE_FLW, RISCV32F_OPCODE_FSW,
-        RISCV32F_OPCODE_FMADD_S, RISCV32F_OPCODE_FMSUB_S,
-        RISCV32F_OPCODE_FNMSUB_S, RISCV32F_OPCODE_FNMADD_S: begin
-            return 'b0;
-        end
+        // RISCV32F_OPCODE_FLW, RISCV32F_OPCODE_FSW,
+        // RISCV32F_OPCODE_FMADD_S, RISCV32F_OPCODE_FMSUB_S,
+        // RISCV32F_OPCODE_FNMSUB_S, RISCV32F_OPCODE_FNMADD_S: begin
+        //     return 'b0;
+        // end
         endcase
 
         return 'b0;
