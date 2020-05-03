@@ -36,7 +36,7 @@ module stream_merge
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
     parameter stream_select_mode_t STREAM_SELECT_MODE = STREAM_SELECT_MODE_ROUND_ROBIN,
     parameter int PORTS = 2,
-    parameter int ID_WIDTH = $clog2(PORTS)
+    parameter int ID_WIDTH = (PORTS > 1) ? $clog2(PORTS) : 1
 )(
     input wire clk, 
     input wire rst,
@@ -47,8 +47,6 @@ module stream_merge
     stream_intf.out             stream_out,
     output logic [ID_WIDTH-1:0] stream_out_id
 );
-
-    `STATIC_ASSERT(PORTS > 1)
 
     localparam PAYLOAD_WIDTH = $bits(stream_out.payload);
 

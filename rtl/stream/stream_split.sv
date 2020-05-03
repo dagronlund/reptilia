@@ -25,7 +25,7 @@ module stream_split
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
     parameter stream_select_mode_t STREAM_SELECT_MODE = STREAM_SELECT_MODE_ROUND_ROBIN, // Unused
     parameter int PORTS = 2,
-    parameter int ID_WIDTH = $clog2(PORTS)
+    parameter int ID_WIDTH = (PORTS > 1) ? $clog2(PORTS) : 1
 )(
     input wire clk, rst,
 
@@ -35,8 +35,6 @@ module stream_split
     stream_intf.out         stream_out [PORTS],
     output logic [ID_WIDTH-1:0] stream_out_id [PORTS]
 );
-
-    `STATIC_ASSERT(PORTS > 1)
 
     localparam PAYLOAD_WIDTH = $bits(stream_in.payload);
 
@@ -98,7 +96,7 @@ module stream_split
 
         consume = 'b1;
         produce = 'b0;
-        produce[stream_in_id] = 'b1;
+        produce[(PORTS > 1) ? stream_in_id : 'b0] = 'b1;
 
         for (i = 0; i < PORTS; i++) begin
             stream_out_id[i] = i;

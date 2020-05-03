@@ -1,51 +1,50 @@
 `timescale 1ns/1ps
 
 `ifdef __LINTER__
-
-`include "../../lib/std/std_util.svh"
-`include "../../lib/std/std_mem.svh"
-
+    `include "../std/std_util.svh"
+    `include "../mem/mem_util.svh"
 `else
-
-`include "std_util.svh"
-`include "std_mem.svh"
-
+    `include "std_util.svh"
+    `include "mem_util.svh"
 `endif
 
-module mem_merge #(
-    parameter int ADDR_WIDTH = 32,
-    parameter int DATA_WIDTH = 32,
-    parameter int MASK_WIDTH = DATA_WIDTH / 8,
-    parameter int ID_WIDTH = 1,
-    parameter int PORTS = 2,
-    parameter int PIPELINE_MODE = 1
+module mem_merge 
+    import std_pkg::*;
+    import stream_pkg::*;
+#(
+    parameter std_clock_info_t CLOCK_INFO = 'b0,
+    parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
+    parameter stream_select_mode_t STREAM_SELECT_MODE = STREAM_SELECT_MODE_ROUND_ROBIN,
+    parameter int PORTS = 2
 )(
-    input logic clk, rst,
+    input wire clk, rst,
 
-    std_mem_intf.in mem_in [PORTS],
-    std_mem_intf.out mem_out
+    mem_intf.in mem_in [PORTS],
+    mem_intf.out mem_out
 );
 
-    `STATIC_ASSERT(PORTS > 1)
-    `STATIC_ASSERT(ID_WIDTH >= $clog2(PORTS))
+    localparam ADDR_WIDTH = $bits(mem_out.addr);
+    localparam DATA_WIDTH = $bits(mem_out.data);
+    localparam MASK_WIDTH = $bits(mem_out.write_enable);
 
-    `STATIC_ASSERT(ADDR_WIDTH == $bits(mem_out.addr))
-    `STATIC_ASSERT(MASK_WIDTH == $bits(mem_out.write_enable))
-    `STATIC_ASSERT(DATA_WIDTH == $bits(mem_out.data))
-    `STATIC_ASSERT(ID_WIDTH == $bits(mem_out.id))
+    localparam ID_WIDTH = $bits(mem_out.id);
+    localparam SUB_ID_WIDTH = (PORTS > 1) ? $clog2(PORTS) : 1;
+    localparam PRE_ID_WIDTH = $bits(mem_in[0].id);
+
+    `STATIC_ASSERT((PORTS > 1) ? (ID_WIDTH == (PRE_ID_WIDTH + SUB_ID_WIDTH)) : (ID_WIDTH == PRE_ID_WIDTH))
 
     typedef struct packed {
         logic read_enable;
         logic [MASK_WIDTH-1:0] write_enable;
         logic [ADDR_WIDTH-1:0] addr;
         logic [DATA_WIDTH-1:0] data;
-        logic [ID_WIDTH-1:0] id;
+        logic [PRE_ID_WIDTH-1:0] id;
     } mem_t;
 
-    std_stream_intf #(.T(mem_t)) stream_in [PORTS] (.clk, .rst);
+    stream_intf #(.T(mem_t)) stream_in [PORTS] (.clk, .rst);
 
-    logic [ID_WIDTH-1:0] stream_out_id;
-    std_stream_intf #(.T(mem_t)) stream_out (.clk, .rst);
+    logic [SUB_ID_WIDTH-1:0] stream_out_id;
+    stream_intf #(.T(mem_t)) stream_out (.clk, .rst);
 
     generate
     genvar k;
@@ -54,7 +53,7 @@ module mem_merge #(
         `PROCEDURAL_ASSERT(ADDR_WIDTH == $bits(mem_in[k].addr))
         `PROCEDURAL_ASSERT(MASK_WIDTH == $bits(mem_in[k].write_enable))
         `PROCEDURAL_ASSERT(DATA_WIDTH == $bits(mem_in[k].data))
-        `PROCEDURAL_ASSERT(ID_WIDTH == $bits(mem_in[k].id))
+        `PROCEDURAL_ASSERT(PRE_ID_WIDTH == $bits(mem_in[k].id))
 
         always_comb begin
             automatic mem_t payload = '{
@@ -70,6 +69,8 @@ module mem_merge #(
             mem_in[k].ready = stream_in[k].ready;
         end
     end
+    endgenerate
+
     always_comb begin
         automatic mem_t payload = stream_out.payload;
         mem_out.valid = stream_out.valid;
@@ -79,19 +80,18 @@ module mem_merge #(
         mem_out.write_enable = payload.write_enable;
         mem_out.addr = payload.addr;
         mem_out.data = payload.data;
-        mem_out.id = stream_out_id;
+        mem_out.id = (PORTS > 1) ? {stream_out_id, payload.id} : payload.id;
     end
-    endgenerate
 
     stream_merge #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .PIPELINE_MODE(PIPELINE_MODE),
+        .STREAM_SELECT_MODE(STREAM_SELECT_MODE),
         .PORTS(PORTS),
-        .ID_WIDTH(ID_WIDTH),
-        .PIPELINE_MODE(PIPELINE_MODE)
+        .ID_WIDTH(ID_WIDTH)
     ) stream_merge_inst (
         .clk, .rst,
-
-        .stream_in, .stream_out,
-        .stream_out_id
+        .stream_in, .stream_out, .stream_out_id
     );
 
 endmodule
