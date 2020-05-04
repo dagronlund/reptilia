@@ -81,49 +81,20 @@ module cache_tb
 
         while (std_is_reset_active(CLOCK_INFO, rst)) @ (posedge clk);
 
-        child_request[0].valid = 'b1;
-        child_request[0].write_enable = 'b0;
-        child_request[0].read_enable = 'b1;
-        child_request[0].addr = 'b0;
-        @ (posedge clk);
-        while (!child_request[0].ready)
-            @ (posedge clk);
+        // Read, Write, Addr, Data, Id
+        child_request[0].send('b1, 'b0, 'h0, 'h0, 'b0); // Read 0x0
+        child_request[0].send('b0, 'b1, 'h0, 'h42, 'b0); // Write 0x0
+        child_request[0].send('b0, 'b1, 'h4, 'h69, 'b0); // Write 0x4
+        child_request[0].send('b1, 'b0, 'h0, 'h0, 'b0); // Read 0x0
+        child_request[0].send('b1, 'b0, 'h4, 'h0, 'b0); // Read 0x4
 
-        child_request[0].valid = 'b1;
-        child_request[0].write_enable = 'b1;
-        child_request[0].read_enable = 'b0;
-        child_request[0].addr = 'd0;
-        child_request[0].data = 'h42;
-        @ (posedge clk);
-        while (!child_request[0].ready)
-            @ (posedge clk);
+        // Read something that should associate
+        child_request[0].send('b1, 'b0, 'h1 << 12, 'h0, 'b0); // Read 0x1000
 
-        child_request[0].valid = 'b1;
-        child_request[0].write_enable = 'b1;
-        child_request[0].read_enable = 'b0;
-        child_request[0].addr = 'd4;
-        child_request[0].data = 'h69;
-        @ (posedge clk);
-        while (!child_request[0].ready)
-            @ (posedge clk);
+        // Read something that should evict the first read
+        child_request[0].send('b1, 'b0, 'h2 << 12, 'h0, 'b0); // Read 0x2000
 
-        child_request[0].valid = 'b1;
-        child_request[0].write_enable = 'b0;
-        child_request[0].read_enable = 'b1;
-        child_request[0].addr = 'b0;
-        @ (posedge clk);
-        while (!child_request[0].ready)
-            @ (posedge clk);
-
-        child_request[0].valid = 'b1;
-        child_request[0].write_enable = 'b0;
-        child_request[0].read_enable = 'b1;
-        child_request[0].addr = 'd4;
-        @ (posedge clk);
-        while (!child_request[0].ready)
-            @ (posedge clk);
-
-        child_request[0].valid = 'b0;
+        // child_request[0].valid = 'b0;
 
         // fork
         // // Send incrementing numbers

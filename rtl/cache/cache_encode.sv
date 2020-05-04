@@ -11,6 +11,7 @@
 module cache_encode
     import std_pkg::*;
     import stream_pkg::*;
+    import cache_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_TRANSPARENT,
@@ -23,6 +24,10 @@ module cache_encode
     parameter int INDEX_ADDR_BITS = 6,
     parameter int ASSOCIATIVITY = 1,
 
+    parameter logic IS_COHERENT = 'b0,
+    parameter logic IS_LAST_LEVEL = 'b0,
+    parameter logic IS_FIRST_LEVEL = 'b0,
+
     parameter int DATA_WIDTH_RATIO = DATA_WIDTH / CHILD_DATA_WIDTH,
     parameter int SUB_BLOCK_ADDR_WIDTH = BLOCK_ADDR_WIDTH - $clog2(DATA_WIDTH_RATIO)
 )(
@@ -32,8 +37,11 @@ module cache_encode
     stream_intf.in local_response_meta, // local_meta_t
     stream_intf.in bypass_response, // bypass_t
 
-    mem_intf.out child_response,
-    mem_intf.out parent_request
+    mem_intf.out                 child_response,
+    output cache_mesi_response_t child_response_info,
+
+    mem_intf.out                parent_request,
+    output cache_mesi_request_t parent_request_info
 );
 
     `STATIC_ASSERT(ADDR_WIDTH == $bits(child_response.addr))
@@ -43,7 +51,8 @@ module cache_encode
     `STATIC_ASSERT(CHILD_DATA_WIDTH == $bits(child_response.data))
     `STATIC_ASSERT(DATA_WIDTH == $bits(parent_request.data))
 
-    `STATIC_ASSERT($bits(local_response.id) == $bits(child_response.id))
+    localparam int ID_WIDTH = $bits(local_response.id);
+    `STATIC_ASSERT(ID_WIDTH == $bits(child_response.id))
 
     localparam int WORD_BITS = $clog2(DATA_WIDTH/8);
     localparam int CHILD_WORD_BITS = $clog2(CHILD_DATA_WIDTH/8);
@@ -77,10 +86,12 @@ module cache_encode
         return sub_word;
     endfunction
 
-    mem_intf #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH), 
-            .ID_WIDTH($bits(local_response.id))) next_child_response (.clk, .rst);
+    mem_intf #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH), .ID_WIDTH(ID_WIDTH)) next_child_response (.clk, .rst);
     mem_intf #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH)) next_parent_request (.clk, .rst);
     
+    cache_mesi_response_t next_child_response_info;
+    cache_mesi_request_t next_parent_request_info;
+
     logic enable;
     logic consume_local_response, consume_bypass_response;
     logic produce_child_response, produce_parent_request;
@@ -104,18 +115,26 @@ module cache_encode
 
     mem_stage #(
         .CLOCK_INFO(CLOCK_INFO),
-        .PIPELINE_MODE(PIPELINE_MODE)
+        .PIPELINE_MODE(PIPELINE_MODE),
+        .META_WIDTH($bits(cache_mesi_response_t))
     ) child_response_stream_stage_inst (
         .clk, .rst,
-        .mem_in(next_child_response), .mem_out(child_response)
+        .mem_in(next_child_response),
+        .mem_in_meta(next_child_response_info),
+        .mem_out(child_response),
+        .mem_out_meta(child_response_info)
     );
 
     mem_stage #(
         .CLOCK_INFO(CLOCK_INFO),
-        .PIPELINE_MODE(STREAM_PIPELINE_MODE_BUFFERED)
+        .PIPELINE_MODE(STREAM_PIPELINE_MODE_BUFFERED),
+        .META_WIDTH($bits(cache_mesi_request_t))
     ) parent_request_stream_stage_inst (
         .clk, .rst,
-        .mem_in(next_parent_request), .mem_out(parent_request)
+        .mem_in(next_parent_request),
+        .mem_in_meta(next_parent_request_info),
+        .mem_out(parent_request),
+        .mem_out_meta(parent_request_info)
     );
 
     logic current_id, next_id;
@@ -136,6 +155,9 @@ module cache_encode
         consume_bypass_response = 'b0;
         produce_child_response = 'b0;
         produce_parent_request = 'b0;
+
+        next_child_response_info = cache_mesi_response_t'('b0);
+        next_parent_request_info = cache_mesi_request_t'('b0);
 
         next_id = current_id;
 

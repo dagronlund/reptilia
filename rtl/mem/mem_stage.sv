@@ -18,6 +18,9 @@ module mem_stage
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
+    parameter int ADDR_WIDTH_OVERRIDE = 0, // Use these for overriding the interface widths
+    parameter int DATA_WIDTH_OVERRIDE = 0,
+    parameter int ID_WIDTH_OVERRIDE = 0,
     parameter int META_WIDTH = 1
 )(
     input logic clk, rst,
@@ -31,10 +34,10 @@ module mem_stage
     `STATIC_ASSERT($bits(mem_in.data) == $bits(mem_out.data))
     `STATIC_ASSERT($bits(mem_in.id) == $bits(mem_out.id))
 
-    localparam ADDR_WIDTH = $bits(mem_in.addr);
-    localparam DATA_WIDTH = $bits(mem_in.data);
-    localparam MASK_WIDTH = $bits(mem_in.write_enable);
-    localparam ID_WIDTH = $bits(mem_in.id);
+    localparam ADDR_WIDTH = (ADDR_WIDTH_OVERRIDE != 0) ? ADDR_WIDTH_OVERRIDE : $bits(mem_in.addr);
+    localparam DATA_WIDTH = (DATA_WIDTH_OVERRIDE != 0) ? DATA_WIDTH_OVERRIDE : $bits(mem_in.data);
+    localparam MASK_WIDTH = (ADDR_WIDTH_OVERRIDE != 0) ? (ADDR_WIDTH_OVERRIDE/8) : $bits(mem_in.write_enable);
+    localparam ID_WIDTH = (ID_WIDTH_OVERRIDE != 0) ? ID_WIDTH_OVERRIDE : $bits(mem_in.id);
 
     typedef struct packed {
         logic read_enable;

@@ -8,9 +8,19 @@
     `include "mem_util.svh"
 `endif
 
+/*
+This implements a basic set-associative cache with parameterizable latency and size.
+
+To support coherency each cache line contains a state marking it as either:
+    INVALID - No valid data stored here
+    SHARED - Clean data but other caches may have it
+    EXCLUSIVE - Clean data and only this cache has it 
+    MODIFIED - Dirty data and by implication only this cache has it
+*/
 module cache
     import std_pkg::*;
     import stream_pkg::*;
+    import cache_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
@@ -23,15 +33,23 @@ module cache
     parameter int PORTS = 1,
     parameter int BLOCK_ADDR_WIDTH = 6,
     parameter int INDEX_ADDR_BITS = 6,
-    parameter int ASSOCIATIVITY = 1
+    parameter int ASSOCIATIVITY = 1,
+
+    parameter logic IS_COHERENT = 'b0,
+    parameter logic IS_LAST_LEVEL = 'b0,
+    parameter logic IS_FIRST_LEVEL = 'b0
 )(
     input logic clk, rst,
-    
-    mem_intf.in child_request [PORTS],
-    mem_intf.out child_response [PORTS],
 
-    mem_intf.out parent_request,
-    mem_intf.in parent_response
+    mem_intf.in                  child_request       [PORTS],
+    input cache_mesi_request_t   child_request_info  [PORTS],
+    mem_intf.out                 child_response      [PORTS],
+    output cache_mesi_response_t child_response_info [PORTS],
+
+    mem_intf.out                parent_request,
+    output cache_mesi_request_t parent_request_info,
+    mem_intf.in                 parent_response,
+    input cache_mesi_response_t parent_response_info
 );
 
     localparam int ADDR_WIDTH = $bits(parent_request.addr);
@@ -61,7 +79,10 @@ module cache
 
         mem_stage #(
             .CLOCK_INFO(CLOCK_INFO),
-            .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT)
+            .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT),
+            .ADDR_WIDTH_OVERRIDE(ADDR_WIDTH),
+            .DATA_WIDTH_OVERRIDE(CHILD_DATA_WIDTH),
+            .ID_WIDTH_OVERRIDE(ID_WIDTH)
         ) child_request_tie_inst (
             .clk, .rst,
             .mem_in(child_request[k]),
@@ -70,7 +91,10 @@ module cache
 
         mem_stage #(
             .CLOCK_INFO(CLOCK_INFO),
-            .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT)
+            .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT),
+            .ADDR_WIDTH_OVERRIDE(ADDR_WIDTH),
+            .DATA_WIDTH_OVERRIDE(CHILD_DATA_WIDTH),
+            .ID_WIDTH_OVERRIDE(ID_WIDTH)
         ) child_response_tie_inst (
             .clk, .rst,
             .mem_in(child_response_temp[k]),
@@ -82,7 +106,7 @@ module cache
     localparam int WORD_BITS = $clog2(DATA_WIDTH/8);
     localparam int TAG_BITS = 32 - BLOCK_ADDR_WIDTH - INDEX_ADDR_BITS - WORD_BITS;
     localparam int LRU_BITS = ($clog2(ASSOCIATIVITY) > 1) ? $clog2(ASSOCIATIVITY) : 1;
-    localparam int LOCAL_ADDR_WIDTH = BLOCK_ADDR_WIDTH + INDEX_ADDR_BITS;
+    localparam int LOCAL_ADDR_WIDTH = BLOCK_ADDR_WIDTH + INDEX_ADDR_BITS + $clog2(ASSOCIATIVITY);
 
     localparam int MERGED_ID_WIDTH = $clog2(PORTS) + $bits(child_request[0].id);
 
@@ -101,49 +125,59 @@ module cache
         addr_t addr;
     } bypass_t;
 
-    mem_intf #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH), 
-        .ID_WIDTH(MERGED_ID_WIDTH)) merged_child_request (.clk, .rst);
-    mem_intf #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH), 
-        .ID_WIDTH(MERGED_ID_WIDTH)) merged_child_response (.clk, .rst);
+    mem_intf #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH), .ID_WIDTH(MERGED_ID_WIDTH)) merged_child_request (.clk, .rst);
+    mem_intf #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH), .ID_WIDTH(MERGED_ID_WIDTH)) merged_child_response (.clk, .rst);
+    
+    cache_mesi_request_t merged_child_request_info;
+    cache_mesi_response_t merged_child_response_info;
 
-    mem_intf #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(LOCAL_ADDR_WIDTH), 
-        .ID_WIDTH(MERGED_ID_WIDTH)) local_request (.clk, .rst);
-    mem_intf #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(LOCAL_ADDR_WIDTH), 
-        .ID_WIDTH(MERGED_ID_WIDTH)) local_response (.clk, .rst);
+    mem_intf #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(LOCAL_ADDR_WIDTH), .ID_WIDTH(MERGED_ID_WIDTH)) local_request (.clk, .rst);
+    mem_intf #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(LOCAL_ADDR_WIDTH), .ID_WIDTH(MERGED_ID_WIDTH)) local_response (.clk, .rst);
 
     stream_intf #(.T(local_meta_t)) local_request_meta (.clk, .rst);
     stream_intf #(.T(local_meta_t)) local_response_meta (.clk, .rst);
 
-    stream_intf #(.T(bypass_t)) bypass_request (.clk, .rst);
+    stream_intf #(.T(bypass_t)) bypass_op (.clk, .rst);
 
     mem_merge #(
         .CLOCK_INFO(CLOCK_INFO),
         .PIPELINE_MODE(MERGE_PIPELINE_MODE),
-        .PORTS(PORTS)
+        .PORTS(PORTS),
+        .META_WIDTH($bits(cache_mesi_request_t))
     ) mem_merge_inst (
         .clk, .rst,
-        .mem_in(child_request_temp), .mem_out(merged_child_request)
+        .mem_in(child_request_temp),
+        .mem_in_meta(child_request_info),
+        .mem_out(merged_child_request),
+        .mem_out_meta(merged_child_request_info)
     );
 
     cache_decode #(
         .CLOCK_INFO(CLOCK_INFO),
         .TECHNOLOGY(TECHNOLOGY),
         .PIPELINE_MODE(DECODE_PIPELINE_MODE),
+        .PORTS(PORTS),
         .ADDR_WIDTH(ADDR_WIDTH),
         .DATA_WIDTH(DATA_WIDTH),
         .CHILD_DATA_WIDTH(CHILD_DATA_WIDTH),
         .BLOCK_ADDR_WIDTH(BLOCK_ADDR_WIDTH),
         .INDEX_ADDR_BITS(INDEX_ADDR_BITS),
-        .ASSOCIATIVITY(ASSOCIATIVITY)
+        .ASSOCIATIVITY(ASSOCIATIVITY),
+        .IS_COHERENT(IS_COHERENT),
+        .IS_LAST_LEVEL(IS_LAST_LEVEL),
+        .IS_FIRST_LEVEL(IS_FIRST_LEVEL)
     ) cache_decode_inst (
         .clk, .rst,
 
         .child_request(merged_child_request),
-        .parent_response(parent_response),
+        .child_request_info(merged_child_request_info),
+
+        .parent_response,
+        .parent_response_info,
         
-        .local_request(local_request),
-        .local_request_meta(local_request_meta),
-        .bypass_request(bypass_request)
+        .local_request,
+        .local_request_meta,
+        .bypass_request(bypass_op)
     );
 
     stream_stage_multiple #(
@@ -166,7 +200,8 @@ module cache
         .ENABLE_OUTPUT_REG(MEMORY_OUTPUT_REGISTER)
     ) cache_local_memory_inst (
         .clk, .rst,
-        .mem_in(local_request), .mem_out(local_response)
+        .mem_in(local_request), 
+        .mem_out(local_response)
     );
 
     cache_encode #(
@@ -177,26 +212,35 @@ module cache
         .CHILD_DATA_WIDTH(CHILD_DATA_WIDTH),
         .BLOCK_ADDR_WIDTH(BLOCK_ADDR_WIDTH),
         .INDEX_ADDR_BITS(INDEX_ADDR_BITS),
-        .ASSOCIATIVITY(ASSOCIATIVITY)
+        .ASSOCIATIVITY(ASSOCIATIVITY),
+        .IS_COHERENT(IS_COHERENT),
+        .IS_LAST_LEVEL(IS_LAST_LEVEL),
+        .IS_FIRST_LEVEL(IS_FIRST_LEVEL)
     ) cache_encode_inst (
         .clk, .rst,
         
-        .local_response(local_response),
-        .local_response_meta(local_response_meta),
-        .bypass_response(bypass_request),
+        .local_response,
+        .local_response_meta,
+        .bypass_response(bypass_op),
 
         .child_response(merged_child_response),
-        .parent_request(parent_request)
+        .child_response_info(merged_child_response_info),
+
+        .parent_request,
+        .parent_request_info
     );
 
     mem_split #(
         .CLOCK_INFO(CLOCK_INFO),
         .PIPELINE_MODE(SPLIT_PIPELINE_MODE),
-        .PORTS(PORTS)
+        .PORTS(PORTS),
+        .META_WIDTH($bits(cache_mesi_response_t))
     ) mem_split_inst (
         .clk, .rst,
         .mem_in(merged_child_response),
-        .mem_out(child_response_temp)
+        .mem_in_meta(merged_child_response_info),
+        .mem_out(child_response_temp),
+        .mem_out_meta(child_response_info)
     );
 
 endmodule

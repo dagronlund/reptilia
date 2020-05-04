@@ -12,15 +12,18 @@
     Address Division: Tag, Index, Block
     Cache Metadata:
         Each Cache Line has
-        Valid, Dirty, LRU, Tag
+        MESI State, LRU, Tag
 */
 module cache_decode
     import std_pkg::*;
     import stream_pkg::*;
+    import cache_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_TRANSPARENT,
+
+    parameter int PORTS = 1,    
 
     parameter int ADDR_WIDTH = 32,
     parameter int DATA_WIDTH = 32,
@@ -30,13 +33,20 @@ module cache_decode
     parameter int INDEX_ADDR_BITS = 6,
     parameter int ASSOCIATIVITY = 1,
 
+    parameter logic IS_COHERENT = 'b0,
+    parameter logic IS_LAST_LEVEL = 'b0,
+    parameter logic IS_FIRST_LEVEL = 'b0,
+
     parameter int DATA_WIDTH_RATIO = DATA_WIDTH / CHILD_DATA_WIDTH,
     parameter int SUB_BLOCK_ADDR_WIDTH = BLOCK_ADDR_WIDTH - $clog2(DATA_WIDTH_RATIO)
 )(
     input logic clk, rst,
     
-    mem_intf.in child_request,
-    mem_intf.in parent_response,
+    mem_intf.in                child_request,
+    input cache_mesi_request_t child_request_info,
+
+    mem_intf.in                 parent_response,
+    input cache_mesi_response_t parent_response_info,
     
     mem_intf.out local_request,
     stream_intf.out local_request_meta, // local_meta_t
@@ -48,7 +58,7 @@ module cache_decode
 
     localparam int TAG_BITS = 32 - BLOCK_ADDR_WIDTH - INDEX_ADDR_BITS - WORD_BITS;
     localparam int LRU_BITS = ($clog2(ASSOCIATIVITY) > 1) ? $clog2(ASSOCIATIVITY) : 1;
-    localparam int LOCAL_ADDR_WIDTH = BLOCK_ADDR_WIDTH + INDEX_ADDR_BITS;
+    localparam int LOCAL_ADDR_WIDTH = BLOCK_ADDR_WIDTH + INDEX_ADDR_BITS + $clog2(ASSOCIATIVITY);
 
     `STATIC_ASSERT(ADDR_WIDTH == $bits(child_request.addr))
     `STATIC_ASSERT(LOCAL_ADDR_WIDTH == $bits(local_request.addr))
@@ -95,14 +105,11 @@ module cache_decode
     } addr_decoded_t;
 
     typedef struct packed {
-        logic valid, dirty;
+        cache_mesi_state_t mesi;
+        logic [PORTS-1:0] owners;
         tag_t tag;
         lru_t lru;
     } line_meta_t;
-
-    // typedef struct packed {
-    //     line_meta_t line_meta [ASSOCIATIVITY];
-    // } row_meta_t;
 
     function automatic addr_decoded_t decode_address(
         input addr_t addr
@@ -131,24 +138,28 @@ module cache_decode
     endfunction
 
     function automatic local_addr_t get_local_address(
-        input addr_t addr
+        input index_t index,
+        input block_t block,
+        input lru_t assoc
     );
-        addr_decoded_t decoded = decode_address(addr);
-        return {decoded.index, decoded.block};
+        // addr_decoded_t decoded = decode_address(addr);
+        return (ASSOCIATIVITY > 1) ? {index, assoc, block} : {index, block};
     endfunction
 
     // Lower LRU means it was modified the latest
     function automatic line_meta_t [ASSOCIATIVITY-1:0] update_lru(
         input line_meta_t [ASSOCIATIVITY-1:0] meta_in,
-        input lru_t modified_index
+        input lru_t accessed_index
     );
+        lru_t old_lru = meta_in[accessed_index].lru;
+
         for (int i = 0; i < ASSOCIATIVITY; i++) begin
-            if (meta_in[modified_index].lru < meta_in[i].lru) begin
+            if (old_lru >= meta_in[i].lru) begin
                 meta_in[i].lru += 'b1;
             end
         end
 
-        meta_in[modified_index].lru = 'b0;
+        meta_in[accessed_index].lru = 'b0;
 
         return meta_in;
     endfunction
@@ -213,6 +224,7 @@ module cache_decode
 
     state_t current_state, next_state;
     tag_t current_residual_tag, next_residual_tag;
+    lru_t current_residual_lru, next_residual_lru;
     sub_block_t current_front_sub_block, next_front_sub_block;
     sub_block_t current_rear_sub_block, next_rear_sub_block;
     logic current_id, next_id;
@@ -266,6 +278,17 @@ module cache_decode
 
     std_register #(
         .CLOCK_INFO(CLOCK_INFO),
+        .T(lru_t),
+        .RESET_VECTOR('b0)
+    ) residual_lru_register_inst (
+        .clk, .rst,
+        .enable,
+        .next(next_residual_lru),
+        .value(current_residual_lru)
+    );
+
+    std_register #(
+        .CLOCK_INFO(CLOCK_INFO),
         .T(logic),
         .RESET_VECTOR('b0)
     ) id_register_inst (
@@ -297,15 +320,20 @@ module cache_decode
         .reset_done
     );
 
+    addr_decoded_t decoded_addr;
+
     always_comb begin
         automatic logic miss = 'b1, has_empty = 'b0;
         automatic lru_t found_line = 'b0, empty_line = 'b0, last_used_line = 'b0;
-        automatic addr_decoded_t decoded_addr = decode_address(child_request.addr);
+        // automatic addr_decoded_t decoded_addr = decode_address(child_request.addr);
+
+        decoded_addr = decode_address(child_request.addr);
 
         next_state = current_state;
         next_front_sub_block = current_front_sub_block;
         next_rear_sub_block = current_rear_sub_block;
         next_residual_tag = current_residual_tag;
+        next_residual_lru = current_residual_lru;
         next_id = current_id;
 
         consume_child = 'b0;
@@ -318,6 +346,22 @@ module cache_decode
         metadata_addr = decoded_addr.index;
         metadata_write_data = metadata_read_data;
 
+        // Search associated lines for hit, empty, and last used lines
+        for (int i = 0; i < ASSOCIATIVITY; i++) begin
+            if (cache_is_mesi_valid(metadata_read_data[i].mesi) && 
+                    metadata_read_data[i].tag == decoded_addr.tag) begin
+                miss = 'b0;
+                found_line = i;
+            end
+            if (!cache_is_mesi_valid(metadata_read_data[i].mesi)) begin
+                has_empty = 'b1;
+                empty_line = i;
+            end
+            if (metadata_read_data[i].lru > metadata_read_data[last_used_line].lru) begin
+                last_used_line = i;
+            end
+        end
+
         // Set defaults for local_request, where child_request is possibly less
         // wide than the local request and write enable needs to be shifted
         next_local_request.read_enable = child_request.read_enable;
@@ -328,62 +372,38 @@ module cache_decode
         end else begin
             next_local_request.write_enable = child_request.write_enable;
         end
-        next_local_request.addr = get_local_address(child_request.addr);
+        next_local_request.addr = get_local_address(decoded_addr.index, decoded_addr.block, found_line);
         next_local_request.data = {DATA_WIDTH_RATIO{child_request.data}};
         next_local_request.id = child_request.id;
-
-        // Search associated lines for hit, empty, and last used lines
-        for (int i = 0; i < ASSOCIATIVITY; i++) begin
-            if (metadata_read_data[i].valid && 
-                    metadata_read_data[i].tag == decoded_addr.tag) begin
-                miss = 'b0;
-                found_line = i;
-            end
-            if (!metadata_read_data[i].valid) begin
-                has_empty = 'b1;
-                empty_line = i;
-            end
-            if (metadata_read_data[i].lru > metadata_read_data[last_used_line].lru) begin
-                last_used_line = i;
-            end
-        end
 
         if (reset_done) begin
             case (current_state)
             CACHE_NORMAL: begin
                 if (child_request.valid) begin
                     if (miss) begin
-                        if (has_empty) begin // Empty line to fill
-                            metadata_write_enable = 'b1;
-                            metadata_write_data[empty_line].valid = 'b1;
-                            metadata_write_data[empty_line].dirty = 'b0;
-                            metadata_write_data[empty_line].tag = decoded_addr.tag;
+                        // Either use line that's empty or last used if none
+                        next_residual_lru = has_empty ? empty_line : last_used_line;
+                        // We only need the tag if we are going to be evicting
+                        next_residual_tag = metadata_read_data[next_residual_lru].tag;
+                        // Only start evicting if no empty line and the last used one is dirty
+                        next_state = (!has_empty && cache_is_mesi_dirty(metadata_read_data[last_used_line].mesi)) ? 
+                                CACHE_EVICT : CACHE_FILL;
 
-                            next_state = CACHE_FILL;
-                        end else begin // No empty line to fill
-                            metadata_write_enable = 'b1;
-                            metadata_write_data[last_used_line].valid = 'b1;
-                            metadata_write_data[last_used_line].dirty = 'b0;
-                            metadata_write_data[last_used_line].tag = decoded_addr.tag;
-
-                            if (!metadata_read_data[last_used_line].dirty) begin
-                                next_state = CACHE_FILL; // No need to evict clean line
-                            end else begin
-                                next_state = CACHE_EVICT;
-                            end
-                        end
+                        metadata_write_enable = 'b1;
+                        metadata_write_data[next_residual_lru].mesi = CACHE_MESI_SHARED;
+                        metadata_write_data[next_residual_lru].tag = decoded_addr.tag;
 
                         next_front_sub_block = 'b0;
                         next_rear_sub_block = 'b0;
-                        // We only need the tag from a line being evicted
-                        next_residual_tag = metadata_read_data[last_used_line].tag;
                     end else begin // Hit
                         consume_child = 'b1;
 
                         // Update LRU and dirty bit in table
                         metadata_write_enable = 'b1;
-                        metadata_write_data = update_lru(metadata_read_data, found_line);
-                        metadata_write_data[found_line].dirty |= (|child_request.write_enable);
+                        metadata_write_data = update_lru(metadata_write_data, found_line);
+                        if (|child_request.write_enable) begin
+                            metadata_write_data[found_line].mesi = CACHE_MESI_MODIFIED;
+                        end
 
                         // Send default local memory request
                         produce_local_request = 'b1;
@@ -404,8 +424,8 @@ module cache_decode
 
                 next_local_request.read_enable = 'b1;
                 next_local_request.write_enable = 'b0;
-                // Address is the index + the sub-block address we are currently on
-                next_local_request.addr = {decoded_addr.index, current_front_sub_block};
+                // Address is the index + association index + the sub-block address we are currently on
+                next_local_request.addr = get_local_address(decoded_addr.index, current_front_sub_block, current_residual_lru);
                 next_local_request.data = child_request.data; // The data does not matter here
 
                 next_local_request_meta.payload.id = current_id;
@@ -444,7 +464,7 @@ module cache_decode
                 end
                 next_local_request.read_enable = 'b0;
                 next_local_request.write_enable = {(DATA_WIDTH/8){1'b1}};
-                next_local_request.addr = {decoded_addr.index, current_rear_sub_block};
+                next_local_request.addr = get_local_address(decoded_addr.index, current_front_sub_block, current_residual_lru);
                 next_local_request.data = parent_response.data;
             end
             CACHE_PENDING: begin
@@ -455,7 +475,7 @@ module cache_decode
 
                 next_local_request.read_enable = 'b0;
                 next_local_request.write_enable = {(DATA_WIDTH/8){1'b1}};
-                next_local_request.addr = {decoded_addr.index, current_rear_sub_block};
+                next_local_request.addr = get_local_address(decoded_addr.index, current_front_sub_block, current_residual_lru);
                 next_local_request.data = parent_response.data;
 
                 if (next_rear_sub_block == 'b0) begin
