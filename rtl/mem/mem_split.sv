@@ -15,12 +15,15 @@ module mem_split
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
     parameter stream_select_mode_t STREAM_SELECT_MODE = STREAM_SELECT_MODE_ROUND_ROBIN,
-    parameter int PORTS = 2
+    parameter int PORTS = 2,
+    parameter int META_WIDTH = 1
 )(
     input wire clk, rst,
 
-    mem_intf.in mem_in,
-    mem_intf.out mem_out [PORTS]
+    mem_intf.in                   mem_in,
+    input wire [META_WIDTH-1:0]   mem_in_meta,
+    mem_intf.out                  mem_out [PORTS],
+    output logic [META_WIDTH-1:0] mem_out_meta [PORTS]
 );
 
     localparam ADDR_WIDTH = $bits(mem_in.addr);
@@ -39,6 +42,7 @@ module mem_split
         logic [ADDR_WIDTH-1:0] addr;
         logic [DATA_WIDTH-1:0] data;
         logic [ID_WIDTH-1:0] id;
+        logic [META_WIDTH-1:0] meta;
     } mem_t;
 
     logic [SUB_ID_WIDTH-1:0] stream_in_id;
@@ -64,6 +68,7 @@ module mem_split
             mem_out[k].addr = payload.addr;
             mem_out[k].data = payload.data;
             mem_out[k].id = payload.id[POST_ID_WIDTH-1:0];
+            mem_out_meta[k] = payload.meta;
             stream_out[k].ready = mem_out[k].ready;
         end
     end
@@ -76,7 +81,8 @@ module mem_split
             write_enable: mem_in.write_enable,
             addr: mem_in.addr,
             data: mem_in.data,
-            id: mem_in.id
+            id: mem_in.id,
+            meta: mem_in_meta
         };
         mem_in.ready = stream_in.ready;
 

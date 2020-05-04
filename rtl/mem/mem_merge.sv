@@ -15,12 +15,15 @@ module mem_merge
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
     parameter stream_select_mode_t STREAM_SELECT_MODE = STREAM_SELECT_MODE_ROUND_ROBIN,
-    parameter int PORTS = 2
+    parameter int PORTS = 2,
+    parameter int META_WIDTH = 1
 )(
     input wire clk, rst,
 
-    mem_intf.in mem_in [PORTS],
-    mem_intf.out mem_out
+    mem_intf.in                   mem_in [PORTS],
+    input wire [META_WIDTH-1:0]   mem_in_meta [PORTS],
+    mem_intf.out                  mem_out,
+    output logic [META_WIDTH-1:0] mem_out_meta
 );
 
     localparam ADDR_WIDTH = $bits(mem_out.addr);
@@ -39,6 +42,7 @@ module mem_merge
         logic [ADDR_WIDTH-1:0] addr;
         logic [DATA_WIDTH-1:0] data;
         logic [PRE_ID_WIDTH-1:0] id;
+        logic [META_WIDTH-1:0] meta;
     } mem_t;
 
     stream_intf #(.T(mem_t)) stream_in [PORTS] (.clk, .rst);
@@ -61,7 +65,8 @@ module mem_merge
                 write_enable: mem_in[k].write_enable,
                 addr: mem_in[k].addr,
                 data: mem_in[k].data,
-                id: mem_in[k].id
+                id: mem_in[k].id,
+                meta: mem_in_meta[k]
             };
 
             stream_in[k].valid = mem_in[k].valid;
@@ -81,6 +86,7 @@ module mem_merge
         mem_out.addr = payload.addr;
         mem_out.data = payload.data;
         mem_out.id = (PORTS > 1) ? {stream_out_id, payload.id} : payload.id;
+        mem_out_meta = payload.meta;
     end
 
     stream_merge #(
