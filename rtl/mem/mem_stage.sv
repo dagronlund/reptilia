@@ -17,11 +17,14 @@ module mem_stage
     import stream_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
-    parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED
+    parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
+    parameter int META_WIDTH = 1
 )(
     input logic clk, rst,
-    mem_intf.in mem_in,
-    mem_intf.out mem_out
+    mem_intf.in                   mem_in,
+    input logic [META_WIDTH-1:0]  mem_in_meta,
+    mem_intf.out                  mem_out,
+    output logic [META_WIDTH-1:0] mem_out_meta
 );
 
     `STATIC_ASSERT($bits(mem_in.addr) == $bits(mem_out.addr))
@@ -39,6 +42,7 @@ module mem_stage
         logic [ADDR_WIDTH-1:0] addr;
         logic [DATA_WIDTH-1:0] data;
         logic [ID_WIDTH-1:0] id;
+        logic [META_WIDTH-1:0] meta;
     } mem_t;
 
     stream_intf #(.T(mem_t)) stream_in (.clk, .rst);
@@ -61,7 +65,8 @@ module mem_stage
             write_enable: mem_in.write_enable,
             addr: mem_in.addr,
             data: mem_in.data,
-            id: mem_in.id
+            id: mem_in.id,
+            meta: mem_in_meta
         };
         mem_in.ready = stream_in.ready;
 
@@ -72,6 +77,7 @@ module mem_stage
         mem_out.addr = stream_out.payload.addr;
         mem_out.data = stream_out.payload.data;
         mem_out.id = stream_out.payload.id;
+        mem_out_meta = stream_out.payload.meta;
         stream_out.ready = mem_out.ready;
     end
 
