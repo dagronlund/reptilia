@@ -25,24 +25,29 @@ module stream_split
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
     parameter stream_select_mode_t STREAM_SELECT_MODE = STREAM_SELECT_MODE_ROUND_ROBIN, // Unused
     parameter int PORTS = 2,
-    parameter int ID_WIDTH = (PORTS > 1) ? $clog2(PORTS) : 1
+    parameter int ID_WIDTH = (PORTS > 1) ? $clog2(PORTS) : 1,
+    parameter int USE_LAST = 0
 )(
     input wire clk, rst,
 
-    stream_intf.in          stream_in,
-    input wire [ID_WIDTH-1:0]   stream_in_id,
+    stream_intf.in            stream_in,
+    input wire [ID_WIDTH-1:0] stream_in_id,
+    input wire                stream_in_last,
 
-    stream_intf.out         stream_out [PORTS],
-    output logic [ID_WIDTH-1:0] stream_out_id [PORTS]
+    stream_intf.out             stream_out [PORTS],
+    output logic [ID_WIDTH-1:0] stream_out_id [PORTS],
+    output logic                stream_out_last [PORTS]
 );
 
     localparam PAYLOAD_WIDTH = $bits(stream_in.payload);
 
-    typedef logic [PAYLOAD_WIDTH-1:0] payload_t;
     typedef logic [ID_WIDTH-1:0] index_t;
+    typedef struct packed {
+        logic [PAYLOAD_WIDTH-1:0] payload;
+        logic                     last;
+    } payload_last_t;
 
     logic [PORTS-1:0] stream_out_valid, stream_out_ready;
-    payload_t         stream_out_payload [PORTS];
 
     // Copy interfaces into arrays
     generate
@@ -51,23 +56,30 @@ module stream_split
 
         `PROCEDURAL_ASSERT(PAYLOAD_WIDTH == $bits(stream_out[k].payload))
 
-        stream_intf #(.T(payload_t)) stream_out_next (.clk, .rst);
+        stream_intf #(.T(payload_last_t)) stream_out_next (.clk, .rst);
+        stream_intf #(.T(payload_last_t)) stream_out_temp (.clk, .rst);
 
         always_comb begin
             stream_out_next.valid = stream_out_valid[k];
-            stream_out_next.payload = stream_in.payload;
             stream_out_ready[k] = stream_out_next.ready;
+            stream_out_next.payload.payload = stream_in.payload;
+            stream_out_next.payload.last = stream_in_last;
+
+            stream_out[k].valid = stream_out_temp.valid;
+            stream_out_temp.ready = stream_out[k].ready;
+            stream_out[k].payload = stream_out_temp.payload.payload;
+            stream_out_last[k] = stream_out_temp.payload.last;
         end
 
         stream_stage #(
             .CLOCK_INFO(CLOCK_INFO),
             .PIPELINE_MODE(PIPELINE_MODE),
-            .T(payload_t)
+            .T(payload_last_t)
         ) stream_stage_inst (
             .clk, .rst,
 
             .stream_in(stream_out_next),
-            .stream_out(stream_out[k])
+            .stream_out(stream_out_temp)
         );
     end
     endgenerate

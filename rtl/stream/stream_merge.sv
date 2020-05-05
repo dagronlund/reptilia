@@ -36,16 +36,19 @@ module stream_merge
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
     parameter stream_select_mode_t STREAM_SELECT_MODE = STREAM_SELECT_MODE_ROUND_ROBIN,
     parameter int PORTS = 2,
-    parameter int ID_WIDTH = (PORTS > 1) ? $clog2(PORTS) : 1
+    parameter int ID_WIDTH = (PORTS > 1) ? $clog2(PORTS) : 1,
+    parameter int USE_LAST = 0
 )(
     input wire clk, 
     input wire rst,
 
-    stream_intf.in              stream_in [PORTS],
-    input wire [ID_WIDTH-1:0]   stream_in_id [PORTS],
+    stream_intf.in            stream_in [PORTS],
+    input wire [ID_WIDTH-1:0] stream_in_id [PORTS],
+    input wire                stream_in_last [PORTS],
 
     stream_intf.out             stream_out,
-    output logic [ID_WIDTH-1:0] stream_out_id
+    output logic [ID_WIDTH-1:0] stream_out_id,
+    output logic                stream_out_last
 );
 
     localparam PAYLOAD_WIDTH = $bits(stream_out.payload);
@@ -56,15 +59,19 @@ module stream_merge
     typedef struct packed {
         payload_t payload;
         index_t id;
-    } payload_id_t;
+        logic last;
+    } payload_id_last_t;
 
     function automatic index_t get_next_priority(
             input index_t current_priority,
             input index_t incr
     );
-        index_t incr_priority = current_priority + incr;
-        if (incr_priority >= PORTS) begin
-            return 'b0;
+        index_t incr_priority = current_priority;
+        for (index_t i = 0; i < incr; i++) begin
+            incr_priority += 'b1;
+            if (incr_priority >= PORTS) begin
+                incr_priority = 'b0;
+            end
         end
         return incr_priority;
     endfunction
@@ -91,8 +98,8 @@ module stream_merge
     logic [PORTS-1:0] consume;
     logic produce;
 
-    stream_intf #(.T(payload_id_t)) stream_out_next (.clk, .rst);
-    stream_intf #(.T(payload_id_t)) stream_out_complete (.clk, .rst);
+    stream_intf #(.T(payload_id_last_t)) stream_out_next (.clk, .rst);
+    stream_intf #(.T(payload_id_last_t)) stream_out_complete (.clk, .rst);
 
     stream_controller #(
         .NUM_INPUTS(PORTS),
@@ -116,7 +123,7 @@ module stream_merge
     stream_stage #(
         .CLOCK_INFO(CLOCK_INFO),
         .PIPELINE_MODE(PIPELINE_MODE),
-        .T(payload_id_t)
+        .T(payload_id_last_t)
     ) stream_stage_inst (
         .clk, .rst,
 
@@ -137,6 +144,19 @@ module stream_merge
         .value(current_priority)
     );
 
+    logic next_last_flag, last_flag;
+
+    std_register #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .T(logic),
+        .RESET_VECTOR('b1)
+    ) last_flag_register_inst (
+        .clk, .rst,
+        .enable(enable_priority),
+        .next(next_last_flag),
+        .value(last_flag)
+    );
+
     always_comb begin
         automatic index_t stream_in_index;
         automatic int i;
@@ -148,26 +168,45 @@ module stream_merge
 
         // Set default master payloads, better than just zeros
         stream_out_next.payload.payload = stream_in_payload[0];
+        stream_out_next.payload.last = stream_in_last[0];
         stream_out_next.payload.id = 'b0;
+        next_last_flag = stream_in_last[0];
 
         if (STREAM_SELECT_MODE == STREAM_SELECT_MODE_ROUND_ROBIN) begin
+            if (USE_LAST && !last_flag) begin
+                // If we are locked into a stream just stall waiting on it
+                consume[current_priority] = 'b1;
+                produce = 'b1;
+                enable_priority = enable;
+                // Only use next stream if that was the last beat
+                next_priority = stream_in_last[current_priority] ? 
+                    get_next_priority(current_priority, 'b1) : current_priority;
 
-            // Go through input streams starting at current priority
-            for (i = 'b0; i < PORTS; i++) begin
-                stream_in_index = get_next_priority(current_priority, i);
-                
-                // Stream is valid and we haven't produced anything yet
-                if (stream_in_valid[stream_in_index] && !produce) begin
-                    consume[stream_in_index] = 'b1;
-                    produce = 'b1;
-                    enable_priority = enable;
-                    next_priority = get_next_priority(stream_in_index, 'b1);
+                stream_out_next.payload.payload = stream_in_payload[current_priority];
+                stream_out_next.payload.last = stream_in_last[current_priority];
+                stream_out_next.payload.id = current_priority;
+                next_last_flag = stream_in_last[current_priority];
+            end else begin
+                // Go through input streams starting at current priority
+                for (i = 'b0; i < PORTS; i++) begin
+                    stream_in_index = get_next_priority(current_priority, i);
+                    
+                    // Stream is valid and we haven't produced anything yet
+                    if (stream_in_valid[stream_in_index] && !produce) begin
+                        consume[stream_in_index] = 'b1;
+                        produce = 'b1;
+                        enable_priority = enable;
+                        // Only use next stream if that was the last beat
+                        next_priority = (USE_LAST && !stream_in_last[stream_in_index]) ? 
+                                stream_in_index : get_next_priority(stream_in_index, 'b1);
 
-                    stream_out_next.payload.payload = stream_in_payload[stream_in_index];
-                    stream_out_next.payload.id = stream_in_index;
+                        stream_out_next.payload.payload = stream_in_payload[stream_in_index];
+                        stream_out_next.payload.last = stream_in_last[stream_in_index];
+                        stream_out_next.payload.id = stream_in_index;
+                        next_last_flag = stream_in_last[stream_in_index];
+                    end
                 end
             end
-
         end else begin // STREAM_SELECT_MODE_ORDERED
 
             // Go through input streams looking for matching id
@@ -181,6 +220,7 @@ module stream_merge
                     next_priority = current_priority + 'b1;
 
                     stream_out_next.payload.payload = stream_in_payload[i];
+                    stream_out_next.payload.last = stream_in_payload[i];
                     stream_out_next.payload.id = current_priority;
                 end
             end
@@ -191,6 +231,7 @@ module stream_merge
         stream_out.valid = stream_out_complete.valid;
         stream_out.payload = stream_out_complete.payload.payload;
         stream_out_id = stream_out_complete.payload.id;
+        stream_out_last = stream_out_complete.payload.last;
         stream_out_complete.ready = stream_out.ready;
     end
 

@@ -16,14 +16,18 @@ module mem_split
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
     parameter stream_select_mode_t STREAM_SELECT_MODE = STREAM_SELECT_MODE_ROUND_ROBIN,
     parameter int PORTS = 2,
-    parameter int META_WIDTH = 1
+    parameter int META_WIDTH = 1,
+    parameter int USE_LAST = 0
 )(
     input wire clk, rst,
 
-    mem_intf.in                   mem_in,
-    input wire [META_WIDTH-1:0]   mem_in_meta,
+    mem_intf.in                 mem_in,
+    input wire [META_WIDTH-1:0] mem_in_meta,
+    input wire                  mem_in_last,
+
     mem_intf.out                  mem_out [PORTS],
-    output logic [META_WIDTH-1:0] mem_out_meta [PORTS]
+    output logic [META_WIDTH-1:0] mem_out_meta [PORTS],
+    output logic                  mem_out_last [PORTS]
 );
 
     localparam ADDR_WIDTH = $bits(mem_in.addr);
@@ -97,7 +101,8 @@ module mem_split
         .ID_WIDTH(ID_WIDTH)
     ) stream_split_inst (
         .clk, .rst,
-        .stream_in, .stream_in_id, .stream_out
+        .stream_in, .stream_in_id, .stream_in_last(mem_in_last),
+        .stream_out, .stream_out_last(mem_out_last)
     );
 
 endmodule

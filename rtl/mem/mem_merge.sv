@@ -16,14 +16,18 @@ module mem_merge
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
     parameter stream_select_mode_t STREAM_SELECT_MODE = STREAM_SELECT_MODE_ROUND_ROBIN,
     parameter int PORTS = 2,
-    parameter int META_WIDTH = 1
+    parameter int META_WIDTH = 1,
+    parameter int USE_LAST = 0
 )(
     input wire clk, rst,
 
-    mem_intf.in                   mem_in [PORTS],
-    input wire [META_WIDTH-1:0]   mem_in_meta [PORTS],
+    mem_intf.in                 mem_in [PORTS],
+    input wire [META_WIDTH-1:0] mem_in_meta [PORTS],
+    input wire                  mem_in_last [PORTS],
+
     mem_intf.out                  mem_out,
-    output logic [META_WIDTH-1:0] mem_out_meta
+    output logic [META_WIDTH-1:0] mem_out_meta,
+    output logic                  mem_out_last
 );
 
     localparam ADDR_WIDTH = $bits(mem_out.addr);
@@ -94,10 +98,12 @@ module mem_merge
         .PIPELINE_MODE(PIPELINE_MODE),
         .STREAM_SELECT_MODE(STREAM_SELECT_MODE),
         .PORTS(PORTS),
-        .ID_WIDTH(ID_WIDTH)
+        .ID_WIDTH(ID_WIDTH),
+        .USE_LAST(USE_LAST)
     ) stream_merge_inst (
         .clk, .rst,
-        .stream_in, .stream_out, .stream_out_id
+        .stream_in, .stream_in_last(mem_in_last),
+        .stream_out, .stream_out_id, .stream_out_last(mem_out_last)
     );
 
 endmodule
