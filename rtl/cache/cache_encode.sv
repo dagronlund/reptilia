@@ -64,26 +64,32 @@ module cache_encode
 
     // Identical type in cache_encode
     typedef struct packed {
-        logic id;
+        logic bypass_id;
         logic send_parent;
+        cache_mesi_operation_t op;
         addr_t addr;
     } local_meta_t;
 
     // Identical type in cache_encode
     typedef struct packed {
-        logic id;
+        logic bypass_id;
+        logic send_parent;
+        cache_mesi_operation_t op;
         addr_t addr;
+        logic [ID_WIDTH-1:0] id;
+        logic last;
     } bypass_t;
 
     function automatic sub_word_t get_sub_word(
         input word_t word,
-        input sub_word_addr_t addr
+        input addr_t addr
     );
+        sub_word_addr_t sub_addr = (DATA_WIDTH_RATIO > 1) ? addr[$clog2(DATA_WIDTH_RATIO)+CHILD_WORD_BITS-1:CHILD_WORD_BITS] : 'b0;
         sub_word_t sub_word = 'b0;
         for (int i = 0; i < CHILD_DATA_WIDTH; i++) begin
             sub_word[i] = word[(addr*CHILD_DATA_WIDTH)+i];
         end
-        return sub_word;
+        return (DATA_WIDTH_RATIO > 1) ? sub_word : word;
     endfunction
 
     mem_intf #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH), .ID_WIDTH(ID_WIDTH)) next_child_response (.clk, .rst);
@@ -137,7 +143,7 @@ module cache_encode
         .mem_out_meta(parent_request_info)
     );
 
-    logic current_id, next_id;
+    logic current_bypass_id, next_bypass_id;
 
     std_register #(
         .CLOCK_INFO(CLOCK_INFO),
@@ -146,8 +152,8 @@ module cache_encode
     ) id_register_inst (
         .clk, .rst,
         .enable,
-        .next(next_id),
-        .value(current_id)
+        .next(next_bypass_id),
+        .value(current_bypass_id)
     );
 
     always_comb begin
@@ -159,48 +165,52 @@ module cache_encode
         next_child_response_info = cache_mesi_response_t'('b0);
         next_parent_request_info = cache_mesi_request_t'('b0);
 
-        next_id = current_id;
+        next_bypass_id = current_bypass_id;
 
+        // Child responses are always just data/op/address
         next_child_response.read_enable = 'b0;
         next_child_response.write_enable = 'b0;
         next_child_response.addr = 'b0;
-        if (DATA_WIDTH_RATIO > 1) begin
-            next_child_response.data = get_sub_word(local_response.data,
-                    local_response_meta.payload.addr[$clog2(DATA_WIDTH_RATIO)+CHILD_WORD_BITS-1:CHILD_WORD_BITS]);
-        end else begin
-            next_child_response.data = local_response.data;
-        end
+        next_child_response.data = get_sub_word(local_response.data, local_response_meta.payload.addr);
         next_child_response.id = local_response.id;
+        next_child_response.last = local_response.last;
+        next_child_response_info.op = local_response_meta.payload.op;
 
         next_parent_request.read_enable = 'b0;
-        next_parent_request.write_enable = 'b0;
+        next_parent_request.write_enable = {(DATA_WIDTH/8){1'b1}}; // Setup to issue only writes to the parent (we already setup parent/child otherwise)
         next_parent_request.addr = local_response_meta.payload.addr;
         next_parent_request.data = local_response.data;
         next_parent_request.id = 'b0;
+        next_parent_request.last = local_response.last;
+        next_parent_request_info.op = local_response_meta.payload.op;
 
-        if (bypass_response.valid && bypass_response.payload.id == current_id) begin
+        if (bypass_response.valid && bypass_response.payload.bypass_id == current_bypass_id) begin
             consume_bypass_response = 'b1;
-            next_id = current_id + 'b1;
+            next_bypass_id = current_bypass_id + 'b1;
 
-            produce_parent_request = 'b1;
+            produce_parent_request = bypass_response.payload.send_parent;
+            produce_child_response = !bypass_response.payload.send_parent;
 
+            // Setup to issue only reads to the parent
             next_parent_request.read_enable = 'b1;
             next_parent_request.write_enable = 'b0;
             next_parent_request.addr = bypass_response.payload.addr;
-        end else if (local_response_meta.valid && local_response_meta.payload.id == current_id) begin
+            next_parent_request.last = bypass_response.payload.last;
+            next_parent_request_info.op = bypass_response.payload.op;
+
+            // Setup to only issue op responses to the child
+            next_child_response.addr = bypass_response.payload.addr;
+            next_child_response.id = bypass_response.payload.id;
+            next_child_response.last = bypass_response.payload.last;
+            next_child_response_info.op = bypass_response.payload.op;
+
+        // We do not need to check valid here, assigning consume will do that for us
+        end else if (local_response_meta.payload.bypass_id == current_bypass_id) begin
             consume_local_response = 'b1;
-            next_id = current_id + 'b1;
+            next_bypass_id = current_bypass_id + 'b1;
 
-            next_parent_request.read_enable = 'b0;
-            next_parent_request.write_enable = {(DATA_WIDTH/8){1'b1}};
-            next_parent_request.addr = local_response_meta.payload.addr;
-
-            if (local_response_meta.payload.send_parent) begin
-                produce_parent_request = 'b1;
-            end else begin
-                produce_child_response = 'b1;
-
-            end
+            produce_parent_request = local_response_meta.payload.send_parent;
+            produce_child_response = !local_response_meta.payload.send_parent;
         end
     end
 

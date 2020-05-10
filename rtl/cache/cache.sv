@@ -114,15 +114,20 @@ module cache
 
     // Identical type in cache_encode
     typedef struct packed {
-        logic id;
+        logic bypass_id;
         logic send_parent;
+        cache_mesi_operation_t op;
         addr_t addr;
     } local_meta_t;
 
     // Identical type in cache_encode
     typedef struct packed {
-        logic id;
+        logic bypass_id;
+        logic send_parent;
+        cache_mesi_operation_t op;
         addr_t addr;
+        logic [MERGED_ID_WIDTH-1:0] id;
+        logic last;
     } bypass_t;
 
     mem_intf #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH), .ID_WIDTH(MERGED_ID_WIDTH)) merged_child_request (.clk, .rst);
