@@ -1,3 +1,5 @@
+`timescale 1ns/1ps
+
 interface stream_intf #(
     parameter type T = logic
 )(

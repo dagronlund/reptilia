@@ -55,7 +55,7 @@ module cache_decode
 
     localparam logic HAS_COHERENT_PARENT = (IS_COHERENT && !IS_LAST_LEVEL);
     localparam logic HAS_COHERENT_CHILD = (IS_COHERENT && !IS_FIRST_LEVEL);
-    `STATIC_ASSERT(IS_COHERENT -> (!IS_FIRST_LEVEL || !IS_LAST_LEVEL))
+    `STATIC_ASSERT(((IS_COHERENT) && (!IS_FIRST_LEVEL || !IS_LAST_LEVEL)) || !IS_COHERENT)
 
     localparam int WORD_BITS = $clog2(DATA_WIDTH/8);
     localparam int CHILD_WORD_BITS = $clog2(CHILD_DATA_WIDTH/8);
@@ -65,6 +65,7 @@ module cache_decode
     localparam int LOCAL_ADDR_WIDTH = BLOCK_ADDR_WIDTH + INDEX_ADDR_BITS + $clog2(ASSOCIATIVITY);
 
     localparam int ID_WIDTH = $bits(child_request.id);
+    localparam int CHILD_ID_WIDTH = (PORTS > 1) ? $clog2(PORTS) : 1;
 
     `STATIC_ASSERT(ADDR_WIDTH == $bits(child_request.addr))
     `STATIC_ASSERT(LOCAL_ADDR_WIDTH == $bits(local_request.addr))
@@ -87,10 +88,10 @@ module cache_decode
     typedef logic [TAG_BITS-1:0] tag_t;
     typedef logic [LRU_BITS-1:0] lru_t;
     typedef logic [INDEX_ADDR_BITS-1:0] index_t;
-    typedef logic [$clog2(PORTS)-1:0] id_t;
+    typedef logic [CHILD_ID_WIDTH-1:0] child_id_t;
     typedef logic [ID_WIDTH-1:0] full_id_t;
 
-    typedef enum logic [1:0] {
+    typedef enum logic [3:0] {
         NORMAL,
         BLOCK_READ, BLOCK_READ_RESPONSE,
         BLOCK_WRITE,
@@ -148,13 +149,13 @@ module cache_decode
         cache_mesi_operation_t op;
         addr_t addr;
         child_data_t data;
-        id_t child_id;
+        child_id_t child_id;
         logic read_enable;
         child_mask_t write_enable;
     } child_request_t;
 
-    function automatic id_t find_next_bit(input logic [PORTS-1:0] ports, id_t start);
-        for (id_t i = start; i < PORTS; i++) begin
+    function automatic child_id_t find_next_bit(input logic [PORTS-1:0] ports, child_id_t start);
+        for (child_id_t i = start; i < PORTS; i++) begin
             if (ports[i]) begin
                 return i;
             end
@@ -192,14 +193,16 @@ module cache_decode
         return search;
     endfunction
 
-    function automatic addr_decoded_t decode_address(
-        input addr_t addr
-    );
-        return '{
-            tag: addr[ADDR_WIDTH-1:ADDR_WIDTH-TAG_BITS],
-            index: addr[ADDR_WIDTH-TAG_BITS-1:ADDR_WIDTH-TAG_BITS-INDEX_ADDR_BITS],
-            block: addr[ADDR_WIDTH-TAG_BITS-INDEX_ADDR_BITS-1:ADDR_WIDTH-TAG_BITS-INDEX_ADDR_BITS-BLOCK_ADDR_WIDTH]
-        };
+    function automatic tag_t decode_address_tag(input addr_t addr);
+        return addr[ADDR_WIDTH-1:ADDR_WIDTH-TAG_BITS];
+    endfunction
+
+    function automatic tag_t decode_address_index(input addr_t addr);
+        return addr[ADDR_WIDTH-TAG_BITS-1:ADDR_WIDTH-TAG_BITS-INDEX_ADDR_BITS];
+    endfunction
+
+    function automatic tag_t decode_address_block(input addr_t addr);
+        return addr[ADDR_WIDTH-TAG_BITS-INDEX_ADDR_BITS-1:ADDR_WIDTH-TAG_BITS-INDEX_ADDR_BITS-BLOCK_ADDR_WIDTH];
     endfunction
 
     function automatic addr_t encode_address(
@@ -244,8 +247,8 @@ module cache_decode
         return meta_in;
     endfunction
 
-    function automatic id_t get_id(input full_id_t full_id);
-        return full_id[$clog2(PORTS)-1:0];
+    function automatic child_id_t get_id(input full_id_t full_id);
+        return (PORTS > 1) ? full_id[$clog2(PORTS)-1:0] : 'b0;
     endfunction
 
     function automatic mask_t get_write_mask(
@@ -325,8 +328,8 @@ module cache_decode
     lru_t current_residual_lru, next_residual_lru;
     addr_t current_residual_address, next_residual_address;
 
-    id_t current_child_id, next_child_id;
-    id_t current_child_id_skip, next_child_id_skip;
+    child_id_t current_child_id, next_child_id;
+    child_id_t current_child_id_skip, next_child_id_skip;
     logic current_child_id_skip_enable, next_child_id_skip_enable;
     logic [PORTS-1:0] current_child_map, next_child_map;
     logic current_response_return, next_response_return;
@@ -335,12 +338,13 @@ module cache_decode
     logic [$bits(state_t)-1:0] current_state_temp;
     assign current_state = state_t'(current_state_temp);
 
-    std_register #(.CLOCK_INFO(CLOCK_INFO), .T(logic [1:0]), .RESET_VECTOR(CACHE_NORMAL)) state_register_inst (.clk, .rst, .enable, .next(next_state), .value(current_state_temp));
+    std_register #(.CLOCK_INFO(CLOCK_INFO), .T(logic [$bits(state_t)-1:0]), .RESET_VECTOR(NORMAL)) state_register_inst (.clk, .rst, .enable, .next(next_state), .value(current_state_temp));
     std_register #(.CLOCK_INFO(CLOCK_INFO), .T(sub_block_t), .RESET_VECTOR('b0)) front_sub_block_register_inst (.clk, .rst, .enable, .next(next_front_sub_block), .value(current_front_sub_block));
     std_register #(.CLOCK_INFO(CLOCK_INFO), .T(sub_block_t), .RESET_VECTOR('b0)) rear_sub_block_register_inst (.clk, .rst, .enable, .next(next_rear_sub_block), .value(current_rear_sub_block));
     std_register #(.CLOCK_INFO(CLOCK_INFO), .T(logic), .RESET_VECTOR('b0)) id_register_inst (.clk, .rst, .enable, .next(next_bypass_id), .value(current_bypass_id));
-    std_register #(.CLOCK_INFO(CLOCK_INFO), .T(parent_request_t), .RESET_VECTOR('{default: 'b0})) parent_request_register_inst (.clk, .rst, .enable, .next(next_parent_request), .value(current_parent_request));
-    std_register #(.CLOCK_INFO(CLOCK_INFO), .T(child_request_t), .RESET_VECTOR('{default: 'b0})) child_request_register_inst (.clk, .rst, .enable, .next(next_child_request), .value(current_child_request));
+
+    std_register #(.CLOCK_INFO(CLOCK_INFO), .T(parent_request_t), .RESET_VECTOR('{op: CACHE_MESI_OPERATION_REJECT, default: 'b0})) parent_request_register_inst (.clk, .rst, .enable, .next(next_parent_request), .value(current_parent_request));
+    std_register #(.CLOCK_INFO(CLOCK_INFO), .T(child_request_t), .RESET_VECTOR('{op: CACHE_MESI_OPERATION_REJECT, default: 'b0})) child_request_register_inst (.clk, .rst, .enable, .next(next_child_request), .value(current_child_request));
 
     // Stores tag, associative index, and normal index between operations
     std_register #(.CLOCK_INFO(CLOCK_INFO), .T(lru_t), .RESET_VECTOR('b0)) residual_lru_register_inst (.clk, .rst, .enable, .next(next_residual_lru), .value(current_residual_lru));
@@ -348,9 +352,9 @@ module cache_decode
 
     // Child eviction only registers
     std_register #(.CLOCK_INFO(CLOCK_INFO), .T(logic [PORTS-1:0]), .RESET_VECTOR('b0)) child_map_register_inst (.clk, .rst, .enable, .next(next_child_map), .value(current_child_map));
-    std_register #(.CLOCK_INFO(CLOCK_INFO), .T(id_t), .RESET_VECTOR('b0)) child_id_register_inst (.clk, .rst, .enable, .next(next_child_id), .value(current_child_id));
+    std_register #(.CLOCK_INFO(CLOCK_INFO), .T(child_id_t), .RESET_VECTOR('b0)) child_id_register_inst (.clk, .rst, .enable, .next(next_child_id), .value(current_child_id));
     std_register #(.CLOCK_INFO(CLOCK_INFO), .T(logic), .RESET_VECTOR('b0)) child_id_skip_enable_register_inst (.clk, .rst, .enable, .next(next_child_id_skip_enable), .value(current_child_id_skip_enable));
-    std_register #(.CLOCK_INFO(CLOCK_INFO), .T(id_t), .RESET_VECTOR('b0)) child_id_skip_register_inst (.clk, .rst, .enable, .next(next_child_id_skip), .value(current_child_id_skip));
+    std_register #(.CLOCK_INFO(CLOCK_INFO), .T(child_id_t), .RESET_VECTOR('b0)) child_id_skip_register_inst (.clk, .rst, .enable, .next(next_child_id_skip), .value(current_child_id_skip));
     std_register #(.CLOCK_INFO(CLOCK_INFO), .T(logic), .RESET_VECTOR('b0)) data_response_return_register_inst (.clk, .rst, .enable, .next(next_data_response_return), .value(current_data_response_return) );
     std_register #(.CLOCK_INFO(CLOCK_INFO), .T(logic), .RESET_VECTOR('b0)) response_return_register_inst (.clk, .rst, .enable, .next(next_response_return), .value(current_response_return));
 
@@ -376,13 +380,22 @@ module cache_decode
         .reset_done
     );
 
-    always_comb begin
-        automatic line_search_t search_results;
-        automatic id_t modified_child_id = 'b0, owner_child_id = 'b0;
+    logic initiate_parent_request, initiate_child_request;
+    logic initiate_complete_eviction;
+    logic initiate_child_evictions, initiate_child_eviction_data;
 
-        automatic logic initiate_parent_request = 'b0, initiate_child_request = 'b0;
-        automatic logic initiate_complete_eviction = 'b0;
-        automatic logic initiate_child_evictions = 'b0, initiate_child_eviction_data = 'b0;
+    always_comb begin
+        automatic addr_t metadata_temp_addr;
+        automatic line_search_t search_results;
+
+        // automatic logic initiate_parent_request = 'b0, initiate_child_request = 'b0;
+        // automatic logic initiate_complete_eviction = 'b0;
+        // automatic logic initiate_child_evictions = 'b0, initiate_child_eviction_data = 'b0;
+        initiate_parent_request = 'b0;
+        initiate_child_request = 'b0;
+        initiate_complete_eviction = 'b0;
+        initiate_child_evictions = 'b0;
+        initiate_child_eviction_data = 'b0;
 
         next_state = current_state;
         next_front_sub_block = current_front_sub_block;
@@ -408,24 +421,18 @@ module cache_decode
         produce_local_request_meta = 'b0;
         produce_bypass_request = 'b0;
 
-        metadata_write_enable = 'b0;
-        
-        metadata_addr = decode_address(child_request.addr).index;
-        metadata_write_data = metadata_read_data;
-        search_results = search_line(metadata_read_data, decode_address(child_request.addr).tag);
-
         // Set defaults for local_request, where child_request is possibly less
         // wide than the local request and write enable needs to be shifted
-        next_local_request.read_enable = child_request.read_enable;
-        next_local_request.write_enable = get_write_mask(child_request.write_enable, child_request.addr);
-        next_local_request.addr = get_local_address(decoded_addr.index, decoded_addr.block, found_line);
+        next_local_request.read_enable = 'b0;
+        next_local_request.write_enable = 'b0;
+        next_local_request.addr = 'b0;
         next_local_request.data = {DATA_WIDTH_RATIO{child_request.data}};
-        next_local_request.id = child_request.id;
+        next_local_request.id = 'b0;
         next_local_request_meta.payload = '{default: 'b0};
         next_bypass_request.payload = '{default: 'b0};
 
-        case (current_state)        
-        NORMAL: begin
+        // Process normal state ahead of the main case statement
+        if (current_state == NORMAL) begin
             if (current_parent_request.valid) begin // Process pending parent request
                 initiate_parent_request = 'b1;
             end else if (current_child_request.valid) begin // Process pending child request
@@ -446,12 +453,37 @@ module cache_decode
                     op: child_request_info.op,
                     addr: child_request.addr,
                     data: child_request.data,
-                    id: get_id(child_request.id),
+                    child_id: get_id(child_request.id),
                     read_enable: child_request.read_enable,
                     write_enable: child_request.write_enable
                 };
             end
         end
+
+        // Make sure we look up in metadata table based on the right request
+        case (current_state)
+        CHILD_EVICTION_REQUESTS, CHILD_EVICTION_RESPONSES,
+        CHILD_EVICTION_DATA_RESPONSE, CHILD_INITIATED_EVICTION_DATA: begin
+            metadata_temp_addr = child_request.addr;
+        end
+        // NORMAL, BLOCK_READ, BLOCK_READ_RESPONSE, BLOCK_WRITE, 
+        // PARENT_SHARED_RESPONSE, PARENT_MODIFIED_RESPONSE, PARENT_UPGRADE_RESPONSE, 
+        // PARENT_EVICTION_DATA_RESPONSE, 
+        // CHILD_SHARED_RESPONSE, CHILD_MODIFIED_RESPONSE
+        default: begin
+            metadata_temp_addr = initiate_parent_request ? next_parent_request.addr : next_child_request.addr;
+        end
+        endcase
+
+        // Perform the metadata lookup once (trying to confuse the tools less)
+        metadata_write_enable = 'b0;
+        metadata_addr = decode_address_index(metadata_temp_addr);
+        metadata_write_data = metadata_read_data;
+        search_results = search_line(metadata_read_data, decode_address_tag(metadata_temp_addr));
+
+        // Go through the main case statement
+        case (current_state)
+        NORMAL: begin end
         BLOCK_WRITE: begin
             next_front_sub_block = current_front_sub_block + 'b1;
 
@@ -461,7 +493,7 @@ module cache_decode
             next_local_request.write_enable = 'b0;
             // Address is the index + association index + the sub-block address we are currently on
             next_local_request.addr = get_local_address(
-                decode_address(current_residual_address).index, 
+                decode_address_index(current_residual_address), 
                 current_front_sub_block, 
                 current_residual_lru);
             next_local_request.last = (next_front_sub_block == 'b0);
@@ -472,8 +504,8 @@ module cache_decode
                 default: 'b0
             };
             next_local_request_meta.payload.addr = encode_sub_address(
-                    decode_address(current_residual_address).tag, 
-                    decode_address(current_residual_address).index, 
+                    decode_address_tag(current_residual_address),
+                    decode_address_index(current_residual_address), 
                     current_front_sub_block);
 
             if (next_front_sub_block == 'b0) begin
@@ -487,12 +519,12 @@ module cache_decode
             produce_bypass_request = 'b1;
             next_bypass_request.payload = '{
                 bypass_id: current_bypass_id,
-                send_parent: 'b1
+                send_parent: 'b1,
                 default: 'b0
             };
             next_bypass_request.payload.addr = encode_sub_address(
-                    decode_address(current_residual_address).tag, 
-                    decode_address(current_residual_address).index, 
+                    decode_address_tag(current_residual_address), 
+                    decode_address_index(current_residual_address), 
                     current_front_sub_block);
 
             // Consume parent responses if available
@@ -504,7 +536,7 @@ module cache_decode
             next_local_request.read_enable = 'b0;
             next_local_request.write_enable = {(DATA_WIDTH/8){1'b1}};
             next_local_request.addr = get_local_address(
-                decode_address(current_residual_address).index, 
+                decode_address_index(current_residual_address), 
                 current_rear_sub_block, 
                 current_residual_lru);
             next_local_request.data = parent_response.data;
@@ -522,7 +554,7 @@ module cache_decode
             next_local_request.read_enable = 'b0;
             next_local_request.write_enable = {(DATA_WIDTH/8){1'b1}};
             next_local_request.addr = get_local_address(
-                decode_address(current_residual_address).index, 
+                decode_address_index(current_residual_address), 
                 current_rear_sub_block, 
                 current_residual_lru);
             next_local_request.data = parent_response.data;
@@ -538,7 +570,10 @@ module cache_decode
             produce_local_request = 'b1;
             next_local_request.read_enable = 'b1;
             next_local_request.write_enable = 'b0;
-            next_local_request.addr = get_local_address(decode_address(current_child_request.addr).index, 'b0, current_residual_lru);
+            next_local_request.addr = get_local_address(
+                decode_address_index(current_child_request.addr), 
+                'b0, 
+                current_residual_lru);
             next_local_request.data = 'b0;
             next_local_request.id = current_child_request.child_id;
             next_local_request.last = (next_front_sub_block == 'b0);
@@ -567,7 +602,8 @@ module cache_decode
                         send_parent: 'b0,
                         op: CACHE_MESI_OPERATION_REJECT,
                         id: current_child_request.child_id,
-                        addr: current_residual_address
+                        addr: current_residual_address,
+                        last: 'b1
                     };
                 end
             end
@@ -577,8 +613,8 @@ module cache_decode
                 // Update metadata table to reflect the response
                 metadata_write_enable = (current_front_sub_block == 'b0);
                 metadata_write_data[current_residual_lru] = '{
-                    mesi: CACHE_MESI_OPERATION_SHARED,
-                    tag: decode_address(current_residual_address).tag,
+                    mesi: CACHE_MESI_SHARED,
+                    tag: decode_address_tag(current_residual_address),
                     default: 'b0
                 };
                 metadata_write_data = update_lru(metadata_write_data, current_residual_lru);
@@ -588,7 +624,7 @@ module cache_decode
                 next_local_request.read_enable = 'b0;
                 next_local_request.write_enable = parent_response.write_enable;
                 next_local_request.addr = get_local_address(
-                        decode_address(current_residual_address).index, 
+                        decode_address_index(current_residual_address), 
                         current_front_sub_block, 
                         current_residual_lru);
                 next_local_request.data = parent_response.data;
@@ -605,8 +641,8 @@ module cache_decode
                 // Update metadata table to reflect the response
                 metadata_write_enable = (current_front_sub_block == 'b0);
                 metadata_write_data[current_residual_lru] = '{
-                    mesi: CACHE_MESI_OPERATION_MODIFIED,
-                    tag: decode_address(current_residual_address).tag,
+                    mesi: CACHE_MESI_MODIFIED,
+                    tag: decode_address_tag(current_residual_address),
                     default: 'b0
                 };
                 metadata_write_data = update_lru(metadata_write_data, current_residual_lru);
@@ -616,7 +652,7 @@ module cache_decode
                 next_local_request.read_enable = 'b0;
                 next_local_request.write_enable = parent_response.write_enable;
                 next_local_request.addr = get_local_address(
-                        decode_address(current_residual_address).index, 
+                        decode_address_index(current_residual_address), 
                         current_front_sub_block, 
                         current_residual_lru);
                 next_local_request.data = parent_response.data;
@@ -632,16 +668,16 @@ module cache_decode
                 // Update metadata table to reflect the response
                 metadata_write_enable = 'b1;
                 metadata_write_data[current_residual_lru] = '{
-                    mesi: CACHE_MESI_OPERATION_MODIFIED,
-                    tag: decode_address(current_residual_address).tag,
+                    mesi: CACHE_MESI_MODIFIED,
+                    tag: decode_address_tag(current_residual_address),
                     default: 'b0
                 };
                 metadata_write_data = update_lru(metadata_write_data, current_residual_lru);                
             end
             // We have a parent request, store it temporarily
-            CACHE_MESI_OPERATION_FORCE_EVICT, CACHE_MESI_OPERATION_FORCE_EVICT_DATA: begin
+            CACHE_MESI_OPERATION_FORCE_EVICT: begin
                 next_parent_request.valid = 'b1;
-                next_parent_request.op = parent_response_info;
+                next_parent_request.op = parent_response_info.op;
                 next_parent_request.addr = parent_response.addr;
             end
             endcase
@@ -656,7 +692,8 @@ module cache_decode
                 send_parent: 'b0,
                 op: CACHE_MESI_OPERATION_FORCE_EVICT,
                 id: current_child_id,
-                addr: current_residual_address
+                addr: current_residual_address,
+                last: 'b1
             };
 
             // Find what the next child would be
@@ -671,7 +708,7 @@ module cache_decode
             consume_child = 'b1;
 
             case (child_request_info.op)
-            CACHE_MESI_OPERATION_READ, CACHE_MESI_OPERATION_WRITE, CACHE_MESI_OPERATION_UPGRADE: begin
+            CACHE_MESI_OPERATION_SHARED, CACHE_MESI_OPERATION_MODIFIED, CACHE_MESI_OPERATION_UPGRADE: begin
                 // Just send rejections to any requests to clear out the input stream
                 produce_bypass_request = 'b1;
                 next_bypass_request.payload = '{
@@ -679,7 +716,8 @@ module cache_decode
                     send_parent: 'b0,
                     op: CACHE_MESI_OPERATION_REJECT,
                     addr: child_request.addr, // Tbh this address really does not matter
-                    id: child_request.id
+                    id: child_request.id,
+                    last: 'b1
                 };
             end
             // Service a transient eviction while we are waiting for force eviction responses
@@ -693,7 +731,7 @@ module cache_decode
 
                 // Check if the normal eviction pre-empted our forced eviction
                 if (search_results.line == current_residual_lru && 
-                        decode_address(child_request.addr).index == decode_address(current_residual_address).index) begin
+                        decode_address_index(child_request.addr) == decode_address_index(current_residual_address)) begin
                     `INLINE_ASSERT(current_state == CHILD_EVICTION_RESPONSES)
 
                     next_child_map[get_id(child_request.id)] = 'b0;
@@ -716,9 +754,9 @@ module cache_decode
                 next_data_response_return = (current_state == CHILD_EVICTION_DATA_RESPONSE);
                 next_front_sub_block = 'b1;
 
-                // Check if the normal data eviction pre-empted our forced data eviction (just go back to normal if so)
+                // Check if the normal data eviction pre-empted our forced data eviction (just go back to normal after getting the data if so)
                 if (search_results.line == current_residual_lru &&
-                        decode_address(child_request.addr).index == decode_address(current_residual_address).index) begin
+                        decode_address_index(child_request.addr) == decode_address_index(current_residual_address)) begin
                     next_data_response_return = 'b0;
                 end
 
@@ -727,29 +765,29 @@ module cache_decode
                 next_local_request.read_enable = 'b0;
                 next_local_request.write_enable = get_write_mask(child_request.write_enable, child_request.addr);
                 next_local_request.addr = get_local_address(
-                        decode_address(child_request.addr).index, 
+                        decode_address_index(child_request.addr), 
                         current_front_sub_block, 
                         search_results.line);
                 next_local_request.data = child_request.data;
             end
             // Mark down a non-data eviction response
             CACHE_MESI_OPERATION_FORCE_EVICT: begin
-                `INLINE_ASSERT(current_state == CHILD_EVICTION_RESPONSES)
-                next_child_map[get_id(child_request.id)] = 'b0;
-                next_state = (next_child_map == 'b0) ? NORMAL : CHILD_EVICTION_RESPONSES;
-            end
-            // Consume data from a data eviction response
-            CACHE_MESI_OPERATION_FORCE_EVICT_DATA: begin
-                `INLINE_ASSERT(current_state == CHILD_EVICTION_DATA_RESPONSE)
+                if (current_state == CHILD_EVICTION_RESPONSES) begin
+                    next_child_map[get_id(child_request.id)] = 'b0;
+                    next_state = (next_child_map == 'b0) ? NORMAL : CHILD_EVICTION_RESPONSES;
+                end else begin // current_state == CHILD_EVICTION_DATA_RESPONSE
+                    // Create local request to store eviction data
+                    next_local_request.read_enable = 'b0;
+                    next_local_request.write_enable = get_write_mask(child_request.write_enable, child_request.addr);
+                    next_local_request.addr = get_local_address(
+                        decode_address_index(current_residual_address), 
+                        current_front_sub_block, 
+                        next_residual_lru);
+                    next_local_request.data = child_request.data;
 
-                // Create local request to store eviction data
-                next_local_request.read_enable = 'b0;
-                next_local_request.write_enable = get_write_mask(child_request.write_enable, child_request.addr);
-                next_local_request.addr = get_local_address(next_residual_index, current_front_sub_block, next_residual_lru);
-                next_local_request.data = child_request.data;
-
-                next_front_sub_block = current_front_sub_block + 'b1;
-                next_state = (next_front_sub_block == 'b0) ? NORMAL : CHILD_EVICTION_DATA_RESPONSE;
+                    next_front_sub_block = current_front_sub_block + 'b1;
+                    next_state = (next_front_sub_block == 'b0) ? NORMAL : CHILD_EVICTION_DATA_RESPONSE;
+                end
             end
             endcase
         end
@@ -760,7 +798,10 @@ module cache_decode
             // We are producing a local request to write so we need no id and can use the address coming from the eviction request each cycle
             next_local_request.read_enable = 'b0;
             next_local_request.write_enable = get_write_mask(child_request.write_enable, child_request.addr);
-            next_local_request.addr = get_local_address(decode_address(child_request.addr).index, current_front_sub_block, search_results.line);
+            next_local_request.addr = get_local_address(
+                decode_address_index(child_request.addr), 
+                current_front_sub_block, 
+                search_results.line);
             next_local_request.data = child_request.data;
 
             next_front_sub_block = current_front_sub_block + 'b1;
@@ -784,7 +825,7 @@ module cache_decode
             next_local_request.read_enable = 'b1;
             next_local_request.write_enable = 'b0;
             next_local_request.addr = get_local_address(
-                    decode_address(current_residual_address).index, 
+                    decode_address_index(current_residual_address), 
                     current_front_sub_block, 
                     current_residual_lru);
             next_local_request.last = (next_front_sub_block == 'b0);
@@ -792,8 +833,8 @@ module cache_decode
             next_local_request_meta.payload = '{
                 bypass_id: current_bypass_id,
                 send_parent: 'b1,
-                op: CACHE_MESI_OPERATION_FORCE_EVICT_DATA,
-                addr: 'b0, // Data response, no address
+                op: CACHE_MESI_OPERATION_FORCE_EVICT,
+                default: 'b0
             };
             
             if (next_front_sub_block == 'b0) begin
@@ -801,11 +842,11 @@ module cache_decode
             end
         end
         default: begin
-            `INLINE_ASSERT(0)
+            if (reset_done) begin
+                `INLINE_ASSERT(0)
+            end
         end
         endcase
-
-        // TODO: Reorganize the stuff below
 
         // Process an existing or new child request
         if (HAS_COHERENT_CHILD && initiate_child_request) begin
@@ -829,7 +870,10 @@ module cache_decode
                         produce_local_request = 'b1;
                         next_local_request.read_enable = 'b1;
                         next_local_request.write_enable = 'b0;
-                        next_local_request.addr = get_local_address(decode_address(next_child_request.addr).index, 'b0, search_results.line);
+                        next_local_request.addr = get_local_address(
+                            decode_address_index(next_child_request.addr), 
+                            'b0, 
+                            search_results.line);
                         next_local_request.data = 'b0;
                         next_local_request.id = next_child_request.child_id;
                         next_local_request.last = 'b0;
@@ -850,7 +894,14 @@ module cache_decode
                         if (HAS_COHERENT_PARENT) begin
                             // Issue request for data in shared state
                             produce_bypass_request = 'b1;
-                            next_bypass_request.payload = '{bypass_id: current_bypass_id, send_parent: 'b1, op: CACHE_MESI_OPERATION_SHARED, addr: next_residual_address, default: 'b0};
+                            next_bypass_request.payload = '{
+                                bypass_id: current_bypass_id, 
+                                send_parent: 'b1, 
+                                op: CACHE_MESI_OPERATION_SHARED, 
+                                addr: next_residual_address,
+                                last: 'b1,
+                                default: 'b0
+                            };
                             next_state = PARENT_SHARED_RESPONSE;
                             next_front_sub_block = 'b0;
                         end else begin
@@ -858,12 +909,13 @@ module cache_decode
                             produce_bypass_request = 'b1;
                             next_bypass_request.payload = '{
                                 bypass_id: current_bypass_id,
-                                send_parent: 'b1
+                                send_parent: 'b1,
+                                last: 'b0,
                                 default: 'b0
                             };
                             next_bypass_request.payload.addr = encode_sub_address(
-                                    decode_address(next_residual_address).tag, 
-                                    decode_address(next_residual_address).index, 
+                                    decode_address_tag(next_residual_address), 
+                                    decode_address_index(next_residual_address), 
                                     'b0);
                             next_state = BLOCK_READ;
                             next_front_sub_block = 'b1;
@@ -871,8 +923,8 @@ module cache_decode
                             // Update metadata to recognize we have the data
                             metadata_write_enable = 'b1;
                             metadata_write_data[search_results.empty] = '{
-                                mesi: CACHE_MESI_OPERATION_SHARED,
-                                tag: decode_address(next_residual_address).tag,
+                                mesi: CACHE_MESI_SHARED,
+                                tag: decode_address_tag(next_residual_address),
                                 default: 'b0
                             };
                             metadata_write_data = update_lru(metadata_write_data, search_results.empty);
@@ -898,7 +950,14 @@ module cache_decode
                     end else if (HAS_COHERENT_PARENT && !cache_is_mesi_dirty(metadata_read_data[search_results.line].mesi)) begin 
                         // Issue request for the data to be upgraded
                         produce_bypass_request = 'b1;
-                        next_bypass_request.payload = '{bypass_id: current_bypass_id, send_parent: 'b1, op: CACHE_MESI_OPERATION_UPGRADE, addr: next_residual_address, default: 'b0};
+                        next_bypass_request.payload = '{
+                            bypass_id: current_bypass_id, 
+                            send_parent: 'b1, 
+                            op: CACHE_MESI_OPERATION_UPGRADE, 
+                            addr: next_residual_address,
+                            last: 'b1,
+                            default: 'b0
+                        };
                         next_state = PARENT_UPGRADE_RESPONSE;
                         next_front_sub_block = 'b0;
                     end else begin
@@ -910,7 +969,10 @@ module cache_decode
                         produce_local_request = 'b1;
                         next_local_request.read_enable = 'b1;
                         next_local_request.write_enable = 'b0;
-                        next_local_request.addr = get_local_address(decode_address(next_child_request.addr).index, 'b0, search_results.line);
+                        next_local_request.addr = get_local_address(
+                            decode_address_index(next_child_request.addr), 
+                            'b0, 
+                            search_results.line);
                         next_local_request.data = 'b0;
                         next_local_request.id = next_child_request.child_id;
                         next_local_request.last = 'b0;
@@ -936,7 +998,14 @@ module cache_decode
                         if (HAS_COHERENT_PARENT) begin
                             // Issue request for the data in modified state
                             produce_bypass_request = 'b1;
-                            next_bypass_request.payload = '{bypass_id: current_bypass_id, send_parent: 'b1, op: CACHE_MESI_OPERATION_MODIFIED, addr: next_residual_address, default: 'b0};
+                            next_bypass_request.payload = '{
+                                bypass_id: current_bypass_id, 
+                                send_parent: 'b1, 
+                                op: CACHE_MESI_OPERATION_MODIFIED, 
+                                addr: next_residual_address,
+                                last: 'b1,
+                                default: 'b0
+                            };
                             next_state = PARENT_MODIFIED_RESPONSE;
                             next_front_sub_block = 'b0;
                         end else begin
@@ -944,12 +1013,13 @@ module cache_decode
                             produce_bypass_request = 'b1;
                             next_bypass_request.payload = '{
                                 bypass_id: current_bypass_id,
-                                send_parent: 'b1
+                                send_parent: 'b1,
+                                last: 'b0,
                                 default: 'b0
                             };
                             next_bypass_request.payload.addr = encode_sub_address(
-                                    decode_address(next_residual_address).tag, 
-                                    decode_address(next_residual_address).index, 
+                                    decode_address_tag(next_residual_address), 
+                                    decode_address_index(next_residual_address), 
                                     'b0);
                             next_state = BLOCK_READ;
                             next_front_sub_block = 'b1;
@@ -957,8 +1027,8 @@ module cache_decode
                             // Update metadata to recognize we have the data
                             metadata_write_enable = 'b1;
                             metadata_write_data[search_results.empty] = '{
-                                mesi: CACHE_MESI_OPERATION_SHARED,
-                                tag: decode_address(next_residual_address).tag,
+                                mesi: CACHE_MESI_SHARED,
+                                tag: decode_address_tag(next_residual_address),
                                 default: 'b0
                             };
                             metadata_write_data = update_lru(metadata_write_data, search_results.empty);
@@ -972,7 +1042,7 @@ module cache_decode
                 end
             end
             CACHE_MESI_OPERATION_UPGRADE: begin
-                `INLINE_ASSET(search_results.found_hit)
+                `INLINE_ASSERT(search_results.found_hit)
                 if (metadata_read_data[search_results.line].modifiers) begin
                     // Issue a force data eviction to single child
                     initiate_child_eviction_data = 'b1;
@@ -984,7 +1054,14 @@ module cache_decode
                 end else if (!cache_is_mesi_dirty(metadata_read_data[search_results.line].mesi)) begin 
                     // Issue request for the data to be upgraded
                     produce_bypass_request = 'b1;
-                    next_bypass_request.payload = '{bypass_id: current_bypass_id, send_parent: 'b1, op: CACHE_MESI_OPERATION_UPGRADE, addr: next_residual_address, default: 'b0};
+                    next_bypass_request.payload = '{
+                        bypass_id: current_bypass_id, 
+                        send_parent: 'b1, 
+                        op: CACHE_MESI_OPERATION_UPGRADE, 
+                        addr: next_residual_address,
+                        last: 'b1,
+                        default: 'b0
+                    };
                     next_state = PARENT_UPGRADE_RESPONSE;
                     next_front_sub_block = 'b0;
                 end else begin
@@ -996,6 +1073,7 @@ module cache_decode
                         send_parent: 'b0,
                         op: CACHE_MESI_OPERATION_UPGRADE,
                         addr: next_child_request.addr,
+                        last: 'b1,
                         id: next_child_request.child_id
                     };
                     // Update metadata table to reflect upgrade
@@ -1034,13 +1112,13 @@ module cache_decode
                 next_local_request.read_enable = 'b0;
                 next_local_request.write_enable = get_write_mask(child_request.write_enable, child_request.addr);
                 next_local_request.addr = get_local_address(
-                        decode_address(child_request.addr).index, 
+                        decode_address_index(child_request.addr), 
                         current_front_sub_block, 
                         search_results.line);
                 next_local_request.data = child_request.data;
             end
             // We should not see force eviction responses here
-            CACHE_MESI_OPERATION_FORCE_EVICT, CACHE_MESI_OPERATION_FORCE_EVICT_DATA: begin
+            CACHE_MESI_OPERATION_FORCE_EVICT: begin
                 `INLINE_ASSERT('b0)
             end
             endcase
@@ -1048,6 +1126,9 @@ module cache_decode
 
         // Process request from CPUs or equivalent that can be read, write, or atomic swap
         if (!HAS_COHERENT_CHILD && initiate_child_request) begin
+            next_residual_lru = search_results.line;
+            next_residual_address = next_child_request.addr;
+
             // The request can be satisifed with local data
             if (search_results.found_hit) begin         
                 // Perform write from local cache
@@ -1055,7 +1136,14 @@ module cache_decode
                         !cache_is_mesi_dirty(metadata_read_data[search_results.line].mesi)) begin 
                     // Issue request for the data to be upgraded
                     produce_bypass_request = 'b1;
-                    next_bypass_request.payload = '{bypass_id: current_bypass_id, send_parent: 'b1, op: CACHE_MESI_OPERATION_UPGRADE, addr: next_residual_address, default: 'b0};
+                    next_bypass_request.payload = '{
+                        bypass_id: current_bypass_id, 
+                        send_parent: 'b1, 
+                        op: CACHE_MESI_OPERATION_UPGRADE, 
+                        addr: next_child_request.addr,
+                        last: 'b1,
+                        default: 'b0
+                    };
                     next_state = PARENT_UPGRADE_RESPONSE;
                     next_front_sub_block = 'b0;
                 end else begin
@@ -1067,8 +1155,8 @@ module cache_decode
                     next_local_request.read_enable = next_child_request.read_enable;
                     next_local_request.write_enable = get_write_mask(next_child_request.write_enable, next_child_request.addr);
                     next_local_request.addr = get_local_address(
-                        decode_address(next_child_request.addr).index, 
-                        decode_address(next_child_request.addr).block, 
+                        decode_address_index(next_child_request.addr), 
+                        decode_address_block(next_child_request.addr), 
                         search_results.line);
                     next_local_request.id = next_child_request.child_id;
                     next_local_request.last = 'b1;
@@ -1092,7 +1180,14 @@ module cache_decode
                     if (HAS_COHERENT_PARENT) begin
                         // Issue request for data in shared state
                         produce_bypass_request = 'b1;
-                        next_bypass_request.payload = '{bypass_id: current_bypass_id, send_parent: 'b1, op: CACHE_MESI_OPERATION_SHARED, addr: next_residual_address, default: 'b0};
+                        next_bypass_request.payload = '{
+                            bypass_id: current_bypass_id, 
+                            send_parent: 'b1, 
+                            op: next_child_request.write_enable ? CACHE_MESI_OPERATION_MODIFIED : CACHE_MESI_OPERATION_SHARED, 
+                            addr: next_child_request.addr,
+                            last: 'b1,
+                            default: 'b0
+                        };
                         next_state = next_child_request.write_enable ? PARENT_MODIFIED_RESPONSE : PARENT_SHARED_RESPONSE;
                         next_front_sub_block = 'b0;
                     end else begin
@@ -1100,12 +1195,13 @@ module cache_decode
                         produce_bypass_request = 'b1;
                         next_bypass_request.payload = '{
                             bypass_id: current_bypass_id,
-                            send_parent: 'b1
+                            send_parent: 'b1,
+                            last: 'b0,
                             default: 'b0
                         };
                         next_bypass_request.payload.addr = encode_sub_address(
-                                decode_address(next_residual_address).tag, 
-                                decode_address(next_residual_address).index, 
+                                decode_address_tag(next_child_request.addr), 
+                                decode_address_index(next_child_request.addr), 
                                 'b0);
                         next_state = BLOCK_READ;
                         next_front_sub_block = 'b1;
@@ -1113,8 +1209,8 @@ module cache_decode
                         // Update metadata to recognize we have the data
                         metadata_write_enable = 'b1;
                         metadata_write_data[search_results.empty] = '{
-                            mesi: (next_child_request.write_enable ? CACHE_MESI_OPERATION_MODIFIED : CACHE_MESI_OPERATION_SHARED),
-                            tag: decode_address(next_residual_address).tag,
+                            mesi: (next_child_request.write_enable ? CACHE_MESI_MODIFIED : CACHE_MESI_SHARED),
+                            tag: decode_address_tag(next_child_request.addr),
                             default: 'b0
                         };
                         metadata_write_data = update_lru(metadata_write_data, search_results.empty);
@@ -1130,17 +1226,11 @@ module cache_decode
 
         // Process an existing or new parent request --------------------------
         if (initiate_parent_request) begin
-            // Find and search for line from parent in metadata table
-            metadata_addr = decode_address(next_parent_request.addr).index;
-            metadata_write_data = metadata_read_data;
-            search_results = search_line(metadata_read_data, decode_address(next_parent_request.addr).tag);
-
             next_residual_address = next_parent_request.addr;
             next_residual_lru = search_results.line;
 
-            `INLINE_ASSERT(search_results.found_hit)
             `INLINE_ASSERT(metadata_read_data[search_results.line].modifiers)
-            `INLINE_ASSERT(next_parent_request.op.op == CACHE_MESI_OPERATION_FORCE_EVICT)
+            `INLINE_ASSERT(next_parent_request.op == CACHE_MESI_OPERATION_FORCE_EVICT)
 
             // If we get a parent eviction request we might still have a miss if it was pre-empted
             if (search_results.found_hit) begin
@@ -1157,7 +1247,9 @@ module cache_decode
         // Handle steps for completely removing a cache line from this cache and its children
         // (next_residual_address, next_residual_lru)
         if (initiate_complete_eviction) begin
-            `INLINE_ASSERT(cache_is_mesi_valid(metadata_read_data[next_residual_lru]))
+            if (reset_done) begin
+                `INLINE_ASSERT(cache_is_mesi_valid(metadata_read_data[next_residual_lru].mesi))
+            end
             // Evict modified data from child
             if (IS_COHERENT && !IS_FIRST_LEVEL && metadata_read_data[next_residual_lru].modifiers) begin
                 initiate_child_eviction_data = 'b1;
@@ -1166,14 +1258,17 @@ module cache_decode
                 initiate_child_evictions = 'b1;
                 next_child_id_skip_enable = 'b0;
             // Return modified data from cache line
-            end else if (cache_is_mesi_dirty(metadata_read_data[next_residual_lru])) begin
+            end else if (cache_is_mesi_dirty(metadata_read_data[next_residual_lru].mesi)) begin
                 // Issue the start of a parent eviction response
                 produce_local_request = 'b1;
                 produce_local_request_meta = 'b1;
                 next_local_request.read_enable = 'b1;
                 next_local_request.write_enable = 'b0;
                 // We are starting on block zero
-                next_local_request.addr = get_local_address(decode_address(next_residual_address).index, 'b0, next_residual_lru);
+                next_local_request.addr = get_local_address(
+                    decode_address_index(next_residual_address), 
+                    'b0, 
+                    next_residual_lru);
                 next_local_request.last = 'b0;
 
                 next_local_request_meta.payload = '{
@@ -1185,8 +1280,8 @@ module cache_decode
                     next_local_request_meta.payload.op = CACHE_MESI_OPERATION_FORCE_EVICT;
                 end else begin
                     next_local_request_meta.payload.addr = encode_sub_address(
-                            decode_address(next_residual_address).tag, 
-                            decode_address(next_residual_address).index, 
+                            decode_address_tag(next_residual_address), 
+                            decode_address_index(next_residual_address), 
                             'b0);
                 end
 
@@ -1205,7 +1300,8 @@ module cache_decode
                     send_parent: 'b1,
                     op: CACHE_MESI_OPERATION_FORCE_EVICT,
                     id: 'b0, // The id does not matter for a response to the parent
-                    addr: 'b0 // We are neither sending address nor data
+                    addr: 'b0, // We are neither sending address nor data
+                    last: 'b1
                 };
                 // Clean the entry in the metadata table
                 metadata_write_enable = 'b1;
@@ -1230,7 +1326,8 @@ module cache_decode
                 send_parent: 'b0,
                 op: CACHE_MESI_OPERATION_FORCE_EVICT,
                 id: next_child_id,
-                addr: next_residual_address
+                addr: next_residual_address,
+                last: 'b1
             };
             // Updata metadata table that there are no current owners
             metadata_write_enable = 'b1;
@@ -1250,9 +1347,10 @@ module cache_decode
             next_bypass_request.payload = '{
                 bypass_id: current_bypass_id,
                 send_parent: 'b0,
-                op: CACHE_MESI_OPERATION_FORCE_EVICT_DATA,
+                op: CACHE_MESI_OPERATION_FORCE_EVICT,
                 id: next_child_id,
-                addr: next_residual_address
+                addr: next_residual_address,
+                last: 'b1
             };
             // Clear the modifier flags in the metadata table
             metadata_write_enable = 'b1;
@@ -1262,7 +1360,9 @@ module cache_decode
         end
 
         `INLINE_ASSERT(!initiate_child_request || !initiate_parent_request)
-        `INLINE_ASSERT(produce_local_request_meta -> next_local_request.read_enable)
+        if (produce_local_request_meta) begin
+            `INLINE_ASSERT(next_local_request.read_enable)
+        end
         `INLINE_ASSERT(!produce_local_request_meta || !produce_bypass_request)
         next_bypass_id = current_bypass_id + (produce_bypass_request || produce_local_request_meta);
 
