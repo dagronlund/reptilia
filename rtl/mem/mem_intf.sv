@@ -32,22 +32,23 @@ interface mem_intf #(
     logic [ADDR_WIDTH-1:0] addr;
     logic [DATA_WIDTH-1:0] data;
     logic [ID_WIDTH-1:0]   id;
+    logic                  last;
 
     modport out(
         output valid,
         input ready,
-        output read_enable, write_enable, addr, data, id
+        output read_enable, write_enable, addr, data, id, last
     );
 
     modport in(
         input valid,
         output ready,
-        input read_enable, write_enable, addr, data, id
+        input read_enable, write_enable, addr, data, id, last
     );
     
     modport view(
         input valid, ready,
-        input read_enable, write_enable, addr, data, id
+        input read_enable, write_enable, addr, data, id, last
     );
 
 `ifndef __SYNTH_ONLY__
@@ -64,6 +65,7 @@ interface mem_intf #(
         addr <= addr_in;
         data <= data_in;
         id <= id_in;
+        last <= 'b0;
 
         valid <= 1'b1;
         @ (posedge clk);

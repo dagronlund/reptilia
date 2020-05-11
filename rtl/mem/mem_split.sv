@@ -23,11 +23,9 @@ module mem_split
 
     mem_intf.in                 mem_in,
     input wire [META_WIDTH-1:0] mem_in_meta,
-    input wire                  mem_in_last,
 
     mem_intf.out                  mem_out [PORTS],
-    output logic [META_WIDTH-1:0] mem_out_meta [PORTS],
-    output logic                  mem_out_last [PORTS]
+    output logic [META_WIDTH-1:0] mem_out_meta [PORTS]
 );
 
     localparam ADDR_WIDTH = $bits(mem_in.addr);
@@ -53,6 +51,7 @@ module mem_split
     stream_intf #(.T(mem_t)) stream_in (.clk, .rst);
 
     stream_intf #(.T(mem_t)) stream_out [PORTS] (.clk, .rst);
+    logic stream_out_last [PORTS];
 
     generate
     genvar k;
@@ -72,6 +71,7 @@ module mem_split
             mem_out[k].addr = payload.addr;
             mem_out[k].data = payload.data;
             mem_out[k].id = payload.id[POST_ID_WIDTH-1:0];
+            mem_out[k].last = stream_out_last[k];
             mem_out_meta[k] = payload.meta;
             stream_out[k].ready = mem_out[k].ready;
         end
@@ -101,8 +101,8 @@ module mem_split
         .ID_WIDTH(ID_WIDTH)
     ) stream_split_inst (
         .clk, .rst,
-        .stream_in, .stream_in_id, .stream_in_last(mem_in_last),
-        .stream_out, .stream_out_last(mem_out_last)
+        .stream_in, .stream_in_id, .stream_in_last(mem_in.last),
+        .stream_out, .stream_out_last
     );
 
 endmodule

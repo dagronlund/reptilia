@@ -23,11 +23,9 @@ module mem_merge
 
     mem_intf.in                 mem_in [PORTS],
     input wire [META_WIDTH-1:0] mem_in_meta [PORTS],
-    input wire                  mem_in_last [PORTS],
 
     mem_intf.out                  mem_out,
-    output logic [META_WIDTH-1:0] mem_out_meta,
-    output logic                  mem_out_last
+    output logic [META_WIDTH-1:0] mem_out_meta
 );
 
     localparam ADDR_WIDTH = $bits(mem_out.addr);
@@ -50,6 +48,7 @@ module mem_merge
     } mem_t;
 
     stream_intf #(.T(mem_t)) stream_in [PORTS] (.clk, .rst);
+    logic stream_in_last [PORTS];
 
     logic [SUB_ID_WIDTH-1:0] stream_out_id;
     stream_intf #(.T(mem_t)) stream_out (.clk, .rst);
@@ -75,6 +74,7 @@ module mem_merge
 
             stream_in[k].valid = mem_in[k].valid;
             stream_in[k].payload = payload;
+            stream_in_last[k] = mem_in[k].last;
             mem_in[k].ready = stream_in[k].ready;
         end
     end
@@ -102,8 +102,8 @@ module mem_merge
         .USE_LAST(USE_LAST)
     ) stream_merge_inst (
         .clk, .rst,
-        .stream_in, .stream_in_last(mem_in_last),
-        .stream_out, .stream_out_id, .stream_out_last(mem_out_last)
+        .stream_in, .stream_in_last,
+        .stream_out, .stream_out_id, .stream_out_last(mem_out.last)
     );
 
 endmodule

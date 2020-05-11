@@ -45,6 +45,7 @@ module mem_stage
         logic [ADDR_WIDTH-1:0] addr;
         logic [DATA_WIDTH-1:0] data;
         logic [ID_WIDTH-1:0] id;
+        logic last;
         logic [META_WIDTH-1:0] meta;
     } mem_t;
 
@@ -69,6 +70,7 @@ module mem_stage
             addr: mem_in.addr,
             data: mem_in.data,
             id: mem_in.id,
+            last: mem_in.last,
             meta: mem_in_meta
         };
         mem_in.ready = stream_in.ready;
@@ -80,6 +82,7 @@ module mem_stage
         mem_out.addr = stream_out.payload.addr;
         mem_out.data = stream_out.payload.data;
         mem_out.id = stream_out.payload.id;
+        mem_out.last = stream_out.payload.last;
         mem_out_meta = stream_out.payload.meta;
         stream_out.ready = mem_out.ready;
     end

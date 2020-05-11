@@ -77,6 +77,7 @@ module mem_sequential_read_write
 
         logic internal_valid;
         logic [ID_WIDTH-1:0] internal_id;
+        logic internal_last;
 
         logic enable_internal_valid, enable_output_valid;
         logic next_internal_valid, next_output_valid;
@@ -143,6 +144,29 @@ module mem_sequential_read_write
             .value(mem_read_out.id)
         );
 
+        // Last Registers
+        std_register #(
+            .CLOCK_INFO(CLOCK_INFO),
+            .T(logic),
+            .RESET_VECTOR('b0)
+        ) last_internal_reg_inst (
+            .clk, .rst,
+            .enable(read_enable),
+            .next(mem_read_in.last),
+            .value(internal_last)
+        );
+
+        std_register #(
+            .CLOCK_INFO(CLOCK_INFO),
+            .T(logic),
+            .RESET_VECTOR('b0)
+        ) last_output_reg_inst (
+            .clk, .rst,
+            .enable(read_output_enable),
+            .next(internal_last),
+            .value(mem_read_out.last)
+        );
+
     end else begin
 
         always_comb begin
@@ -171,6 +195,17 @@ module mem_sequential_read_write
             .enable(read_enable),
             .next(mem_read_in.id),
             .value(mem_read_out.id)
+        );
+
+        std_register #(
+            .CLOCK_INFO(CLOCK_INFO),
+            .T(logic),
+            .RESET_VECTOR('b0)
+        ) last_reg_inst (
+            .clk, .rst,
+            .enable(read_enable),
+            .next(mem_read_in.last),
+            .value(mem_read_out.last)
         );
 
     end

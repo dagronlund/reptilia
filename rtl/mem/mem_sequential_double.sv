@@ -88,6 +88,7 @@ module mem_sequential_double
 
         logic internal_valid;
         logic [ID_WIDTH-1:0] internal_id;
+        logic internal_last;
 
         logic enable_internal_valid, enable_output_valid;
         logic next_internal_valid, next_output_valid;
@@ -154,6 +155,29 @@ module mem_sequential_double
             .value(mem_out0.id)
         );
 
+        // Last Registers
+        std_register #(
+            .CLOCK_INFO(CLOCK_INFO),
+            .T(logic),
+            .RESET_VECTOR('b0)
+        ) last_internal_reg_inst (
+            .clk, .rst,
+            .enable(enable0),
+            .next(mem_in0.last),
+            .value(internal_last)
+        );
+
+        std_register #(
+            .CLOCK_INFO(CLOCK_INFO),
+            .T(logic),
+            .RESET_VECTOR('b0)
+        ) last_output_reg_inst (
+            .clk, .rst,
+            .enable(enable_output0),
+            .next(internal_last),
+            .value(mem_out0.last)
+        );
+
     end else begin
 
         always_comb begin
@@ -184,12 +208,24 @@ module mem_sequential_double
             .value(mem_out0.id)
         );
 
+        std_register #(
+            .CLOCK_INFO(CLOCK_INFO),
+            .T(logic),
+            .RESET_VECTOR('b0)
+        ) last_reg_inst (
+            .clk, .rst,
+            .enable(enable0),
+            .next(mem_in0.last),
+            .value(mem_out0.last)
+        );
+
     end
 
     if (ENABLE_OUTPUT_REG1) begin
 
         logic internal_valid;
         logic [ID_WIDTH-1:0] internal_id;
+        logic internal_last;
 
         logic enable_internal_valid, enable_output_valid;
         logic next_internal_valid, next_output_valid;
@@ -256,6 +292,29 @@ module mem_sequential_double
             .value(mem_out1.id)
         );
 
+        // Last Registers
+        std_register #(
+            .CLOCK_INFO(CLOCK_INFO),
+            .T(logic),
+            .RESET_VECTOR('b0)
+        ) last_internal_reg_inst (
+            .clk, .rst,
+            .enable(enable1),
+            .next(mem_in1.last),
+            .value(internal_last)
+        );
+
+        std_register #(
+            .CLOCK_INFO(CLOCK_INFO),
+            .T(logic),
+            .RESET_VECTOR('b0)
+        ) last_output_reg_inst (
+            .clk, .rst,
+            .enable(enable_output1),
+            .next(internal_last),
+            .value(mem_out1.last)
+        );
+
     end else begin
 
         always_comb begin
@@ -284,6 +343,17 @@ module mem_sequential_double
             .enable(enable1),
             .next(mem_in1.id),
             .value(mem_out1.id)
+        );
+
+        std_register #(
+            .CLOCK_INFO(CLOCK_INFO),
+            .T(logic),
+            .RESET_VECTOR('b0)
+        ) last_reg_inst (
+            .clk, .rst,
+            .enable(enable1),
+            .next(mem_in1.last),
+            .value(mem_out1.last)
         );
 
     end

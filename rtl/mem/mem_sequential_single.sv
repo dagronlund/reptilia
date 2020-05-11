@@ -75,6 +75,7 @@ module mem_sequential_single
 
         logic internal_valid;
         logic [ID_WIDTH-1:0] internal_id;
+        logic internal_last;
 
         logic enable_internal_valid, enable_output_valid;
         logic next_internal_valid, next_output_valid;
@@ -96,50 +97,14 @@ module mem_sequential_single
         end
 
         // Valid Registers
-        std_register #(
-            .CLOCK_INFO(CLOCK_INFO),
-            .T(logic),
-            .RESET_VECTOR('b0)
-        ) valid_internal_reg_inst (
-            .clk, .rst,
-            .enable(enable_internal_valid),
-            .next(next_internal_valid),
-            .value(internal_valid)
-        );
-
-        std_register #(
-            .CLOCK_INFO(CLOCK_INFO),
-            .T(logic),
-            .RESET_VECTOR('b0)
-        ) valid_output_reg_inst (
-            .clk, .rst,
-            .enable(enable_output_valid),
-            .next(next_output_valid),
-            .value(mem_out.valid)
-        );
-
+        std_register #(.CLOCK_INFO(CLOCK_INFO), .T(logic), .RESET_VECTOR('b0)) valid_internal_reg_inst (.clk, .rst, .enable(enable_internal_valid), .next(next_internal_valid), .value(internal_valid));
+        std_register #(.CLOCK_INFO(CLOCK_INFO), .T(logic), .RESET_VECTOR('b0)) valid_output_reg_inst (.clk, .rst, .enable(enable_output_valid), .next(next_output_valid), .value(mem_out.valid));
         // ID Registers
-        std_register #(
-            .CLOCK_INFO(CLOCK_INFO),
-            .T(logic[ID_WIDTH-1:0]),
-            .RESET_VECTOR('b0)
-        ) id_internal_reg_inst (
-            .clk, .rst,
-            .enable,
-            .next(mem_in.id),
-            .value(internal_id)
-        );
-
-        std_register #(
-            .CLOCK_INFO(CLOCK_INFO),
-            .T(logic[ID_WIDTH-1:0]),
-            .RESET_VECTOR('b0)
-        ) id_output_reg_inst (
-            .clk, .rst,
-            .enable(enable_output),
-            .next(internal_id),
-            .value(mem_out.id)
-        );
+        std_register #(.CLOCK_INFO(CLOCK_INFO), .T(logic[ID_WIDTH-1:0]), .RESET_VECTOR('b0)) id_internal_reg_inst (.clk, .rst, .enable, .next(mem_in.id), .value(internal_id));
+        std_register #(.CLOCK_INFO(CLOCK_INFO), .T(logic[ID_WIDTH-1:0]), .RESET_VECTOR('b0)) id_output_reg_inst (.clk, .rst, .enable(enable_output), .next(internal_id), .value(mem_out.id));
+        // Last Registers
+        std_register #(.CLOCK_INFO(CLOCK_INFO), .T(logic), .RESET_VECTOR('b0)) last_internal_reg_inst (.clk, .rst, .enable, .next(mem_in.last), .value(internal_last));
+        std_register #(.CLOCK_INFO(CLOCK_INFO), .T(logic), .RESET_VECTOR('b0)) last_output_reg_inst (.clk, .rst, .enable(enable_output), .next(internal_last), .value(mem_out.last));
 
     end else begin
 
@@ -169,6 +134,17 @@ module mem_sequential_single
             .enable,
             .next(mem_in.id),
             .value(mem_out.id)
+        );
+
+        std_register #(
+            .CLOCK_INFO(CLOCK_INFO),
+            .T(logic),
+            .RESET_VECTOR('b0)
+        ) last_reg_inst (
+            .clk, .rst,
+            .enable,
+            .next(mem_in.last),
+            .value(mem_out.last)
         );
 
     end
