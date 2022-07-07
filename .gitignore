@@ -1,22 +1,27 @@
-# Linting Temp Files
+# Vivado files
 xvhdl.log
 xvhdl.pb
 xvlog.log
 xvlog.pb
 xsim.dir/
 
-# VCS Temp Files
+# VCS files
 simv.daidir/
 csrc/
 simv
 ucli.key
 
-# C Temp Files
-*.exe
-
-# Assembly Temp Files
+# Compiler files
 *.o
 *.so
 *.bin
 *.mem
 *.out
+*.exe
+
+# Top level folders
+obj_dir/
+bin/
+misc/
+__pycache__/
+.vscode/

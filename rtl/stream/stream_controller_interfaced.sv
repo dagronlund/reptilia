@@ -1,6 +1,6 @@
-//!import stream/stream_controller
-
-`timescale 1ns/1ps
+//!import stream/stream_intf.sv
+//!import stream/stream_controller.sv
+//!wrapper stream/stream_controller_interfaced_wrapper.sv
 
 module stream_controller_interfaced #(
     parameter int NUM_INPUTS = 1, 

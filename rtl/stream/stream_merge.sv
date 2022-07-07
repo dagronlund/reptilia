@@ -1,15 +1,11 @@
-//!import std/std_pkg
-//!import std/stream_pkg
-//!import stream/stream_intf
-//!import stream/stream_stage
+//!import std/std_pkg.sv
+//!import stream/stream_pkg.sv
+//!import stream/stream_intf.sv
+//!import stream/stream_controller.sv
+//!import stream/stream_stage.sv
+//!wrapper stream/stream_merge_wrapper.sv
 
-`timescale 1ns/1ps
-
-`ifdef __LINTER__
-    `include "../std/std_util.svh"
-`else
-    `include "std_util.svh"
-`endif
+`include "std/std_util.svh"
 
 /*
 A multiplexer of sorts that merges multiple streams into a single stream, using
@@ -37,7 +33,7 @@ module stream_merge
     parameter stream_select_mode_t STREAM_SELECT_MODE = STREAM_SELECT_MODE_ROUND_ROBIN,
     parameter int PORTS = 2,
     parameter int ID_WIDTH = (PORTS > 1) ? $clog2(PORTS) : 1,
-    parameter int USE_LAST = 0
+    parameter bit USE_LAST = 0
 )(
     input wire clk, 
     input wire rst,
@@ -51,7 +47,9 @@ module stream_merge
     output logic                stream_out_last
 );
 
-    localparam PAYLOAD_WIDTH = $bits(stream_out.payload);
+    typedef bit [$bits(stream_out.T_LOGIC)-1:0] payload_width_temp_t;
+    localparam int PAYLOAD_WIDTH = $bits(payload_width_temp_t);
+    // localparam PAYLOAD_WIDTH = $bits(stream_out.payload);
 
     typedef logic [PAYLOAD_WIDTH-1:0] payload_t;
     typedef logic [ID_WIDTH-1:0] index_t;
@@ -69,7 +67,7 @@ module stream_merge
         index_t incr_priority = current_priority;
         for (index_t i = 0; i < incr; i++) begin
             incr_priority += 'b1;
-            if (incr_priority >= PORTS) begin
+            if (int'(incr_priority) >= PORTS) begin
                 incr_priority = 'b0;
             end
         end
@@ -158,6 +156,7 @@ module stream_merge
     );
 
     always_comb begin
+        automatic payload_id_last_t stream_out_next_payload, stream_out_complete_payload;
         automatic index_t stream_in_index;
         automatic int i;
 
@@ -167,9 +166,11 @@ module stream_merge
         next_priority = current_priority;
 
         // Set default master payloads, better than just zeros
-        stream_out_next.payload.payload = stream_in_payload[0];
-        stream_out_next.payload.last = stream_in_last[0];
-        stream_out_next.payload.id = 'b0;
+        stream_out_next_payload = '{
+            payload: stream_in_payload[0],
+            last: stream_in_last[0],
+            id: 'b0            
+        };
         next_last_flag = stream_in_last[0];
 
         if (STREAM_SELECT_MODE == STREAM_SELECT_MODE_ROUND_ROBIN) begin
@@ -182,14 +183,17 @@ module stream_merge
                 next_priority = stream_in_last[current_priority] ? 
                     get_next_priority(current_priority, 'b1) : current_priority;
 
-                stream_out_next.payload.payload = stream_in_payload[current_priority];
-                stream_out_next.payload.last = stream_in_last[current_priority];
-                stream_out_next.payload.id = current_priority;
+                stream_out_next_payload = '{
+                    payload: stream_in_payload[current_priority],
+                    last: stream_in_last[current_priority],
+                    id: current_priority
+                };
+
                 next_last_flag = stream_in_last[current_priority];
             end else begin
                 // Go through input streams starting at current priority
                 for (i = 'b0; i < PORTS; i++) begin
-                    stream_in_index = get_next_priority(current_priority, i);
+                    stream_in_index = get_next_priority(current_priority, index_t'(i));
                     
                     // Stream is valid and we haven't produced anything yet
                     if (stream_in_valid[stream_in_index] && !produce) begin
@@ -200,9 +204,12 @@ module stream_merge
                         next_priority = (USE_LAST && !stream_in_last[stream_in_index]) ? 
                                 stream_in_index : get_next_priority(stream_in_index, 'b1);
 
-                        stream_out_next.payload.payload = stream_in_payload[stream_in_index];
-                        stream_out_next.payload.last = stream_in_last[stream_in_index];
-                        stream_out_next.payload.id = stream_in_index;
+                        stream_out_next_payload = '{
+                            payload: stream_in_payload[current_priority],
+                            last: stream_in_last[current_priority],
+                            id: stream_in_index
+                        };
+
                         next_last_flag = stream_in_last[stream_in_index];
                     end
                 end
@@ -219,20 +226,27 @@ module stream_merge
                     enable_priority = enable;
                     next_priority = current_priority + 'b1;
 
-                    stream_out_next.payload.payload = stream_in_payload[i];
-                    stream_out_next.payload.last = stream_in_payload[i];
-                    stream_out_next.payload.id = current_priority;
+                    stream_out_next_payload = '{
+                        payload: stream_in_payload[i],
+                        last: stream_in_last[i],
+                        id: current_priority
+                    };
                 end
             end
 
         end
 
+        /* verilator lint_off WIDTH */
+        stream_out_next.payload = stream_out_next_payload;
+
         // Connect stream_out_id to stream_out
+        stream_out_complete_payload = stream_out_complete.payload;
         stream_out.valid = stream_out_complete.valid;
-        stream_out.payload = stream_out_complete.payload.payload;
-        stream_out_id = stream_out_complete.payload.id;
-        stream_out_last = stream_out_complete.payload.last;
+        stream_out.payload = stream_out_complete_payload.payload;
+        stream_out_id = stream_out_complete_payload.id;
+        stream_out_last = stream_out_complete_payload.last;
         stream_out_complete.ready = stream_out.ready;
+        /* verilator lint_on WIDTH */
     end
 
 endmodule

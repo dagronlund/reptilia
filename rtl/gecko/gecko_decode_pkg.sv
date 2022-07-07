@@ -1,10 +1,11 @@
-//!import riscv/riscv_pkg
-//!import riscv/riscv32_pkg
-//!import riscv/riscv32i_pkg
-//!import riscv/riscv32m_pkg
-//!import riscv/riscv32f_pkg
-//!import riscv/riscv32v_pkg
-//!import gecko/gecko_pkg
+//!import riscv/riscv_pkg.sv
+//!import riscv/riscv32_pkg.sv
+//!import riscv/riscv32i_pkg.sv
+//!import riscv/riscv32m_pkg.sv
+//!import riscv/riscv32f_pkg.sv
+//!import riscv/riscv32v_pkg.sv
+//!import gecko/gecko_pkg.sv
+//!no_lint
 
 package gecko_decode_pkg;
 
@@ -20,11 +21,16 @@ package gecko_decode_pkg;
     typedef gecko_reg_status_t gecko_decode_reg_file_counter_t [32];
 
     typedef struct packed {
-        logic rs1_valid, rs2_valid, rd_valid;
+        logic rs1_valid;
+        logic rs2_valid;
+        logic rd_valid;
     } gecko_decode_operands_status_t;
 
     typedef struct packed {
-        logic execute, system, float, error;
+        logic execute_flag;
+        logic system_flag;
+        logic float_flag;
+        logic error_flag;
     } gecko_decode_opcode_status_t;
 
     function automatic riscv32_reg_addr_t update_execute_saved(
@@ -54,8 +60,10 @@ package gecko_decode_pkg;
                     return 'b0;
                 end
             end
+            default: begin end
             endcase
         end
+        default: begin end
         endcase
         case (riscv32f_opcode_t'(instruction_fields.opcode))
         RISCV32F_OPCODE_FP_OP_S: begin
@@ -66,8 +74,10 @@ package gecko_decode_pkg;
                     return 'b0;
                 end
             end
+            default: begin end
             endcase
         end
+        default: begin end
         endcase
         return current_execute_saved;
     endfunction
@@ -79,11 +89,11 @@ package gecko_decode_pkg;
         case (riscv32i_opcode_t'(instruction_fields.opcode))
         RISCV32I_OPCODE_OP, RISCV32I_OPCODE_IMM, RISCV32I_OPCODE_LUI, 
         RISCV32I_OPCODE_AUIPC, RISCV32I_OPCODE_LOAD: begin
-            status.execute = (instruction_fields.rd != 'b0);
+            status.execute_flag = (instruction_fields.rd != 'b0);
         end
         RISCV32I_OPCODE_STORE, RISCV32I_OPCODE_JAL, 
         RISCV32I_OPCODE_JALR, RISCV32I_OPCODE_BRANCH: begin
-            status.execute = 'b1;
+            status.execute_flag = 'b1;
         end
         RISCV32I_OPCODE_SYSTEM: begin
             case (riscv32i_funct3_sys_t'(instruction_fields.funct3))
@@ -95,21 +105,21 @@ package gecko_decode_pkg;
                 case (instruction_fields.funct12)
                 RISCV32I_CSR_CYCLE, RISCV32I_CSR_TIME, RISCV32I_CSR_INSTRET, 
                 RISCV32I_CSR_CYCLEH, RISCV32I_CSR_TIMEH, RISCV32I_CSR_INSTRETH: begin
-                    status.system = 'b1;
+                    status.system_flag = 'b1;
                 end
                 RISCV32F_CSR_FFLAGS, RISCV32F_CSR_FRM, RISCV32F_CSR_FCSR, RISCV32V_CSR_VL: begin
-                    status.float = 'b1;
+                    status.float_flag = 'b1;
                 end
-                default: status.error = 'b1;
+                default: status.error_flag = 'b1;
                 endcase
             end
             default: begin
-                status.error = 'b1;
+                status.error_flag = 'b1;
             end
             endcase
         end
         default: begin
-            status.error = 'b1;
+            status.error_flag = 'b1;
         end
         endcase
 
@@ -117,9 +127,10 @@ package gecko_decode_pkg;
         RISCV32F_OPCODE_FLW, RISCV32F_OPCODE_FSW,
         RISCV32F_OPCODE_FMADD_S, RISCV32F_OPCODE_FMSUB_S,
         RISCV32F_OPCODE_FNMSUB_S, RISCV32F_OPCODE_FNMADD_S, RISCV32F_OPCODE_FP_OP_S: begin
-            status.float = 'b1;
-            status.error = 'b0;
+            status.float_flag = 'b1;
+            status.error_flag = 'b0;
         end
+        default: begin end
         endcase
         
         case (riscv32v_opcode_t'(instruction_fields.opcode))
@@ -130,30 +141,35 @@ package gecko_decode_pkg;
                 RISCV32V_FUNCT6_VFADD, RISCV32V_FUNCT6_VFSUB, RISCV32V_FUNCT6_VFDIV, 
                 RISCV32V_FUNCT6_VFSQRT, RISCV32V_FUNCT6_VFMUL, RISCV32V_FUNCT6_VFMACC,
                 RISCV32V_FUNCT6_VFNMACC, RISCV32V_FUNCT6_VFMSAC, RISCV32V_FUNCT6_VFNMSAC: begin
-                    status.float = 'b1;
-                    status.error = 'b0;
+                    status.float_flag = 'b1;
+                    status.error_flag = 'b0;
                 end
+                default: begin end
                 endcase
             end
             RISCV32V_FUNCT3_OP_FVF: begin // Floating Point Vector-Scalar
                 case (riscv32v_funct6_t'(instruction_fields.funct6))
                 RISCV32V_FUNCT6_VFADD, RISCV32V_FUNCT6_VFSUB, RISCV32V_FUNCT6_VFDIV,
                 RISCV32V_FUNCT6_VFSQRT, RISCV32V_FUNCT6_VFRDIV, RISCV32V_FUNCT6_VFMUL: begin
-                    status.float = 'b1;
-                    status.error = 'b0;
+                    status.float_flag = 'b1;
+                    status.error_flag = 'b0;
                 end
+                default: begin end
                 endcase
             end
             RISCV32V_FUNCT3_OP_IVI: begin // Integer Vector-Immediate (Slideup/Slidedown)
                 case (riscv32v_funct6_t'(instruction_fields.funct6))
                 RISCV32V_FUNCT6_VSLIDEUP, RISCV32V_FUNCT6_VSLIDEDOWN: begin
-                    status.float = 'b1;
-                    status.error = 'b0;
+                    status.float_flag = 'b1;
+                    status.error_flag = 'b0;
                 end
+                default: begin end
                 endcase
             end
+            default: begin end
             endcase
         end
+        default: begin end
         endcase
         
         return status;
@@ -214,6 +230,7 @@ package gecko_decode_pkg;
             default: return 'b0;
             endcase
         end
+        default: begin end
         endcase
 
         case (riscv32f_opcode_t'(instruction_fields.opcode))
@@ -229,6 +246,7 @@ package gecko_decode_pkg;
         // RISCV32F_OPCODE_FNMSUB_S, RISCV32F_OPCODE_FNMADD_S: begin
         //     return 'b0;
         // end
+        default: begin end
         endcase
 
         return 'b0;
@@ -303,6 +321,7 @@ package gecko_decode_pkg;
             end
             endcase
         end
+        default: begin end
         endcase
 
         case (riscv32f_opcode_t'(instruction_fields.opcode))
@@ -329,8 +348,10 @@ package gecko_decode_pkg;
                     rd_valid: 'b1
                 };
             end
+            default: begin end
             endcase
         end
+        default: begin end
         endcase
 
         return '{

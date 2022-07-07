@@ -1,4 +1,4 @@
-//!import riscv/riscv_pkg
+//!import riscv/riscv_pkg.sv
 
 package riscv32_pkg;
 

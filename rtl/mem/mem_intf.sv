@@ -1,12 +1,7 @@
-`timescale 1ns/1ps
+//!no_lint
 
-`ifdef __LINTER__
-    `include "../std/std_util.svh"
-    `include "mem_util.svh"
-`else
-    `include "std_util.svh"
-    `include "mem_util.svh"
-`endif
+`include "std/std_util.svh"
+`include "mem/mem_util.svh"
 
 interface mem_intf #(
     parameter int DATA_WIDTH = 32,
@@ -14,9 +9,9 @@ interface mem_intf #(
     parameter int MASK_WIDTH = DATA_WIDTH / 8,
     parameter int ID_WIDTH = 1,
     // Indicates that the address steps by bytes regardless of the data width
-    parameter int ADDR_BYTE_SHIFTED = 0,
+    parameter bit ADDR_BYTE_SHIFTED = 0,
     // Indicates that the bus only carries data (i.e. a read response)
-    parameter int DATA_ONLY = 0
+    parameter bit DATA_ONLY = 0
 )(
 `ifndef __SYNTH_ONLY__
     input wire clk = 'b0, rst = 'b0
@@ -25,7 +20,8 @@ interface mem_intf #(
 `endif
 );
 
-    logic valid, ready;
+    logic valid /* verilator isolate_assignments*/;
+    logic ready /* verilator isolate_assignments*/;
 
     logic                  read_enable;
     logic [MASK_WIDTH-1:0] write_enable;

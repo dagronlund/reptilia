@@ -1,19 +1,17 @@
-//!import std/std_pkg
-//!import stream/stream_pkg
-//!import riscv/riscv_pkg
-//!import riscv/riscv32_pkg
-//!import riscv/riscv32i_pkg
-//!import gecko/gecko_pkg
+//!import std/std_pkg.sv
+//!import stream/stream_pkg.sv
+//!import riscv/riscv_pkg.sv
+//!import riscv/riscv32_pkg.sv
+//!import riscv/riscv32i_pkg.sv
+//!import gecko/gecko_pkg.sv
+//!import stream/stream_intf.sv
+//!import std/std_register.sv
+//!import stream/stream_stage.sv
+//!import stream/stream_controller.sv
+//!wrapper gecko/gecko_system_wrapper.sv
 
-`timescale 1ns/1ps
-
-`ifdef __LINTER__
-    `include "../std/std_util.svh"
-    `include "../mem/mem_util.svh"
-`else
-    `include "std_util.svh"
-    `include "mem_util.svh"
-`endif
+`include "std/std_util.svh"
+`include "mem/mem_util.svh"
 
 /*
 This module contains all the basic RISC-V performance counters, plus support for 
@@ -74,7 +72,7 @@ module gecko_system
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
-    parameter int ENABLE_PERFORMANCE_COUNTERS = 1
+    parameter bit ENABLE_PERFORMANCE_COUNTERS = 1
 )(
     input wire clk, 
     input wire rst,
@@ -168,13 +166,13 @@ module gecko_system
         automatic gecko_system_operation_t command_in;
 
         next_clock_counter_partial = {1'b0, clock_counter_partial[31:0]} + 'b1;
-        next_instruction_counter_partial = {1'b0, instruction_counter_partial[31:0]} + retired_instructions;
+        next_instruction_counter_partial = {1'b0, instruction_counter_partial[31:0]} + {28'b0, retired_instructions};
 
         next_clock_counter[31:0] = clock_counter_partial[31:0];
-        next_clock_counter[63:32] = clock_counter[63:32] + clock_counter_partial[32];
+        next_clock_counter[63:32] = clock_counter[63:32] + {31'b0, clock_counter_partial[32]};
 
         next_instruction_counter[31:0] = instruction_counter_partial[31:0];
-        next_instruction_counter[63:32] = instruction_counter[63:32] + instruction_counter_partial[32];
+        next_instruction_counter[63:32] = instruction_counter[63:32] + {31'b0, instruction_counter_partial[32]};
 
         command_in = gecko_system_operation_t'(system_command.payload);
 
@@ -194,6 +192,7 @@ module gecko_system
             RISCV32I_CSR_CYCLEH: next_system_result.payload.value = clock_counter[63:32];
             RISCV32I_CSR_TIMEH: next_system_result.payload.value = clock_counter[63:32];
             RISCV32I_CSR_INSTRETH: next_system_result.payload.value = instruction_counter[63:32];
+            default: begin end
             endcase
         end
 

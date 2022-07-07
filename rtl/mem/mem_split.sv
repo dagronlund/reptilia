@@ -1,12 +1,10 @@
-`timescale 1ns/1ps
+//!import stream/stream_intf.sv
+//!import stream/stream_split.sv
+//!import mem/mem_intf.sv
+//!wrapper mem/mem_split_wrapper.sv
 
-`ifdef __LINTER__
-    `include "../std/std_util.svh"
-    `include "../mem/mem_util.svh"
-`else
-    `include "std_util.svh"
-    `include "mem_util.svh"
-`endif
+`include "std/std_util.svh"
+`include "mem/mem_util.svh"
 
 module mem_split
     import std_pkg::*;
@@ -17,7 +15,7 @@ module mem_split
     parameter stream_select_mode_t STREAM_SELECT_MODE = STREAM_SELECT_MODE_ROUND_ROBIN,
     parameter int PORTS = 2,
     parameter int META_WIDTH = 1,
-    parameter int USE_LAST = 0
+    parameter bit USE_LAST = 0
 )(
     input wire clk, rst,
 
@@ -28,15 +26,26 @@ module mem_split
     output logic [META_WIDTH-1:0] mem_out_meta [PORTS]
 );
 
-    localparam ADDR_WIDTH = $bits(mem_in.addr);
-    localparam DATA_WIDTH = $bits(mem_in.data);
-    localparam MASK_WIDTH = $bits(mem_in.write_enable);
+    typedef bit [mem_in.ADDR_WIDTH-1:0] addr_width_temp_t;
+    localparam int ADDR_WIDTH = $bits(addr_width_temp_t);
+    typedef bit [mem_in.DATA_WIDTH-1:0] data_width_temp_t;
+    localparam int DATA_WIDTH = $bits(data_width_temp_t);
+    typedef bit [mem_in.MASK_WIDTH-1:0] mask_width_temp_t;
+    localparam int MASK_WIDTH = $bits(mask_width_temp_t);
+    typedef bit [mem_in.ID_WIDTH-1:0] id_width_temp_t;
+    localparam int ID_WIDTH = $bits(id_width_temp_t);
+    // typedef bit [mem_out[0].ID_WIDTH-1:0] OUTPUT_ID_WIDTH_temp_t;
+    // localparam int OUTPUT_ID_WIDTH = $bits(OUTPUT_ID_WIDTH_temp_t);
 
-    localparam ID_WIDTH = $bits(mem_in.id);
-    localparam SUB_ID_WIDTH = (PORTS > 1) ? $clog2(PORTS) : 1;;
-    localparam POST_ID_WIDTH = $bits(mem_out[0].id);
-
-    `STATIC_ASSERT((PORTS > 1) ? (ID_WIDTH == (POST_ID_WIDTH + SUB_ID_WIDTH)) : (ID_WIDTH == POST_ID_WIDTH))
+    // localparam ADDR_WIDTH = $bits(mem_in.addr);
+    // localparam DATA_WIDTH = $bits(mem_in.data);
+    // localparam MASK_WIDTH = $bits(mem_in.write_enable);
+    // localparam ID_WIDTH = $bits(mem_in.id);
+    // localparam OUTPUT_ID_WIDTH = $bits(mem_out[0].id);
+    localparam int INTERNAL_ID_WIDTH = (PORTS > 1) ? $clog2(PORTS) : 1;
+    // TODO: Actually check in and out ID widths against PORT count
+    localparam int OUTPUT_ID_WIDTH = (PORTS > 1) ? (ID_WIDTH - INTERNAL_ID_WIDTH) : ID_WIDTH; // ID_WIDTH - INTERNAL_ID_WIDTH;
+    // `STATIC_ASSERT((PORTS > 1) ? (ID_WIDTH == (OUTPUT_ID_WIDTH + INTERNAL_ID_WIDTH)) : (ID_WIDTH == OUTPUT_ID_WIDTH))
 
     typedef struct packed {
         logic read_enable;
@@ -47,7 +56,7 @@ module mem_split
         logic [META_WIDTH-1:0] meta;
     } mem_t;
 
-    logic [SUB_ID_WIDTH-1:0] stream_in_id;
+    logic [INTERNAL_ID_WIDTH-1:0] stream_in_id;
     stream_intf #(.T(mem_t)) stream_in (.clk, .rst);
 
     stream_intf #(.T(mem_t)) stream_out [PORTS] (.clk, .rst);
@@ -60,7 +69,7 @@ module mem_split
         `PROCEDURAL_ASSERT(ADDR_WIDTH == $bits(mem_out[k].addr))
         `PROCEDURAL_ASSERT(MASK_WIDTH == $bits(mem_out[k].write_enable))
         `PROCEDURAL_ASSERT(DATA_WIDTH == $bits(mem_out[k].data))
-        `PROCEDURAL_ASSERT(POST_ID_WIDTH == $bits(mem_out[k].id))
+        `PROCEDURAL_ASSERT(OUTPUT_ID_WIDTH == $bits(mem_out[k].id))
 
         always_comb begin
             automatic mem_t payload = stream_out[k].payload;
@@ -70,7 +79,7 @@ module mem_split
             mem_out[k].write_enable = payload.write_enable;
             mem_out[k].addr = payload.addr;
             mem_out[k].data = payload.data;
-            mem_out[k].id = payload.id[POST_ID_WIDTH-1:0];
+            mem_out[k].id = payload.id[OUTPUT_ID_WIDTH-1:0];
             mem_out[k].last = stream_out_last[k];
             mem_out_meta[k] = payload.meta;
             stream_out[k].ready = mem_out[k].ready;
@@ -90,7 +99,7 @@ module mem_split
         };
         mem_in.ready = stream_in.ready;
 
-        stream_in_id = (PORTS > 1) ? mem_in.id[SUB_ID_WIDTH+POST_ID_WIDTH-1:POST_ID_WIDTH] : 'b0;
+        stream_in_id = mem_in.id[ID_WIDTH-1:OUTPUT_ID_WIDTH];
     end
 
     stream_split #(
@@ -98,11 +107,16 @@ module mem_split
         .PIPELINE_MODE(PIPELINE_MODE),
         .STREAM_SELECT_MODE(STREAM_SELECT_MODE),
         .PORTS(PORTS),
-        .ID_WIDTH(ID_WIDTH)
+        .ID_WIDTH(OUTPUT_ID_WIDTH)
     ) stream_split_inst (
-        .clk, .rst,
-        .stream_in, .stream_in_id, .stream_in_last(mem_in.last),
-        .stream_out, .stream_out_last
+        .clk, 
+        .rst,
+        .stream_in, 
+        .stream_in_id, 
+        .stream_in_last(mem_in.last),
+        .stream_out,
+        .stream_out_id(), 
+        .stream_out_last
     );
 
 endmodule

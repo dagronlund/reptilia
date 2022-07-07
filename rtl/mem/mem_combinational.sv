@@ -1,16 +1,9 @@
-//!import std/std_pkg
-//!import std/std_register
-//!import xilinx/xilinx_distributed_ram
+//!import std/std_pkg.sv
+//!import std/std_register.sv
+//!import xilinx/xilinx_distributed_ram.sv
 
-`ifdef __LINTER__
-    `include "../std/std_util.svh"
-    `include "../mem/mem_util.svh"
-`else
-    `include "std_util.svh"
-    `include "mem_util.svh"
-`endif
-
-`timescale 1ns/1ps
+`include "std/std_util.svh"
+`include "mem/mem_util.svh"
 
 module mem_combinational
     import std_pkg::*;
@@ -20,7 +13,7 @@ module mem_combinational
     parameter int DATA_WIDTH = 1,
     parameter int ADDR_WIDTH = 5,
     parameter int READ_PORTS = 1,
-    parameter int AUTO_RESET = 0
+    parameter bit AUTO_RESET = 0
 )(
     input wire clk, 
     input wire rst,
@@ -74,7 +67,7 @@ module mem_combinational
             reset_done = (current_reset_state == 0);
 
             if (current_reset_state) begin
-                write_enable_internal = {DATA_WIDTH{1'b1}};
+                write_enable_internal = 1'b1;
                 write_addr_internal = current_reset_counter;
                 write_data_in_internal = 'b0;
             end else begin
@@ -97,53 +90,54 @@ module mem_combinational
     end
     endgenerate
 
-    generate
-    // Only try the latch-RAM if it is wide enough to justify it 
-    if ((TECHNOLOGY == STD_TECHNOLOGY_ASIC_TSMC || 
-            TECHNOLOGY == STD_TECHNOLOGY_ASIC_INTEL) &&
-            DATA_WIDTH > 8) begin
+    // TODO: Fix ASIC latch RAM and verilator
+    // generate
+    // // Only try the latch-RAM if it is wide enough to justify it 
+    // if ((TECHNOLOGY == STD_TECHNOLOGY_ASIC_TSMC || 
+    //         TECHNOLOGY == STD_TECHNOLOGY_ASIC_INTEL) &&
+    //         DATA_WIDTH > 8) begin
 
-        asic_latch_ram #(
-            .CLOCK_INFO(CLOCK_INFO),
-            .TECHNOLOGY(TECHNOLOGY),
-            .DATA_WIDTH(DATA_WIDTH),
-            .ADDR_WIDTH(ADDR_WIDTH),
-            .READ_PORTS(READ_PORTS)
-        ) asic_latch_ram_inst (
-            .clk, .rst,
+    //     asic_latch_ram #(
+    //         .CLOCK_INFO(CLOCK_INFO),
+    //         .TECHNOLOGY(TECHNOLOGY),
+    //         .DATA_WIDTH(DATA_WIDTH),
+    //         .ADDR_WIDTH(ADDR_WIDTH),
+    //         .READ_PORTS(READ_PORTS)
+    //     ) asic_latch_ram_inst (
+    //         .clk, .rst,
 
-            .write_enable(write_enable_internal),
-            .write_addr(write_addr_internal),
-            .write_data_in(write_data_in_internal),
-            .write_data_out,
-            .read_addr, 
-            .read_data_out
-        );
+    //         .write_enable(write_enable_internal),
+    //         .write_addr(write_addr_internal),
+    //         .write_data_in(write_data_in_internal),
+    //         .write_data_out,
+    //         .read_addr, 
+    //         .read_data_out
+    //     );
 
-    end else begin // TECHNOLOGY == STD_TECHNOLOGY_FPGA_XILINX
+    // end else begin // TECHNOLOGY == STD_TECHNOLOGY_FPGA_XILINX
 
-        // Just use inferred distributed RAM for any FPGA technology
-        // TODO: Verify Intel FPGAs supports this format
-        xilinx_distributed_ram #(
-            .CLOCK_INFO(CLOCK_INFO),
-            .DATA_WIDTH(DATA_WIDTH),
-            .ADDR_WIDTH(ADDR_WIDTH),
-            .READ_PORTS(READ_PORTS)
-        ) xilinx_distributed_ram_inst (
-            .clk, .rst,
+    // end
+    // endgenerate
 
-            // Only using single-bit write enable for this module,
-            // manually use the distributed RAM module for more
-            // granularity
-            .write_enable({DATA_WIDTH{write_enable_internal}}),
-            .write_addr(write_addr_internal),
-            .write_data_in(write_data_in_internal),
-            .write_data_out,
-            .read_addr, 
-            .read_data_out
-        );
+    // Just use inferred distributed RAM for any FPGA technology
+    // TODO: Verify Intel FPGAs supports this format
+    xilinx_distributed_ram #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .DATA_WIDTH(DATA_WIDTH),
+        .ADDR_WIDTH(ADDR_WIDTH),
+        .READ_PORTS(READ_PORTS)
+    ) xilinx_distributed_ram_inst (
+        .clk, .rst,
 
-    end
-    endgenerate
+        // Only using single-bit write enable for this module,
+        // manually use the distributed RAM module for more
+        // granularity
+        .write_enable({DATA_WIDTH{write_enable_internal}}),
+        .write_addr(write_addr_internal),
+        .write_data_in(write_data_in_internal),
+        .write_data_out,
+        .read_addr, 
+        .read_data_out
+    );
 
 endmodule

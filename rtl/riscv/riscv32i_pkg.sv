@@ -1,5 +1,5 @@
-//!import riscv/riscv_pkg
-//!import riscv/riscv32_pkg
+//!import riscv/riscv_pkg.sv
+//!import riscv/riscv32_pkg.sv
 
 package riscv32i_pkg;
 

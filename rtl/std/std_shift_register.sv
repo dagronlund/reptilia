@@ -1,7 +1,5 @@
-//!import std/std_pkg
-//!import std/std_register
-
-`timescale 1ns/1ps
+//!import std/std_pkg.sv
+//!import std/std_register.sv
 
 module std_shift_register 
     import std_pkg::*;

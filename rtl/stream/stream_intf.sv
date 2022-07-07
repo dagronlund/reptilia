@@ -1,7 +1,8 @@
-`timescale 1ns/1ps
+//!no_lint
 
 interface stream_intf #(
-    parameter type T = logic
+    parameter type T = logic,
+    parameter logic [$bits(T)-1:0] T_LOGIC = 'b0
 )(
 `ifndef __SYNTH_ONLY__
     input wire clk = 'b0, rst = 'b0
@@ -10,7 +11,8 @@ interface stream_intf #(
 `endif
 );
 
-    logic valid, ready;
+    logic valid /* verilator isolate_assignments*/;
+    logic ready /* verilator isolate_assignments*/;
 
     T payload;
 

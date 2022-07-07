@@ -1,8 +1,5 @@
-//!import std/std_pkg
+//!import std/std_pkg.sv
 
-`timescale 1ns/1ps
-
-// I hope you hate how verbose this is just as much as I do
 module std_register 
     import std_pkg::*;
 #(
@@ -20,7 +17,7 @@ module std_register
 
     // Maybe this will be supported by synthesis?
     logic rst_actual;
-    assign rst_actual = std_is_reset_active(CLOCK_INFO, rst);
+    always_comb rst_actual = std_is_reset_active(CLOCK_INFO, rst);
 
     generate
     if (CLOCK_INFO.clock_edge == STD_CLOCK_EDGE_RISING) begin

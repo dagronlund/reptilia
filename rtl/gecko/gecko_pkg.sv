@@ -1,8 +1,13 @@
-//!import riscv/riscv_pkg
-//!import riscv/riscv32_pkg
-//!import riscv/riscv32i_pkg
+//!import stream/stream_pkg.sv
+//!import riscv/riscv_pkg.sv
+//!import riscv/riscv32_pkg.sv
+//!import riscv/riscv32i_pkg.sv
+//!import riscv/riscv32m_pkg.sv
+//!no_lint
 
 package gecko_pkg;
+
+    import stream_pkg::*;
 
     import riscv_pkg::*;
     import riscv32_pkg::*;
@@ -22,11 +27,11 @@ package gecko_pkg;
     typedef logic [7:0] gecko_prediction_history_t;
 
     typedef enum logic [1:0] {
-        GECKO_BRANCH_PREDICTOR_NONE = 'h0,
-        GECKO_BRANCH_PREDICTOR_SIMPLE = 'h1,
-        GECKO_BRANCH_PREDICTOR_GLOBAL = 'h2,
-        GECKO_BRANCH_PREDICTOR_LOCAL = 'h3
-    } gecko_branch_predictor_t;
+        GECKO_BRANCH_PREDICTOR_MODE_NONE = 'h0,
+        GECKO_BRANCH_PREDICTOR_MODE_SIMPLE = 'h1,
+        GECKO_BRANCH_PREDICTOR_MODE_GLOBAL = 'h2,
+        GECKO_BRANCH_PREDICTOR_MODE_LOCAL = 'h3
+    } gecko_branch_predictor_mode_t;
 
     typedef enum logic [1:0] {
         GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN = 'h0,
@@ -99,9 +104,7 @@ package gecko_pkg;
         gecko_branch_predictor_history_t history;
     } gecko_prediction_t;
 
-    /*************************************************************************
-     * Internal Gecko Stream Datatypes                                       *
-     *************************************************************************/
+    // Internal Gecko Stream Datatypes -----------------------------------------
 
     typedef struct packed {
         riscv32_reg_addr_t addr;
@@ -144,7 +147,7 @@ package gecko_pkg;
         riscv32_reg_addr_t reg_addr;
         gecko_reg_status_t reg_status;
         gecko_jump_flag_t jump_flag;
-        riscv32_reg_addr_t imm_value;
+        riscv32_reg_value_t imm_value;
         riscv32_reg_value_t rs1_value;
         riscv32i_funct3_sys_t sys_op;
         riscv32_funct12_t csr;
@@ -187,7 +190,7 @@ package gecko_pkg;
         
         logic enable_status_op;
         riscv32i_funct3_sys_t sys_op;
-        riscv32_reg_addr_t sys_imm;
+        riscv32_reg_value_t sys_imm;
         riscv32_funct12_t sys_csr;
     } gecko_float_operation_t;
 
@@ -196,9 +199,7 @@ package gecko_pkg;
         logic [7:0] data;
     } gecko_ecall_operation_t;
 
-    /*************************************************************************
-     * Internal Gecko Helper Functions                                       *
-     *************************************************************************/
+    // Internal Gecko Helper Functions -----------------------------------------
 
     function automatic gecko_forwarded_t gecko_construct_forward(
         input logic valid,
@@ -223,7 +224,7 @@ package gecko_pkg;
         gecko_add_sub_result_t result;
         riscv32_reg_value_t b_inv;
         b_inv = sub ? (~b) : (b);
-        {result.carry, result.sum} = a + b_inv + sub;
+        {result.carry, result.sum} = a + b_inv + {32'b0, sub};
         return result;
     endfunction
 
@@ -331,14 +332,12 @@ package gecko_pkg;
         };
     endfunction
 
-    /*************************************************************************
-     * Gecko Integer Math Helpers                                            *
-     *************************************************************************/
+    // Gecko Integer Math Helpers ----------------------------------------------
 
     typedef struct packed {
         riscv32m_funct3_t math_op;
-        riscv32_reg_value_t operand; // rs1, multiplicand, dividend
-        riscv32_reg_value_t operator; // rs2, multiplier, divisor
+        riscv32_reg_value_t operand_value; // rs1, multiplicand, dividend
+        riscv32_reg_value_t operator_value; // rs2, multiplier, divisor
         riscv32_reg_value_t result;
         logic flag;
         logic done;
@@ -354,88 +353,88 @@ package gecko_pkg;
         unique case (op.math_op)
         RISCV32M_FUNCT3_MUL: begin
             if (current_iteration == 'b0) begin
-                // Swap lesser value into operator to save cycles
-                if (op.operand < op.operator) begin
-                    {op.operand, op.operator} = {op.operator, op.operand};
+                // Swap lesser value into operator_value to save cycles
+                if (op.operand_value < op.operator_value) begin
+                    {op.operand_value, op.operator_value} = {op.operator_value, op.operand_value};
                 end
             end else begin
-                if (op.operator[0]) begin
-                    op.result = op.result + op.operand;
+                if (op.operator_value[0]) begin
+                    op.result = op.result + op.operand_value;
                 end
-                op.operand = {op.operand[30:0], 1'b0};
-                op.operator = {1'b0, op.operator[31:1]};
-                op.done = (op.operator == 'b0);
+                op.operand_value = {op.operand_value[30:0], 1'b0};
+                op.operator_value = {1'b0, op.operator_value[31:1]};
+                op.done = (op.operator_value == 'b0);
             end
             return op;
         end
         RISCV32M_FUNCT3_MULH: begin
             // Use Booth's Algorithm
-            if (!op.operator[0] && op.flag) begin
-                op.result = op.result + op.operand;
-            end else if (op.operator[0] && !op.flag) begin
-                op.result = op.result - op.operand;
+            if (!op.operator_value[0] && op.flag) begin
+                op.result = op.result + op.operand_value;
+            end else if (op.operator_value[0] && !op.flag) begin
+                op.result = op.result - op.operand_value;
             end
-            op.flag = op.operator[0];
+            op.flag = op.operator_value[0];
             op.result = {op.result[31], op.result[31:1]};
-            op.operator = {1'b0, op.operator[31:1]};
-            op.done = (op.operator == 'b0);
+            op.operator_value = {1'b0, op.operator_value[31:1]};
+            op.done = (op.operator_value == 'b0);
             return op;
         end
         // TODO: Fix performance of MULHSU (does not always need 34 cycles)
         RISCV32M_FUNCT3_MULHSU: begin
-            if (current_iteration == 'b0) begin // ABS operand and record
-                if (op.operand[31]) begin // Flip sign
+            if (current_iteration == 'b0) begin // ABS operand_value and record
+                if (op.operand_value[31]) begin // Flip sign
                     op.flag = 'b1;
-                    op.operand = 'b0 - op.operand;
+                    op.operand_value = 'b0 - op.operand_value;
                 end
             end else if (current_iteration == 'd33) begin // Flip sign if necessary
                 if (op.flag) begin
                     op.result = ~op.result;
                     // Only perform the increment if the zeros flag remained active,
                     // otherwise the addition would get "eaten" by LSBs
-                    if (op.operator[31]) begin
+                    if (op.operator_value[31]) begin
                         op.result = op.result + 'b1;
                     end
                 end
                 op.done = 'b1;
             end else begin // iterations 1...31
-                if (op.operator[0]) begin
-                    {carry, op.result} = op.result + op.operand;
+                if (op.operator_value[0]) begin
+                    {carry, op.result} = op.result + op.operand_value;
                 end
                 if (current_iteration == 'b1) begin
-                    // Shift operator and use msb to store if the
+                    // Shift operator_value and use msb to store if the
                     // shifted out result was a zero
-                    op.operator = {!op.result[0], op.operator[31:1]};
+                    op.operator_value = {!op.result[0], op.operator_value[31:1]};
                 end else begin
-                    // Continue shifting operator and record if
+                    // Continue shifting operator_value and record if
                     // shifted out result was all zeros
-                    op.operator = {!op.result[0] && op.operator[31], op.operator[31:1]};
+                    op.operator_value = {!op.result[0] && op.operator_value[31], op.operator_value[31:1]};
                 end
                 op.result = {carry, op.result[31:1]};
             end
             return op;
         end
         RISCV32M_FUNCT3_MULHU: begin
-            if (op.operator[0]) begin
-                {carry, op.result} = op.result + op.operand;
+            if (op.operator_value[0]) begin
+                {carry, op.result} = op.result + op.operand_value;
             end
             op.result = {carry, op.result[31:1]};
-            op.operator = {1'b0, op.operator[31:1]};
-            op.done = (op.operator == 'b0);
+            op.operator_value = {1'b0, op.operator_value[31:1]};
+            op.done = (op.operator_value == 'b0);
             return op;
         end
         // TODO: CRITICAL: Support signed division (I hate thinking about it)
         RISCV32M_FUNCT3_DIV, RISCV32M_FUNCT3_REM,
         // : begin
         //     if (current_iteration == 'd0) begin // Find ABS of first arg
-        //         if (op.operand[31]) begin
+        //         if (op.operand_value[31]) begin
         //             op.flag = 'b1;
-        //             op.operand = 'b0 - op.operand;
+        //             op.operand_value = 'b0 - op.operand_value;
         //         end
         //     end else if (current_iteration == 'd1) begin // Find ABS of second arg
-        //         if (op.operator[31]) begin
+        //         if (op.operator_value[31]) begin
         //             op.flag = ~op.flag; // Make flag zero again if both negative
-        //             op.operator = 'b0 = op.operator;
+        //             op.operator_value = 'b0 = op.operator_value;
         //         end
         //     end else if (current_iteration == 'd34) begin // Invert result if necessary
         //         if (op.flag) begin
@@ -443,31 +442,31 @@ package gecko_pkg;
         //         end
         //     end else begin
         //         // Left shift remainder, fill in with numerator MSB
-        //         op.result = {op.result[30:0], op.operand[31]};
+        //         op.result = {op.result[30:0], op.operand_value[31]};
         //         // If remainder >= divisor (or fills in ones if division by zero)
-        //         if ((op.result >= op.operator) || (op.operator == 0)) begin
+        //         if ((op.result >= op.operator_value) || (op.operator_value == 0)) begin
         //             // Subtract divisor from remainder
-        //             op.result = op.result - op.operator;
-        //             // Fill in quotient with one (replaces operand lsb)
-        //             op.operand = {op.operand[30:0], 1'b1};
+        //             op.result = op.result - op.operator_value;
+        //             // Fill in quotient with one (replaces operand_value lsb)
+        //             op.operand_value = {op.operand_value[30:0], 1'b1};
         //         end else begin
         //             // Fill in quotient with zero
-        //             op.operand = {op.operand[30:0], 1'b0};
+        //             op.operand_value = {op.operand_value[30:0], 1'b0};
         //         end
         //     end
         // end
         RISCV32M_FUNCT3_DIVU, RISCV32M_FUNCT3_REMU: begin
             // Left shift remainder, fill in with numerator MSB
-            op.result = {op.result[30:0], op.operand[31]};
+            op.result = {op.result[30:0], op.operand_value[31]};
             // If remainder >= divisor (or fills in ones if division by zero)
-            if ((op.result >= op.operator) || (op.operator == 0)) begin
+            if ((op.result >= op.operator_value) || (op.operator_value == 0)) begin
                 // Subtract divisor from remainder
-                op.result = op.result - op.operator;
-                // Fill in quotient with one (replaces operand lsb)
-                op.operand = {op.operand[30:0], 1'b1};
+                op.result = op.result - op.operator_value;
+                // Fill in quotient with one (replaces operand_value lsb)
+                op.operand_value = {op.operand_value[30:0], 1'b1};
             end else begin
                 // Fill in quotient with zero
-                op.operand = {op.operand[30:0], 1'b0};
+                op.operand_value = {op.operand_value[30:0], 1'b0};
             end
 
             // TODO: Fix division performance, does not have to run all cycles
@@ -488,5 +487,70 @@ package gecko_pkg;
         endcase
 
     endfunction
+
+    // Gecko core configuration ------------------------------------------------
+
+    typedef struct packed {
+        gecko_branch_predictor_mode_t mode;
+        int                           target_addr_width;
+        int                           history_width;
+        int                           local_addr_width;
+    } gecko_branch_predictor_config_t;
+
+    typedef struct packed {
+        gecko_pc_t start_addr;
+        // Internal pipeline
+        stream_pipeline_mode_t fetch_pipeline_mode;
+        stream_pipeline_mode_t imem_pipeline_mode;
+        stream_pipeline_mode_t decode_pipeline_mode;
+        stream_pipeline_mode_t execute_pipeline_mode;
+        stream_pipeline_mode_t system_pipeline_mode;
+        stream_pipeline_mode_t print_pipeline_mode;
+        stream_pipeline_mode_t writeback_pipeline_mode;
+        int                    instruction_memory_latency;
+        int                    data_memory_latency;
+        int                    float_memory_latency;
+        // Branch predictor
+        gecko_branch_predictor_config_t branch_predictor_config;
+        // Features
+        bit enable_performance_counters;
+        bit enable_print_out;
+        bit enable_floating_point;
+        bit enable_integer_math;
+    } gecko_config_t;
+
+    function automatic gecko_branch_predictor_config_t gecko_get_basic_branch_predictor_config();
+        return gecko_branch_predictor_config_t'{
+            mode: GECKO_BRANCH_PREDICTOR_MODE_SIMPLE,
+            target_addr_width: 5,
+            history_width: 5,
+            local_addr_width: 5
+        };
+    endfunction
+
+    function automatic gecko_config_t gecko_get_basic_config(
+        input int instruction_memory_latency,
+        input int data_memory_latency,
+        input int float_memory_latency
+    );
+        return gecko_config_t'{
+            start_addr: 'b0,
+            fetch_pipeline_mode: STREAM_PIPELINE_MODE_TRANSPARENT,
+            imem_pipeline_mode: STREAM_PIPELINE_MODE_TRANSPARENT,
+            decode_pipeline_mode: STREAM_PIPELINE_MODE_REGISTERED,
+            execute_pipeline_mode: STREAM_PIPELINE_MODE_REGISTERED,
+            system_pipeline_mode: STREAM_PIPELINE_MODE_REGISTERED,
+            print_pipeline_mode: STREAM_PIPELINE_MODE_REGISTERED,
+            writeback_pipeline_mode: STREAM_PIPELINE_MODE_REGISTERED,
+            instruction_memory_latency: instruction_memory_latency,
+            data_memory_latency: data_memory_latency,
+            float_memory_latency: float_memory_latency,
+            branch_predictor_config: gecko_get_basic_branch_predictor_config(),
+            enable_performance_counters: 1,
+            enable_print_out: 1,
+            enable_floating_point: 0,
+            enable_integer_math: 0
+        };
+    endfunction    
 
 endpackage

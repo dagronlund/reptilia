@@ -1,19 +1,16 @@
-//!import std/std_pkg
-//!import stream/stream_pkg
-//!import riscv/riscv_pkg
-//!import riscv/riscv32_pkg
-//!import riscv/riscv32i_pkg
-//!import gecko/gecko_pkg
+//!import std/std_pkg.sv
+//!import stream/stream_pkg.sv
+//!import riscv/riscv_pkg.sv
+//!import riscv/riscv32_pkg.sv
+//!import riscv/riscv32i_pkg.sv
+//!import gecko/gecko_pkg.sv
+//!import stream/stream_intf.sv
+//!import stream/stream_controller.sv
+//!import stream/stream_stage.sv
+//!wrapper gecko/gecko_print_wrapper.sv
 
-`timescale 1ns/1ps
-
-`ifdef __LINTER__
-    `include "../std/std_util.svh"
-    `include "../mem/mem_util.svh"
-`else
-    `include "std_util.svh"
-    `include "mem_util.svh"
-`endif
+`include "std/std_util.svh"
+`include "mem/mem_util.svh"
 
 module gecko_print
     import std_pkg::*;

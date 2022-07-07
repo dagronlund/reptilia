@@ -1,20 +1,20 @@
-//!import std/std_pkg
-//!import stream/stream_pkg
-//!import riscv/riscv_pkg
-//!import riscv/riscv32_pkg
-//!import riscv/riscv32i_pkg
-//!import riscv/riscv32m_pkg
-//!import gecko/gecko_pkg
+//!import std/std_pkg.sv
+//!import stream/stream_pkg.sv
+//!import riscv/riscv_pkg.sv
+//!import riscv/riscv32_pkg.sv
+//!import riscv/riscv32i_pkg.sv
+//!import riscv/riscv32m_pkg.sv
+//!import gecko/gecko_pkg.sv
+//!import stream/stream_intf.sv
+//!import mem/mem_intf.sv
+//!import std/std_register.sv
+//!import stream/stream_stage.sv
+//!import stream/stream_controller.sv
+//!import mem/mem_stage.sv
+//!wrapper gecko/gecko_execute_wrapper.sv
 
-`timescale 1ns/1ps
-
-`ifdef __LINTER__
-    `include "../std/std_util.svh"
-    `include "../mem/mem_util.svh"
-`else
-    `include "std_util.svh"
-    `include "mem_util.svh"
-`endif
+`include "std/std_util.svh"
+`include "mem/mem_util.svh"
 
 module gecko_execute
     import std_pkg::*;
@@ -28,7 +28,7 @@ module gecko_execute
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
-    parameter int ENABLE_INTEGER_MATH = 0 // Supports iterative division and multiplication
+    parameter bit ENABLE_INTEGER_MATH = 0 // Supports iterative division and multiplication
 )(
     input wire clk, 
     input wire rst,
@@ -75,7 +75,8 @@ module gecko_execute
         .T(gecko_mem_operation_t)
     ) mem_command_output_stage (
         .clk, .rst,
-        .stream_in(next_mem_command), .stream_out(mem_command)
+        .stream_in(next_mem_command), 
+        .stream_out(mem_command)
     );
 
     mem_stage #(
@@ -83,7 +84,10 @@ module gecko_execute
         .PIPELINE_MODE(PIPELINE_MODE)
     ) mem_request_output_stage (
         .clk, .rst,
-        .mem_in(next_mem_request), .mem_out(mem_request)
+        .mem_in(next_mem_request), 
+        .mem_in_meta('b0),
+        .mem_out(mem_request),
+        .mem_out_meta()
     );
 
     stream_stage #(
@@ -92,7 +96,8 @@ module gecko_execute
         .T(gecko_operation_t)
     ) execute_result_output_stage (
         .clk, .rst,
-        .stream_in(next_execute_result), .stream_out(execute_result)
+        .stream_in(next_execute_result), 
+        .stream_out(execute_result)
     );
 
     stream_stage #(
@@ -101,7 +106,8 @@ module gecko_execute
         .T(gecko_jump_operation_t)
     ) jump_command_output_stage (
         .clk, .rst,
-        .stream_in(next_jump_command), .stream_out(jump_command)
+        .stream_in(next_jump_command), 
+        .stream_out(jump_command)
     );
 
     riscv32_reg_value_t current_execute_value;
@@ -114,7 +120,8 @@ module gecko_execute
         .T(riscv32_reg_value_t),
         .RESET_VECTOR('b0)
     ) execute_value_register (
-        .clk, .rst(std_get_reset(CLOCK_INFO, 0)), // No reset
+        .clk, 
+        .rst(std_get_reset(CLOCK_INFO, 0)), // No reset
         .enable(enable && produce_execute),
         .next(next_execute_result.payload.value),
         .value(current_execute_value)
@@ -134,16 +141,10 @@ module gecko_execute
     std_register #(
         .CLOCK_INFO(CLOCK_INFO),
         .T(gecko_math_operation_t),
-        .RESET_VECTOR('{
-            math_op: RISCV32M_FUNCT3_MUL,
-            operand: 'b0,
-            operator: 'b0,
-            flag: 'b0,
-            done: 'b0,
-            result: 'b0
-        })
+        .RESET_VECTOR('b0)
     ) math_op_register (
-        .clk, .rst(std_get_reset(CLOCK_INFO, 0)), // No reset
+        .clk, 
+        .rst(std_get_reset(CLOCK_INFO, 0)), // No reset
         .enable,
         .next(next_math_op),
         .value(current_math_op)
@@ -188,6 +189,7 @@ module gecko_execute
         endcase
 
         alu_result = gecko_get_full_math_result(a, b, alt);
+        store_result = gecko_get_store_result(c, alu_result.add_sub_result[1:0], cmd_in.op.ls);
 
         next_execute_result.payload.value = alu_result.add_sub_result;
         next_execute_result.payload.addr = cmd_in.reg_addr;
@@ -233,7 +235,7 @@ module gecko_execute
             // Only for division is the result stored in the operand
             // Use the next values so we can fully run 32 cycles
             case (current_math_op.math_op)
-            RISCV32M_FUNCT3_DIV, RISCV32M_FUNCT3_DIVU: next_execute_result.payload.value = next_math_op.operand;
+            RISCV32M_FUNCT3_DIV, RISCV32M_FUNCT3_DIVU: next_execute_result.payload.value = next_math_op.operand_value;
             default: next_execute_result.payload.value = next_math_op.result;
             endcase
 
@@ -266,8 +268,6 @@ module gecko_execute
             end
             GECKO_EXECUTE_TYPE_STORE: begin
                 produce_mem_request = 'b1;
-
-                store_result = gecko_get_store_result(c, alu_result.add_sub_result[1:0], cmd_in.op.ls);
 
                 next_mem_request.addr = alu_result.add_sub_result;
                 next_mem_request.data = store_result.value;
@@ -306,8 +306,8 @@ module gecko_execute
                         // Perform math operation
                         next_math_op = gecko_math_operation_step('{
                             math_op: riscv32m_funct3_t'(cmd_in.op),
-                            operand: a,
-                            operator: b,
+                            operand_value: a,
+                            operator_value: b,
                             flag: 'b0,
                             done: 'b0,
                             result: 'b0
@@ -325,7 +325,7 @@ module gecko_execute
                         //     case (next_math_op.math_op)
                         //     RISCV32M_FUNCT3_DIV, RISCV32M_FUNCT3_DIVU: 
                         //         next_execute_result.payload.value = 
-                        //             next_math_op.operand;
+                        //             next_math_op.operand_value;
                         //     default: 
                         //         next_execute_result.payload.value = 
                         //             next_math_op.result;
@@ -337,6 +337,7 @@ module gecko_execute
                     next_execute_result.payload.value = 'b0;
                 end
             end
+            default: begin end
             endcase
         end
     end

@@ -1,19 +1,20 @@
-//!import std/std_pkg
-//!import stream/stream_pkg
-//!import riscv/riscv_pkg
-//!import riscv/riscv32_pkg
-//!import riscv/riscv32i_pkg
-//!import gecko/gecko_pkg
+//!import std/std_pkg.sv
+//!import stream/stream_pkg.sv
+//!import riscv/riscv_pkg.sv
+//!import riscv/riscv32_pkg.sv
+//!import riscv/riscv32i_pkg.sv
+//!import gecko/gecko_pkg.sv
+//!import stream/stream_stage_multiple.sv
+//!import gecko/gecko_fetch.sv
+//!import gecko/gecko_decode.sv
+//!import gecko/gecko_execute.sv
+//!import gecko/gecko_writeback.sv
+//!import gecko/gecko_system.sv
+//!import gecko/gecko_print.sv
+//!wrapper gecko/gecko_core_wrapper.sv
 
-`timescale 1ns/1ps
-
-`ifdef __LINTER__
-    `include "../std/std_util.svh"
-    `include "../mem/mem_util.svh"
-`else
-    `include "std_util.svh"
-    `include "mem_util.svh"
-`endif
+`include "std/std_util.svh"
+`include "mem/mem_util.svh"
 
 module gecko_core
     import std_pkg::*;
@@ -25,25 +26,7 @@ module gecko_core
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
-    parameter stream_pipeline_mode_t FETCH_PIPELINE_MODE = STREAM_PIPELINE_MODE_TRANSPARENT,
-    parameter stream_pipeline_mode_t INST_MEMORY_PIPELINE_MODE = STREAM_PIPELINE_MODE_TRANSPARENT,
-    parameter stream_pipeline_mode_t DECODE_PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
-    parameter stream_pipeline_mode_t EXECUTE_PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
-    parameter stream_pipeline_mode_t SYSTEM_PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
-    parameter stream_pipeline_mode_t PRINT_PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
-    parameter stream_pipeline_mode_t WRITEBACK_PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
-    parameter int INST_LATENCY = 1,
-    parameter int DATA_LATENCY = 1,
-    parameter int FLOAT_LATENCY = 1,
-    parameter gecko_pc_t START_ADDR = 'b0,
-    parameter gecko_branch_predictor_t BRANCH_PREDICTOR_TYPE = GECKO_BRANCH_PREDICTOR_SIMPLE,
-    parameter int BRANCH_PREDICTOR_TARGET_ADDR_WIDTH = 5,
-    parameter int BRANCH_PREDICTOR_HISTORY_WIDTH = BRANCH_PREDICTOR_TARGET_ADDR_WIDTH,
-    parameter int BRANCH_PREDICTOR_LOCAL_ADDR_WIDTH = BRANCH_PREDICTOR_TARGET_ADDR_WIDTH,
-    parameter int ENABLE_PERFORMANCE_COUNTERS = 0,
-    parameter int ENABLE_PRINT = 1,
-    parameter int ENABLE_FLOAT = 0,
-    parameter int ENABLE_INTEGER_MATH = 0
+    parameter gecko_config_t   CONFIG     = gecko_get_basic_config(1, 1, 1)
 )(
     input wire clk, 
     input wire rst,
@@ -91,30 +74,31 @@ module gecko_core
 
     gecko_retired_count_t retired_instructions;
 
-    assign memory_result.valid = mem_command_out.valid && data_result.valid;
-    assign memory_result.payload = gecko_get_load_operation(mem_command_out.payload, data_result.data);
-    assign mem_command_out.ready = memory_result.ready;
-    assign data_result.ready = memory_result.ready;
+    always_comb memory_result.valid = mem_command_out.valid && data_result.valid;
+    always_comb memory_result.payload = gecko_get_load_operation(mem_command_out.payload, data_result.data);
+    always_comb mem_command_out.ready = memory_result.ready;
+    always_comb data_result.ready = memory_result.ready;
 
     gecko_forwarded_t execute_forwarded;
     gecko_forwarded_t writeback_forwarded;
     gecko_forwarded_t memory_forwarded;
 
-    assign execute_forwarded = gecko_construct_forward(execute_result.valid, execute_result.payload);
-    assign writeback_forwarded = gecko_construct_forward(writeback_result.valid, writeback_result.payload);
-    assign memory_forwarded = gecko_construct_forward(memory_result.valid, memory_result.payload);
+    always_comb execute_forwarded = gecko_construct_forward(execute_result.valid, execute_result.payload);
+    always_comb writeback_forwarded = gecko_construct_forward(writeback_result.valid, writeback_result.payload);
+    always_comb memory_forwarded = gecko_construct_forward(memory_result.valid, memory_result.payload);
 
-    assign jump_command.ready = 'b1;
+    always_comb jump_command.ready = 'b1;
 
     gecko_fetch #(
         .CLOCK_INFO(CLOCK_INFO),
         .TECHNOLOGY(TECHNOLOGY),
-        .PIPELINE_MODE(FETCH_PIPELINE_MODE),
-        .START_ADDR(START_ADDR),
-        .BRANCH_PREDICTOR_TYPE(BRANCH_PREDICTOR_TYPE),
-        .BRANCH_PREDICTOR_TARGET_ADDR_WIDTH(BRANCH_PREDICTOR_TARGET_ADDR_WIDTH),
-        .BRANCH_PREDICTOR_HISTORY_WIDTH(BRANCH_PREDICTOR_HISTORY_WIDTH),
-        .BRANCH_PREDICTOR_LOCAL_ADDR_WIDTH(BRANCH_PREDICTOR_LOCAL_ADDR_WIDTH)
+        .PIPELINE_MODE(CONFIG.fetch_pipeline_mode),
+        .START_ADDR(CONFIG.start_addr),
+        .BRANCH_PREDICTOR_CONFIG(CONFIG.branch_predictor_config)
+        // .BRANCH_PREDICTOR_TYPE(BRANCH_PREDICTOR_TYPE),
+        // .BRANCH_PREDICTOR_TARGET_ADDR_WIDTH(BRANCH_PREDICTOR_TARGET_ADDR_WIDTH),
+        // .BRANCH_PREDICTOR_HISTORY_WIDTH(BRANCH_PREDICTOR_HISTORY_WIDTH),
+        // .BRANCH_PREDICTOR_LOCAL_ADDR_WIDTH(BRANCH_PREDICTOR_LOCAL_ADDR_WIDTH)
     ) gecko_fetch_inst (
         .clk, .rst,
 
@@ -127,7 +111,7 @@ module gecko_core
     stream_stage_multiple #(
         .CLOCK_INFO(CLOCK_INFO),
         .PIPELINE_MODE(STREAM_PIPELINE_MODE_REGISTERED),
-        .STAGES(INST_LATENCY),
+        .STAGES(CONFIG.instruction_memory_latency),
         .T(gecko_instruction_operation_t)
     ) gecko_inst_stage_inst (
         .clk, .rst,
@@ -139,19 +123,23 @@ module gecko_core
 
     mem_stage #(
         .CLOCK_INFO(CLOCK_INFO),
-        .PIPELINE_MODE(INST_MEMORY_PIPELINE_MODE)
+        .PIPELINE_MODE(CONFIG.imem_pipeline_mode)
     ) instruction_result_output_stage_inst (
         .clk, .rst,
-        .mem_in(inst_result), .mem_out(inst_result_break)
+        .mem_in(inst_result), 
+        .mem_in_meta('b0),
+        .mem_out(inst_result_break),
+        .mem_out_meta()
     );
 
     stream_stage #(
         .CLOCK_INFO(CLOCK_INFO),
-        .PIPELINE_MODE(INST_MEMORY_PIPELINE_MODE),
+        .PIPELINE_MODE(CONFIG.imem_pipeline_mode),
         .T(gecko_instruction_operation_t)
     ) instruction_command_output_stage_inst (
         .clk, .rst,
-        .stream_in(instruction_command_out), .stream_out(instruction_command_break)
+        .stream_in(instruction_command_out), 
+        .stream_out(instruction_command_break)
     );
 
     logic exit_flag;
@@ -160,11 +148,11 @@ module gecko_core
     gecko_decode #(
         .CLOCK_INFO(CLOCK_INFO),
         .TECHNOLOGY(TECHNOLOGY),
-        .PIPELINE_MODE(DECODE_PIPELINE_MODE),
+        .PIPELINE_MODE(CONFIG.decode_pipeline_mode),
         .NUM_FORWARDED(3),
-        .ENABLE_PRINT(ENABLE_PRINT),
-        .ENABLE_FLOAT(ENABLE_FLOAT),
-        .ENABLE_INTEGER_MATH(ENABLE_INTEGER_MATH)
+        .ENABLE_PRINT(CONFIG.enable_print_out),
+        .ENABLE_FLOAT(CONFIG.enable_floating_point),
+        .ENABLE_INTEGER_MATH(CONFIG.enable_integer_math)
     ) gecko_decode_inst (
         .clk, .rst,
 
@@ -187,14 +175,14 @@ module gecko_core
         .retired_instructions
     );
 
-    assign finished_flag = exit_flag && (exit_code == 'b0);
-    assign faulted_flag = exit_flag && (exit_code != 'b0);
+    always_comb finished_flag = exit_flag && (exit_code == 'b0);
+    always_comb faulted_flag = exit_flag && (exit_code != 'b0);
 
     gecko_execute #(
         .CLOCK_INFO(CLOCK_INFO),
         .TECHNOLOGY(TECHNOLOGY),
-        .PIPELINE_MODE(EXECUTE_PIPELINE_MODE),
-        .ENABLE_INTEGER_MATH(ENABLE_INTEGER_MATH)
+        .PIPELINE_MODE(CONFIG.execute_pipeline_mode),
+        .ENABLE_INTEGER_MATH(CONFIG.enable_integer_math)
     ) gecko_execute_inst (
         .clk, .rst,
 
@@ -211,7 +199,7 @@ module gecko_core
     stream_stage_multiple #(
         .CLOCK_INFO(CLOCK_INFO),
         .PIPELINE_MODE(STREAM_PIPELINE_MODE_REGISTERED),
-        .STAGES(DATA_LATENCY),
+        .STAGES(CONFIG.data_memory_latency),
         .T(gecko_mem_operation_t)
     ) gecko_data_stage_inst (
         .clk, .rst,
@@ -222,8 +210,8 @@ module gecko_core
     gecko_system #(
         .CLOCK_INFO(CLOCK_INFO),
         .TECHNOLOGY(TECHNOLOGY),
-        .PIPELINE_MODE(SYSTEM_PIPELINE_MODE),
-        .ENABLE_PERFORMANCE_COUNTERS(ENABLE_PERFORMANCE_COUNTERS)
+        .PIPELINE_MODE(CONFIG.system_pipeline_mode),
+        .ENABLE_PERFORMANCE_COUNTERS(CONFIG.enable_performance_counters)
     ) gecko_system_inst (
         .clk, .rst,
 
@@ -236,7 +224,7 @@ module gecko_core
     gecko_print #(
         .CLOCK_INFO(CLOCK_INFO),
         .TECHNOLOGY(TECHNOLOGY),
-        .PIPELINE_MODE(PRINT_PIPELINE_MODE)
+        .PIPELINE_MODE(CONFIG.print_pipeline_mode)
     ) gecko_print_inst (
         .clk, .rst,
         .ecall_command,
@@ -244,11 +232,11 @@ module gecko_core
     );
 
     generate
-    if (ENABLE_FLOAT) begin
+    if (CONFIG.enable_floating_point) begin
 
         // // TODO: Refactor VPU/FPU logic
         // basilisk_vpu #(
-        //     .MEMORY_LATENCY(FLOAT_LATENCY)
+        //     .MEMORY_LATENCY(CONFIG.float_memory_latency)
         // ) basilisk_vpu_inst (
         //     .clk, .rst,
         //     .float_command, .float_result,
@@ -256,10 +244,10 @@ module gecko_core
         // );
 
     end else begin
-        assign float_mem_request.valid = 'b0;
-        assign float_mem_result.ready = 'b0;
-        assign float_command.ready = 'b0;
-        assign float_result.valid = 'b0;
+        always_comb float_mem_request.valid = 'b0;
+        always_comb float_mem_result.ready = 'b0;
+        always_comb float_command.ready = 'b0;
+        always_comb float_result.valid = 'b0;
     end
     endgenerate
 
@@ -268,32 +256,49 @@ module gecko_core
     stream_stage #(
         .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT),
         .T(gecko_operation_t)
-    ) stream_tie_inst0(.stream_in(execute_result), .stream_out(writeback_results_in[0]));
+    ) stream_tie_inst0(
+        .clk,
+        .rst,
+        .stream_in(execute_result), 
+        .stream_out(writeback_results_in[0]));
     
     stream_stage #(
         .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT),
         .T(gecko_operation_t)
-    ) stream_tie_inst1(.stream_in(memory_result), .stream_out(writeback_results_in[1]));
+    ) stream_tie_inst1(
+        .clk,
+        .rst,
+        .stream_in(memory_result), 
+        .stream_out(writeback_results_in[1]));
 
     stream_stage #(
         .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT),
         .T(gecko_operation_t)
-    ) stream_tie_inst2(.stream_in(system_result), .stream_out(writeback_results_in[2]));
+    ) stream_tie_inst2(
+        .clk,
+        .rst,
+        .stream_in(system_result), 
+        .stream_out(writeback_results_in[2]));
     
     stream_stage #(
         .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT),
         .T(gecko_operation_t)
-    ) stream_tie_inst3(.stream_in(float_result), .stream_out(writeback_results_in[3]));
+    ) stream_tie_inst3(
+        .clk,
+        .rst,
+        .stream_in(float_result), 
+        .stream_out(writeback_results_in[3]));
 
     gecko_writeback #(
         .CLOCK_INFO(CLOCK_INFO),
         .TECHNOLOGY(TECHNOLOGY),
-        .PIPELINE_MODE(WRITEBACK_PIPELINE_MODE),
+        .PIPELINE_MODE(CONFIG.writeback_pipeline_mode),
         .PORTS(4)
     ) gecko_writeback_inst (
         .clk, .rst,
 
-        .writeback_results_in, .writeback_result
+        .writeback_results_in, 
+        .writeback_result
     );
 
 `ifdef __SIMULATION__

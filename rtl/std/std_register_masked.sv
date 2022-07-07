@@ -1,7 +1,5 @@
-//!import std/std_pkg
-//!import std/std_register
-
-`timescale 1ns/1ps
+//!import std/std_pkg.sv
+//!import std/std_register.sv
 
 module std_register_masked
     import std_pkg::*;
@@ -18,6 +16,16 @@ module std_register_masked
     output T value
 );
 
+    localparam logic [$bits(T)-1:0] RESET_VECTOR_INTERNAL = {RESET_VECTOR};
+
+    logic [$bits(T)-1:0] enable_internal;
+    logic [$bits(T)-1:0] next_internal;
+    logic [$bits(T)-1:0] value_internal;
+
+    always_comb enable_internal = {enable};
+    always_comb next_internal = {next};
+    always_comb {value} = value_internal;
+
     genvar k;
     generate
     for (k = 0; k < $bits(T); k++) begin
@@ -25,13 +33,13 @@ module std_register_masked
         std_register #(
             .CLOCK_INFO(CLOCK_INFO),
             .T(logic),
-            .RESET_VECTOR(RESET_VECTOR[k])
+            .RESET_VECTOR(RESET_VECTOR_INTERNAL[k])
         ) std_register_inst (
             .clk, .rst,
 
-            .enable(enable[k]),
-            .next(next[k]),
-            .value(value[k])
+            .enable(enable_internal[k]),
+            .next(next_internal[k]),
+            .value(value_internal[k])
         );
 
     end

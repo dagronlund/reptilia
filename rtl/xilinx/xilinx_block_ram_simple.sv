@@ -1,7 +1,5 @@
-//!import std/std_pkg
-//!import std/std_register
-
-`timescale 1ns/1ps
+//!import std/std_pkg.sv
+//!import std/std_register.sv
 
 // TODO: Support mask usage
 // TODO: Support asymmetric widths
@@ -11,7 +9,7 @@ module xilinx_block_ram_simple
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter int DATA_WIDTH = 32,
     parameter int ADDR_WIDTH = 10,
-    parameter int ENABLE_OUTPUT_REG = 0,
+    parameter bit ENABLE_OUTPUT_REG = 0,
     parameter HEX_FILE = ""
 )(
     input wire clk, 
@@ -84,7 +82,7 @@ module xilinx_block_ram_simple
         );
 
     end else begin
-        assign read_data = read_data_temp;
+        always_comb read_data = read_data_temp;
     end
     endgenerate
 

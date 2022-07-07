@@ -1,5 +1,3 @@
-`timescale 1ns/1ps
-
 /*
  * A stateless manager of valid/ready pairs that translates consume/produce
  * signals into the correct output signals.
@@ -23,12 +21,17 @@ module stream_controller #(
     output logic enable // Enable for current state
 );
 
+    // Create seperate enables for each channel, avoid valid/ready dependence
+    logic output_enable /* verilator isolate_assignments*/;
+    logic input_enable /* verilator isolate_assignments*/;
+    logic [NUM_OUTPUTS-1:0] output_enables /* verilator isolate_assignments*/;
+    logic [NUM_INPUTS-1:0] input_enables /* verilator isolate_assignments*/;
+
     always_comb begin
-        
-        // Create seperate enables for each channel, avoid valid/ready dependence
-        automatic logic output_enable = 'b1, input_enable = 'b1;
-        automatic logic [NUM_OUTPUTS-1:0] output_enables = {NUM_OUTPUTS{1'b1}};
-        automatic logic [NUM_INPUTS-1:0] input_enables = {NUM_INPUTS{1'b1}};
+        output_enable = '1;
+        input_enable = '1;
+        output_enables = '1;
+        input_enables = '1;
 
         // Enable if all outputs are either not being produced or ready
         for (int i = 0; i < NUM_OUTPUTS; i++) begin

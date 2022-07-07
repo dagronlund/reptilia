@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+//!import stream/stream_controller.sv
 
 /*
  * A stateless manager of valid/ready pairs that translates consume/produce

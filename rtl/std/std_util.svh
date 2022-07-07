@@ -1,17 +1,11 @@
 `ifndef __STD_UTIL__
 `define __STD_UTIL__
 
-/*
-Preprocessor utilities for SV development, original STATIC_ASSERT from Reid
-Long. Honestly though, you should hate using these as much as I do, the
-preprocessor is evil and will burn you eventually.
-*/
-
-function MAX(int a, int b);
+function int MAX(int a, int b);
     return (a > b) ? a : b;
 endfunction
 
-function MIN(int a, int b);
+function int MIN(int a, int b);
     return (a < b) ? a : b;
 endfunction
 

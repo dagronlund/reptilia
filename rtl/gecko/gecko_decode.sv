@@ -1,22 +1,24 @@
-//!import std/std_pkg
-//!import stream/stream_pkg
-//!import riscv/riscv_pkg
-//!import riscv/riscv32_pkg
-//!import riscv/riscv32i_pkg
-//!import riscv/riscv32m_pkg
-//!import riscv/riscv32f_pkg
-//!import gecko/gecko_pkg
-//!import gecko/gecko_decode_pkg
+//!import std/std_pkg.sv
+//!import stream/stream_pkg.sv
+//!import riscv/riscv_pkg.sv
+//!import riscv/riscv32_pkg.sv
+//!import riscv/riscv32i_pkg.sv
+//!import riscv/riscv32m_pkg.sv
+//!import riscv/riscv32f_pkg.sv
+//!import gecko/gecko_pkg.sv
+//!import gecko/gecko_decode_pkg.sv
+//!import stream/stream_intf.sv
+//!import mem/mem_intf.sv
+//!import std/std_counter_split.sv
+//!import stream/stream_stage.sv
+//!import mem/mem_combinational.sv
+//!wrapper gecko/gecko_decode_wrapper.sv
 
-`timescale 1ns/1ps
 
-`ifdef __LINTER__
-    `include "../std/std_util.svh"
-    `include "../mem/mem_util.svh"
-`else
-    `include "std_util.svh"
-    `include "mem_util.svh"
-`endif
+/////!import stream/stream_controller.sv
+
+`include "std/std_util.svh"
+`include "mem/mem_util.svh"
 
 /*
 Decode State:
@@ -61,9 +63,9 @@ module gecko_decode
     parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
     parameter int NUM_FORWARDED = 0,
-    parameter int ENABLE_PRINT = 1,
-    parameter int ENABLE_FLOAT = 0,
-    parameter int ENABLE_INTEGER_MATH = 0
+    parameter bit ENABLE_PRINT = 1,
+    parameter bit ENABLE_FLOAT = 0,
+    parameter bit ENABLE_INTEGER_MATH = 0
 )(
     input wire clk, 
     input wire rst,
@@ -151,8 +153,12 @@ module gecko_decode
         return search;
     endfunction
 
+    stream_controller8_output_t stream_controller_result;
     logic consume_instruction;
-    logic produce_system, produce_execute, produce_print, produce_float;
+    logic produce_system;
+    logic produce_execute;
+    logic produce_print;
+    logic produce_float;
     logic enable;
 
     stream_intf #(.T(gecko_system_operation_t)) next_system_command (.clk, .rst);
@@ -160,22 +166,22 @@ module gecko_decode
     stream_intf #(.T(gecko_float_operation_t)) next_float_command (.clk, .rst);
     stream_intf #(.T(gecko_ecall_operation_t)) next_ecall_command (.clk, .rst);
 
-    stream_controller #(
-        .NUM_INPUTS(2),
-        .NUM_OUTPUTS(4)
-    ) stream_controller_inst (
-        .clk, .rst,
+    // stream_controller #(
+    //     .NUM_INPUTS(2),
+    //     .NUM_OUTPUTS(4)
+    // ) stream_controller_inst (
+    //     .clk, .rst,
 
-        .valid_input({instruction_result.valid, instruction_command.valid}),
-        .ready_input({instruction_result.ready, instruction_command.ready}),
+    //     .valid_input({instruction_result.valid, instruction_command.valid}),
+    //     .ready_input({instruction_result.ready, instruction_command.ready}),
 
-        .valid_output({next_system_command.valid, next_execute_command.valid, next_ecall_command.valid, next_float_command.valid}),
-        .ready_output({next_system_command.ready, next_execute_command.ready, next_ecall_command.ready, next_float_command.ready}),
+    //     .valid_output({next_system_command.valid, next_execute_command.valid, next_ecall_command.valid, next_float_command.valid}),
+    //     .ready_output({next_system_command.ready, next_execute_command.ready, next_ecall_command.ready, next_float_command.ready}),
 
-        .consume({consume_instruction, consume_instruction}), 
-        .produce({produce_system, produce_execute, produce_print, produce_float}),
-        .enable
-    );
+    //     .consume({consume_instruction, consume_instruction}), 
+    //     .produce({produce_system, produce_execute, produce_print, produce_float}),
+    //     .enable
+    // );
 
     stream_stage #(
         .CLOCK_INFO(CLOCK_INFO),
@@ -229,7 +235,7 @@ module gecko_decode
     gecko_retired_count_t next_retired_instructions;
 
     logic [1:0] state_temp; // Vivado sux
-    assign state = gecko_decode_state_t'(state_temp);
+    always_comb state = gecko_decode_state_t'(state_temp);
 
     std_register #(
         .CLOCK_INFO(CLOCK_INFO),
@@ -242,7 +248,8 @@ module gecko_decode
         .value(state_temp)
     );
 
-    logic enable_speculative_flag_front, enable_speculative_flag_rear;
+    logic enable_speculative_flag_front /* verilator isolate_assignments*/;
+    logic enable_speculative_flag_rear /* verilator isolate_assignments*/;
     gecko_jump_flag_t current_speculative_flag_front, current_speculative_flag_rear;
 
     std_counter_split #(
@@ -254,16 +261,14 @@ module gecko_decode
         .increment_enable(enable && enable_speculative_flag_front),
         .decrement_enable(enable_speculative_flag_rear),
         .front_value(current_speculative_flag_front),
-        .rear_value(current_speculative_flag_rear)
+        .rear_value(current_speculative_flag_rear),
+        .value()
     );
 
     std_register #(
         .CLOCK_INFO(CLOCK_INFO),
         .T(gecko_speculative_status_t),
-        .RESET_VECTOR('{NUM_SPECULATIVE_COUNTERS{'{
-            mispredicted: 'b0,
-            count: 'b0
-        }}})
+        .RESET_VECTOR('b0)
     ) speculative_status_register_inst (
         .clk, .rst,
         .enable('b1),
@@ -337,11 +342,13 @@ module gecko_decode
         .value(execute_saved)
     );
 
-    logic register_write_enable;
-    riscv32_reg_addr_t register_write_addr;
+    logic               register_write_enable;
+    riscv32_reg_addr_t  register_write_addr;
     riscv32_reg_value_t register_write_value;
-    riscv32_reg_addr_t register_read_addr0, register_read_addr1;
-    riscv32_reg_value_t register_read_value0, register_read_value1;
+    riscv32_reg_addr_t  register_read_addr0 /* verilator isolate_assignments*/;
+    riscv32_reg_addr_t  register_read_addr1 /* verilator isolate_assignments*/;
+    riscv32_reg_value_t register_read_value0;
+    riscv32_reg_value_t register_read_value1;
 
     // Register File
     mem_combinational #(
@@ -357,14 +364,19 @@ module gecko_decode
         .write_enable(register_write_enable),
         .write_addr(register_write_addr),
         .write_data_in(register_write_value),
+        .write_data_out(),
 
         .read_addr({register_read_addr0, register_read_addr1}),
-        .read_data_out({register_read_value0, register_read_value1})
+        .read_data_out({register_read_value0, register_read_value1}),
+
+        .reset_done()
     );
 
     logic front_status_rd_write_enable, rear_status_writeback_enable;
 
-    riscv32_reg_addr_t reg_status_rd_addr, reg_status_rs1_addr, reg_status_rs2_addr;
+    riscv32_reg_addr_t reg_status_rd_addr /* verilator isolate_assignments*/;
+    riscv32_reg_addr_t reg_status_rs1_addr /* verilator isolate_assignments*/;
+    riscv32_reg_addr_t reg_status_rs2_addr /* verilator isolate_assignments*/;
     gecko_reg_status_t front_status_rd, front_status_rs1, front_status_rs2;
     gecko_reg_status_t rear_status_rd, rear_status_rs1, rear_status_rs2;
 
@@ -386,10 +398,12 @@ module gecko_decode
         .write_data_out(front_status_rd),
 
         .read_addr({reg_status_rs1_addr, reg_status_rs2_addr}),
-        .read_data_out({front_status_rs1, front_status_rs2})
+        .read_data_out({front_status_rs1, front_status_rs2}),
+
+        .reset_done()
     );
 
-    riscv32_reg_addr_t rear_status_writeback_addr;
+    riscv32_reg_addr_t rear_status_writeback_addr /* verilator isolate_assignments*/;
     gecko_reg_status_t rear_status_writeback;
 
     // Register file status from writebacks
@@ -410,34 +424,61 @@ module gecko_decode
         .write_data_out(rear_status_writeback),
 
         .read_addr({reg_status_rd_addr, reg_status_rs1_addr, reg_status_rs2_addr}),
-        .read_data_out({rear_status_rd, rear_status_rs1, rear_status_rs2})
+        .read_data_out({rear_status_rd, rear_status_rs1, rear_status_rs2}),
+
+        .reset_done()
     );
 
-    always_comb begin
-        automatic gecko_instruction_operation_t instruction_op;
-        automatic gecko_jump_operation_t jump_cmd_in;
-        automatic gecko_operation_t writeback_in;
+    riscv32_fields_t instruction_fields;
+    gecko_decode_opcode_status_t opcode_status;
 
+    always_comb begin
+        instruction_fields = riscv32_get_fields(instruction_result.data);
+        opcode_status = get_opcode_status(instruction_fields);
+
+        // Read specific registers if calling the operating environment
+        if (instruction_fields.opcode == RISCV32I_OPCODE_SYSTEM && 
+                instruction_fields.funct3 == RISCV32I_FUNCT3_SYS_ENV) begin
+            instruction_fields.rs1 = 'd10; // a0
+            instruction_fields.rs2 = 'd11; // a1
+        end
+
+        // Set register file addresses
+        register_read_addr0 = instruction_fields.rs1;
+        register_read_addr1 = instruction_fields.rs2;
+
+        // Set register status file addresses
+        reg_status_rd_addr  = instruction_fields.rd;
+        reg_status_rs1_addr = instruction_fields.rs1;
+        reg_status_rs2_addr = instruction_fields.rs2;
+    end
+
+    gecko_instruction_operation_t instruction_op;
+    gecko_jump_operation_t jump_cmd_in;
+    gecko_operation_t writeback_in /* verilator isolate_assignments*/;
+
+    gecko_jump_flag_t next_jump_flag;
+    gecko_jump_flag_t next_speculative_flag_rear /* verilator isolate_assignments*/;
+
+    logic flush_instruction, send_operation, decode_exit, during_speculation /* verilator isolate_assignments*/;
+
+    always_comb begin
         automatic gecko_decode_operands_status_t operands_status;
         automatic gecko_reg_status_t forwarded_status_plus;
         automatic riscv32_reg_value_t rs1_value, rs2_value;
         automatic gecko_reg_status_t rd_status, rd_counter;
-        automatic riscv32_fields_t instruction_fields;
+        // automatic riscv32_fields_t instruction_fields;
 
-        automatic logic flush_instruction, send_operation, decode_exit, during_speculation;
         automatic logic increment_speculative_counter, clear_speculative_mispredict;
         automatic gecko_decode_forwarded_search_t forwarded_search;
-        automatic gecko_decode_opcode_status_t opcode_status;
-
-        automatic gecko_jump_flag_t next_jump_flag;
-        automatic gecko_jump_flag_t next_speculative_flag_rear;
+        // automatic gecko_decode_opcode_status_t opcode_status;
 
         // Reassign payloads to typed values
-        instruction_fields = riscv32_get_fields(instruction_result.data);
+        // instruction_fields = riscv32_get_fields(instruction_result.data);
         instruction_op = gecko_instruction_operation_t'(instruction_command.payload);
         jump_cmd_in = gecko_jump_operation_t'(jump_command.payload);
         writeback_in = gecko_operation_t'(writeback_result.payload);
-        opcode_status = get_opcode_status(instruction_fields);
+        // opcode_status = get_opcode_status(instruction_fields);
 
         // Assign next values to defaults
         next_execute_saved = execute_saved;
@@ -450,31 +491,31 @@ module gecko_decode
         produce_float = 'b0;
         produce_print = 'b0;
 
-        // Read specific registers if calling the operating environment
-        if (instruction_fields.opcode == RISCV32I_OPCODE_SYSTEM && 
-                instruction_fields.funct3 == RISCV32I_FUNCT3_SYS_ENV) begin
-            instruction_fields.rs1 = 'd10; // a0
-            instruction_fields.rs2 = 'd11; // a1
-        end
+        // // Read specific registers if calling the operating environment
+        // if (instruction_fields.opcode == RISCV32I_OPCODE_SYSTEM && 
+        //         instruction_fields.funct3 == RISCV32I_FUNCT3_SYS_ENV) begin
+        //     instruction_fields.rs1 = 'd10; // a0
+        //     instruction_fields.rs2 = 'd11; // a1
+        // end
 
         // Handle clearing register file by default
         register_write_enable = (state == GECKO_DECODE_RESET);
         register_write_addr = (state == GECKO_DECODE_RESET) ? reset_counter : writeback_in.addr;
         register_write_value = (state == GECKO_DECODE_RESET) ? 'b0 : writeback_in.value;
 
-        // Set register file addresses
-        register_read_addr0 = instruction_fields.rs1;
-        register_read_addr1 = instruction_fields.rs2;
+        // // Set register file addresses
+        // register_read_addr0 = instruction_fields.rs1;
+        // register_read_addr1 = instruction_fields.rs2;
+
+        // // Determine register status
+        // reg_status_rd_addr = instruction_fields.rd;
+        // reg_status_rs1_addr = instruction_fields.rs1;
+        // reg_status_rs2_addr = instruction_fields.rs2;
 
         // Clear register file status by default
         front_status_rd_write_enable = (state == GECKO_DECODE_RESET);
         rear_status_writeback_enable = (state == GECKO_DECODE_RESET);
         rear_status_writeback_addr = (state == GECKO_DECODE_RESET) ? reset_counter : writeback_in.addr;
-
-        // Determine register status
-        reg_status_rd_addr = instruction_fields.rd;
-        reg_status_rs1_addr = instruction_fields.rs1;
-        reg_status_rs2_addr = instruction_fields.rs2;
 
         // Determine various external flags
         exit_flag = (state == GECKO_DECODE_EXIT);
@@ -495,7 +536,7 @@ module gecko_decode
                 next_execute_saved = 'b0;
                 speculative_status_mispredicted_enable = 'b1;
             end else begin // Predicted Correctly
-                next_retired_instructions = retired_instructions_speculative;
+                next_retired_instructions = gecko_retired_count_t'(retired_instructions_speculative);
             end
 
             clear_speculative_retired_counter = 'b1;
@@ -616,14 +657,15 @@ module gecko_decode
             consume_instruction = 'b1;
             flush_instruction = 'b1;
         end
+        default: begin end
         endcase
         
         next_exit_code = exit_code;
 
         if (consume_instruction && !flush_instruction) begin
-            decode_exit |= opcode_status.error;
-            decode_exit |= (ENABLE_FLOAT == 0) && opcode_status.float;
-            decode_exit |= (ENABLE_INTEGER_MATH == 0) && opcode_status.execute && 
+            decode_exit |= opcode_status.error_flag;
+            decode_exit |= (ENABLE_FLOAT == 0) && opcode_status.float_flag;
+            decode_exit |= (ENABLE_INTEGER_MATH == 0) && opcode_status.execute_flag && 
                     next_execute_command.payload.op_type == GECKO_EXECUTE_TYPE_MUL_DIV;
             decode_exit |= is_instruction_ebreak(instruction_fields);
 
@@ -639,16 +681,28 @@ module gecko_decode
                 produce_system = 'b0;
                 produce_float = 'b0;
             end else begin
-                produce_execute = opcode_status.execute;
-                produce_system = opcode_status.system;
-                produce_float = opcode_status.float;
+                produce_execute = opcode_status.execute_flag;
+                produce_system = opcode_status.system_flag;
+                produce_float = opcode_status.float_flag;
             end
+        end
 
-            // Increment instruction counters
+        stream_controller_result = stream_controller8(stream_controller8_input_t'{
+            valid_input:  {6'b0, instruction_result.valid, instruction_command.valid},
+            ready_output: {4'b0, next_system_command.ready, next_execute_command.ready, next_ecall_command.ready, next_float_command.ready},
+            consume: {6'b0, consume_instruction, consume_instruction},
+            produce: {4'b0, produce_system, produce_execute, produce_print, produce_float}
+        });
+        {instruction_result.ready, instruction_command.ready} = stream_controller_result.ready_input[1:0];
+        {next_system_command.valid, next_execute_command.valid, next_ecall_command.valid, next_float_command.valid} = stream_controller_result.valid_output[3:0];
+        enable = stream_controller_result.enable;
+
+        // Increment instruction counters
+        if (consume_instruction && !flush_instruction) begin
             if (during_speculation) begin
-                next_retired_instructions_speculative += enable;
+                next_retired_instructions_speculative += enable ? 'd1 : 'd0;
             end else begin
-                next_retired_instructions += enable;
+                next_retired_instructions += enable ? 'd1 : 'd0;
             end
         end
 
@@ -670,13 +724,13 @@ module gecko_decode
 
         // Work out sychronous speculative status updates (enable gated)
         next_speculative_status = speculative_status;
-        next_speculative_status[next_speculative_flag_rear].count += enable && increment_speculative_counter;
+        next_speculative_status[next_speculative_flag_rear].count += (enable && increment_speculative_counter) ? 'd1 : 'd0;
         if (enable && clear_speculative_mispredict) begin
             next_speculative_status[next_speculative_flag_rear].mispredicted = 'b0;
         end
 
         // Work out asynchronous speculative status updates
-        next_speculative_status[writeback_in.jump_flag].count -= speculative_status_decrement_enable;
+        next_speculative_status[writeback_in.jump_flag].count -= speculative_status_decrement_enable ? 'd1 : 'd0;
         if (speculative_status_mispredicted_enable) begin
             next_speculative_status[current_speculative_flag_rear].mispredicted = 'b1;
         end

@@ -1,7 +1,5 @@
-//!import std/std_pkg
-//!import std/std_register
-
-`timescale 1ns/1ps
+//!import std/std_pkg.sv
+//!import std/std_register.sv
 
 module xilinx_block_ram_single 
     import std_pkg::*;
@@ -10,7 +8,7 @@ module xilinx_block_ram_single
     parameter int DATA_WIDTH = 32,
     parameter int ADDR_WIDTH = 10,
     parameter int MASK_WIDTH = DATA_WIDTH / 8,
-    parameter int ENABLE_OUTPUT_REG = 0,
+    parameter bit ENABLE_OUTPUT_REG = 0,
     parameter HEX_FILE = ""
 )(
     input wire clk, 
@@ -82,7 +80,7 @@ module xilinx_block_ram_single
         );
 
     end else begin
-        assign data_out = data_out_temp;
+        always_comb data_out = data_out_temp;
     end
     endgenerate
 

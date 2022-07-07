@@ -1,5 +1,18 @@
-# risc-v
+# reptilia
 SystemVerilog RISC-V implementation and libraries
+
+## Build/Verify
+
+Before building you need to install three different tools, Verilator, RISCV-GNU, 
+and LLVM. Once these are installed you need to set three environment variables
+to reflect where these are installed.
+- $VERILATOR_ROOT
+- $LLVM_ROOT
+- $RISCV_GNU_ROOT
+
+The RTL can then be verified by running `./build.py`, which will compile the
+test programs, generate the verilator models, and then compile the verilator
+models with the test programs loaded into memory.
 
 ## Cores
 
@@ -18,59 +31,20 @@ Iguana core with supervisor extensions for booting Unix operating systems
 ## Folder Structure
 
 rtl/
-	Systemverilog (\*.sv) files containing modules that are going to be synthesized into logic 
+	SystemVerilog (\*.sv) files containing modules that are going to be synthesized into logic 
 
-intf/
-	Systemverilog (\*.sv) files containing interfaces that will be used to connect different modules together
+tb/
+	SystemVerilog testbenches for verifying the RTL behavior
 
-lib/
-	Systemverilog header (\*.svh) files containing packages with enumerations, structs, and functions that will contain shared behavior between modules.
+tb_cpp/
+	C++ testbenches for verifying the RTL behavior with Verilator
 
-## Stream Libraries
-Managing and pipelining streams is a critical part of digital logic design, and a consistent naming convention and library support is crucial part of maintainable design.
+tests/
+	C/C++/Assembly code for verifying RISC-V core behavior
 
-The following standard stream components are provided
-1. rv_stream_stage
-	Provides a combinational break for the datapath but leaves the backflow path (ready flag) propagating combinationally through it.
-2. rv_stream_break
-	Provides a complete combinational break for twice the register resources.
-3. rv_stream_reset
-	Provides a purely combinational reset domain converter for two synchronous resets.
-
-The following standard state machine controller are provided for working with streams
-1. rv_seq_flow_controller
-	...
-2. rv_comb_flow_controler
-	...
-
-
-## Pre-Preprocessor Notes
-To run this on windows requires Cygwin installed with the following packages:
-- bison
-- flex
-- gcc-g++
-- libcrypt-devel
-- make
-- perl
-
-[Installation Instructions](https://www.veripool.org/projects/verilog-perl/wiki/Installing)
-
-```
-git clone http://git.veripool.org/git/Verilog-Perl
-perl Makefile.PL
-make
-```
-
-To run the preprocessor for wrappers in this repository use the following command as an example (in Cygwin)
-
-```
-perl vppreproc --noline --noblank --nocomment +define+__PRE_PREPROCESSOR__ wrapper.sv --o wrapper_processed.sv
-```
+wrappers/
+	SystemVerilog wrappers for verilating/linting RTL files with top-level interfaces
 
 ## Random Notes
-1. ABSOLUTELY NEVER put an interface or module definition in a header file, Vivado loses it brainz
-2. Use $bit(interface.bus) instead of interface.BUS_WIDTH to parameterize bit widths when possible
-3. When referencing a parameter or type passed through an interface port (i.e my_intf.BUS_WIDTH or $bits(my_intf.bus)), make sure that it is assigned to a localparam, not a parameter
-4. Always put interfaces in a seperate \*.sv file and only put packages in \*.svh files.
-5. Never include a header file from another header file, the simulator can handle this but the synthesis engine cannot properly handle the relative includes. Instead the file using those the primary header needs to include the secondary header itself. Vivado has the ```-include_dirs /somepath/somewhere``` option for synthesis but all of directories with header files would need to be included here, and usually with absolute paths since these paths are otherwise relative to the directory that Vivado was started in.
-6. Add this to the synthesis additional options ```-verilog_define SYNTHESIS```
+1. Use $bit(interface.bus) instead of interface.BUS_WIDTH to parameterize bit widths when possible
+2. When referencing a parameter or type passed through an interface port (i.e my_intf.BUS_WIDTH or $bits(my_intf.bus)), make sure that it is assigned to a localparam, not a parameter

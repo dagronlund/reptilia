@@ -1,3 +1,5 @@
+//!no_lint
+
 package std_pkg;
 
     typedef enum logic {
@@ -43,11 +45,12 @@ package std_pkg;
         end
     endfunction
 
-    typedef enum logic [1:0] {
-        STD_TECHNOLOGY_FPGA_XILINX = 'h0,
-        STD_TECHNOLOGY_FPGA_INTEL = 'h1,
-        STD_TECHNOLOGY_ASIC_TSMC = 'h2,
-        STD_TECHNOLOGY_ASIC_INTEL = 'h3
+    typedef enum int {
+        STD_TECHNOLOGY_SIMULATION = 'h0,
+        STD_TECHNOLOGY_FPGA_XILINX = 'h1,
+        STD_TECHNOLOGY_FPGA_INTEL = 'h2,
+        STD_TECHNOLOGY_ASIC_TSMC = 'h3,
+        STD_TECHNOLOGY_ASIC_INTEL = 'h4
     } std_technology_t;
 
 endpackage

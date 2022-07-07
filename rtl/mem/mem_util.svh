@@ -1,11 +1,7 @@
 `ifndef __MEM_UTIL__
 `define __MEM_UTIL__
 
-`ifdef __LINTER__
-    `include "../std/std_util.svh"
-`else
-    `include "std_util.svh"
-`endif
+`include "std/std_util.svh"
 
 `define STATIC_MATCH_MEM(INTF1, INTF2) \
     `STATIC_ASSERT($bits(INTF1.write_enable) == $bits(INTF2.write_enable)) \

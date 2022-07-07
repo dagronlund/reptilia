@@ -1,7 +1,5 @@
-//!import std/std_pkg
-//!import std/std_register
-
-`timescale 1ns/1ps
+//!import std/std_pkg.sv
+//!import std/std_register.sv
 
 // TODO: Add asymmetric data widths
 module xilinx_block_ram_double 
@@ -11,8 +9,8 @@ module xilinx_block_ram_double
     parameter int DATA_WIDTH = 32,
     parameter int ADDR_WIDTH = 10,
     parameter int MASK_WIDTH = DATA_WIDTH / 8,
-    parameter int ENABLE_OUTPUT_REG0 = 0,
-    parameter int ENABLE_OUTPUT_REG1 = 0,
+    parameter bit ENABLE_OUTPUT_REG0 = 0,
+    parameter bit ENABLE_OUTPUT_REG1 = 0,
     parameter HEX_FILE = ""
 )(
     input wire clk, 
@@ -116,7 +114,7 @@ module xilinx_block_ram_double
             );
 
         end else begin
-            assign data_out0 = data_out_temp0;
+            always_comb data_out0 = data_out_temp0;
         end
 
         if (ENABLE_OUTPUT_REG1) begin
@@ -133,7 +131,7 @@ module xilinx_block_ram_double
             );
         
         end else begin
-            assign data_out1 = data_out_temp1;
+            always_comb data_out1 = data_out_temp1;
         end
     endgenerate
 

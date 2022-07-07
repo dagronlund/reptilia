@@ -1,16 +1,11 @@
-//!import std/std_pkg
-//!import stream/stream_pkg
-//!import stream/stream_stage
+//!import std/std_pkg.sv
+//!import stream/stream_pkg.sv
+//!import stream/stream_stage.sv
+//!import mem/mem_intf.sv
+//!wrapper mem/mem_stage_wrapper.sv
 
-`timescale 1ns/1ps
-
-`ifdef __LINTER__
-    `include "../std/std_util.svh"
-    `include "../mem/mem_util.svh"
-`else
-    `include "std_util.svh"
-    `include "mem_util.svh"
-`endif
+`include "std/std_util.svh"
+`include "mem/mem_util.svh"
 
 module mem_stage 
     import std_pkg::*;
@@ -30,14 +25,21 @@ module mem_stage
     output logic [META_WIDTH-1:0] mem_out_meta
 );
 
-    `STATIC_ASSERT($bits(mem_in.addr) == $bits(mem_out.addr))
-    `STATIC_ASSERT($bits(mem_in.data) == $bits(mem_out.data))
-    `STATIC_ASSERT($bits(mem_in.id) == $bits(mem_out.id))
+    typedef bit [mem_in.ADDR_WIDTH-1:0] addr_width_temp_t;
+    localparam int ADDR_WIDTH_INTERNAL = $bits(addr_width_temp_t);
+    typedef bit [mem_in.DATA_WIDTH-1:0] data_width_temp_t;
+    localparam int DATA_WIDTH_INTERNAL = $bits(data_width_temp_t);
+    typedef bit [mem_in.MASK_WIDTH-1:0] mask_width_temp_t;
+    localparam int MASK_WIDTH_INTERNAL = $bits(mask_width_temp_t);
+    typedef bit [mem_in.ID_WIDTH-1:0] id_width_temp_t;
+    localparam int ID_WIDTH_INTERNAL = $bits(id_width_temp_t);
 
-    localparam ADDR_WIDTH = (ADDR_WIDTH_OVERRIDE != 0) ? ADDR_WIDTH_OVERRIDE : $bits(mem_in.addr);
-    localparam DATA_WIDTH = (DATA_WIDTH_OVERRIDE != 0) ? DATA_WIDTH_OVERRIDE : $bits(mem_in.data);
-    localparam MASK_WIDTH = (ADDR_WIDTH_OVERRIDE != 0) ? (ADDR_WIDTH_OVERRIDE/8) : $bits(mem_in.write_enable);
-    localparam ID_WIDTH = (ID_WIDTH_OVERRIDE != 0) ? ID_WIDTH_OVERRIDE : $bits(mem_in.id);
+    `STATIC_MATCH_MEM(mem_in, mem_out)
+
+    localparam ADDR_WIDTH = (ADDR_WIDTH_OVERRIDE != 0) ? ADDR_WIDTH_OVERRIDE : ADDR_WIDTH_INTERNAL;
+    localparam DATA_WIDTH = (DATA_WIDTH_OVERRIDE != 0) ? DATA_WIDTH_OVERRIDE : DATA_WIDTH_INTERNAL;
+    localparam MASK_WIDTH = (ADDR_WIDTH_OVERRIDE != 0) ? (ADDR_WIDTH_OVERRIDE/8) : MASK_WIDTH_INTERNAL;
+    localparam ID_WIDTH = (ID_WIDTH_OVERRIDE != 0) ? ID_WIDTH_OVERRIDE : ID_WIDTH_INTERNAL;
 
     typedef struct packed {
         logic read_enable;

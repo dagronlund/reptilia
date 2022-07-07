@@ -1,15 +1,11 @@
-//!import std/std_pkg
-//!import std/stream_pkg
-//!import stream/stream_intf
-//!import stream/stream_stage
+//!import std/std_pkg.sv
+//!import stream/stream_pkg.sv
+//!import stream/stream_intf.sv
+//!import stream/stream_stage.sv
+//!import stream/stream_controller.sv
+//!wrapper stream/stream_split_wrapper.sv
 
-`timescale 1ns/1ps
-
-`ifdef __LINTER__
-    `include "../std/std_util.svh"
-`else
-    `include "std_util.svh"
-`endif
+`include "std/std_util.svh"
 
 /*
 A demultiplexer of sorts that merges multiple streams into a single stream, 
@@ -39,7 +35,9 @@ module stream_split
     output logic                stream_out_last [PORTS]
 );
 
-    localparam PAYLOAD_WIDTH = $bits(stream_in.payload);
+    typedef bit [$bits(stream_in.T_LOGIC)-1:0] payload_width_temp_t;
+    localparam int PAYLOAD_WIDTH = $bits(payload_width_temp_t);
+    // localparam PAYLOAD_WIDTH = $bits(stream_in.payload);
 
     typedef logic [ID_WIDTH-1:0] index_t;
     typedef struct packed {
@@ -60,15 +58,24 @@ module stream_split
         stream_intf #(.T(payload_last_t)) stream_out_temp (.clk, .rst);
 
         always_comb begin
+            automatic payload_last_t stream_out_next_payload, stream_out_temp_payload;
+
+            /* verilator lint_off WIDTH */
             stream_out_next.valid = stream_out_valid[k];
             stream_out_ready[k] = stream_out_next.ready;
-            stream_out_next.payload.payload = stream_in.payload;
-            stream_out_next.payload.last = stream_in_last;
+            stream_out_next_payload = '{
+                payload: stream_in.payload,
+                last: stream_in_last
+            };
+            stream_out_next.payload = stream_out_next_payload;
+
+            stream_out_temp_payload = stream_out_temp.payload;
 
             stream_out[k].valid = stream_out_temp.valid;
             stream_out_temp.ready = stream_out[k].ready;
-            stream_out[k].payload = stream_out_temp.payload.payload;
-            stream_out_last[k] = stream_out_temp.payload.last;
+            stream_out[k].payload = stream_out_temp_payload.payload;
+            stream_out_last[k] = stream_out_temp_payload.last;
+            /* verilator lint_on WIDTH */
         end
 
         stream_stage #(
@@ -111,7 +118,7 @@ module stream_split
         produce[(PORTS > 1) ? stream_in_id : 'b0] = 'b1;
 
         for (i = 0; i < PORTS; i++) begin
-            stream_out_id[i] = i;
+            stream_out_id[i] = index_t'(i);
         end
     end
 

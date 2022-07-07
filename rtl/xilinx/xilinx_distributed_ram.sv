@@ -1,6 +1,4 @@
-//!import std/std_pkg
-
-`timescale 1ns/1ps
+//!import std/std_pkg.sv
 
 module xilinx_distributed_ram
     import std_pkg::*;

@@ -1,15 +1,14 @@
-//!import std/std_pkg
-//!import std/std_register
-//!import std/std_register_masked
-//!import stream/stream_pkg
+//!import std/std_pkg.sv
+//!import std/std_register.sv
+//!import std/std_register_masked.sv
+//!import stream/stream_pkg.sv
+//!import stream/stream_intf.sv
+//!import stream/stream_stage.sv
+//!import mem/mem_combinational.sv
+//!import mem/mem_sequential_read_write.sv
+//!wrapper stream/stream_fifo_wrapper.sv
 
-`timescale 1ns/1ps
-
-`ifdef __LINTER__
-    `include "../std/std_util.svh"
-`else
-    `include "std_util.svh"
-`endif
+`include "std/std_util.svh"
 
 /*
 Implements a valid/ready controlled FIFO. The FIFO mas two main settings that
@@ -185,9 +184,12 @@ module stream_fifo
             .write_enable(mem_write_enable),
             .write_addr(write_pointer),
             .write_data_in(stream_in.payload),
+            .write_data_out(),
 
             .read_addr({read_pointer}),
-            .read_data_out({stream_next.payload})
+            .read_data_out({stream_next.payload}),
+
+            .reset_done()
         );
 
         always_comb begin

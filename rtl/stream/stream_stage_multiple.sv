@@ -1,14 +1,10 @@
-//!import std/std_pkg
-//!import std/std_register
-//!import stream/stream_pkg
+//!import std/std_pkg.sv
+//!import stream/stream_pkg.sv
+//!import stream/stream_intf.sv
+//!import stream/stream_stage.sv
+//!wrapper stream/stream_stage_multiple_wrapper.sv
 
-`timescale 1ns/1ps
-
-`ifdef __LINTER__
-    `include "../std/std_util.svh"
-`else
-    `include "std_util.svh"
-`endif
+`include "std/std_util.svh"
 
 module stream_stage_multiple
     import std_pkg::*;

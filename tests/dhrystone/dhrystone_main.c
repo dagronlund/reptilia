@@ -7,75 +7,75 @@
 // This is the classic Dhrystone synthetic integer benchmark.
 //
 
-#pragma GCC optimize ("no-inline")
+#pragma GCC optimize("no-inline")
 
 #include "dhrystone.h"
-#include "../libio.h"
+#include "../lib/libio.h"
 #include "dhrystone_main.h"
 
 // void debug_printf(const char* str, ...);
 
 #define debug_printf tiny_printf
 
-#include "util.h"
+// #include "util.h"
 
 #include <alloca.h>
+#include <stdint.h>
 
 /* Global Variables: */
 
-Rec_Pointer     Ptr_Glob,
-                Next_Ptr_Glob;
-int             Int_Glob;
-Boolean         Bool_Glob;
-char            Ch_1_Glob,
-                Ch_2_Glob;
-int             Arr_1_Glob [50];
-int             Arr_2_Glob [50] [50];
+Rec_Pointer Ptr_Glob,
+    Next_Ptr_Glob;
+int Int_Glob;
+Boolean Bool_Glob;
+char Ch_1_Glob,
+    Ch_2_Glob;
+int Arr_1_Glob[50];
+int Arr_2_Glob[50][50];
 
 // Enumeration     Func_1 ();
-//    forward declaration necessary since Enumeration may not simply be int 
+//    forward declaration necessary since Enumeration may not simply be int
 
 #ifndef REG
-        Boolean Reg = false;
+Boolean Reg = false;
 #define REG
-        /* REG becomes defined as empty */
-        /* i.e. no register variables   */
+/* REG becomes defined as empty */
+/* i.e. no register variables   */
 #else
-        Boolean Reg = true;
+Boolean Reg = true;
 #undef REG
 #define REG register
 #endif
 
-Boolean		Done;
+Boolean Done;
 
 uint32_t Begin_Inst, End_Inst, User_Inst;
 uint32_t Begin_Time, End_Time, User_Time;
-long            Microseconds,
-                Dhrystones_Per_Second;
+long Microseconds,
+    Dhrystones_Per_Second;
 
-void Proc_1 (REG Rec_Pointer Ptr_Val_Par);
-void Proc_2 (One_Fifty   *Int_Par_Ref);
-void Proc_3 (Rec_Pointer *Ptr_Ref_Par);
-void Proc_4 ();
-void Proc_5 ();
+void Proc_1(REG Rec_Pointer Ptr_Val_Par);
+void Proc_2(One_Fifty *Int_Par_Ref);
+void Proc_3(Rec_Pointer *Ptr_Ref_Par);
+void Proc_4();
+void Proc_5();
 
 /* end of variables for time measurement */
 
-
 int dhrystone_main()
 /*****/
-  /* main program, corresponds to procedures        */
-  /* Main and Proc_0 in the Ada version             */
+/* main program, corresponds to procedures        */
+/* Main and Proc_0 in the Ada version             */
 {
-        One_Fifty       Int_1_Loc;
-  REG   One_Fifty       Int_2_Loc;
-        One_Fifty       Int_3_Loc;
-  REG   char            Ch_Index;
-        Enumeration     Enum_Loc;
-        Str_30          Str_1_Loc;
-        Str_30          Str_2_Loc;
-  REG   int             Run_Index;
-  REG   int             Number_Of_Runs;
+  One_Fifty Int_1_Loc;
+  REG One_Fifty Int_2_Loc;
+  One_Fifty Int_3_Loc;
+  REG char Ch_Index;
+  Enumeration Enum_Loc;
+  Str_30 Str_1_Loc;
+  Str_30 Str_2_Loc;
+  REG int Run_Index;
+  REG int Number_Of_Runs;
 
   /* Arguments */
   Number_Of_Runs = 5; // NUMBER_OF_RUNS;
@@ -88,22 +88,22 @@ int dhrystone_main()
   // Ptr_Glob = (Rec_Pointer) &Glob;
   // Next_Ptr_Glob = (Rec_Pointer) &Next_Glob;
 
-  Next_Ptr_Glob = (Rec_Pointer) alloca (sizeof (Rec_Type));
-  Ptr_Glob = (Rec_Pointer) alloca (sizeof (Rec_Type));
+  Next_Ptr_Glob = (Rec_Pointer)alloca(sizeof(Rec_Type));
+  Ptr_Glob = (Rec_Pointer)alloca(sizeof(Rec_Type));
 
-  Ptr_Glob->Ptr_Comp                    = Next_Ptr_Glob;
-  Ptr_Glob->Discr                       = Ident_1;
-  Ptr_Glob->variant.var_1.Enum_Comp     = Ident_3;
-  Ptr_Glob->variant.var_1.Int_Comp      = 40;
-  strcpy (Ptr_Glob->variant.var_1.Str_Comp, 
-          "DHRYSTONE PROGRAM, SOME STRING");
-  strcpy (Str_1_Loc, "DHRYSTONE PROGRAM, 1'ST STRING");
+  Ptr_Glob->Ptr_Comp = Next_Ptr_Glob;
+  Ptr_Glob->Discr = Ident_1;
+  Ptr_Glob->variant.var_1.Enum_Comp = Ident_3;
+  Ptr_Glob->variant.var_1.Int_Comp = 40;
+  strcpy(Ptr_Glob->variant.var_1.Str_Comp,
+         "DHRYSTONE PROGRAM, SOME STRING");
+  strcpy(Str_1_Loc, "DHRYSTONE PROGRAM, 1'ST STRING");
 
-  Arr_2_Glob [8][7] = 10;
-        /* Was missing in published program. Without this statement,    */
-        /* Arr_2_Glob [8][7] would have an undefined value.             */
-        /* Warning: With 16-Bit processors and Number_Of_Runs > 32000,  */
-        /* overflow may occur for this array element.                   */
+  Arr_2_Glob[8][7] = 10;
+  /* Was missing in published program. Without this statement,    */
+  /* Arr_2_Glob [8][7] would have an undefined value.             */
+  /* Warning: With 16-Bit processors and Number_Of_Runs > 32000,  */
+  /* overflow may occur for this array element.                   */
 
   debug_printf("\n");
   debug_printf("Dhrystone Benchmark, Version %s\n", Version);
@@ -119,7 +119,8 @@ int dhrystone_main()
   debug_printf("\n");
 
   Done = false;
-  while (!Done) {
+  while (!Done)
+  {
 
     /***************/
     /* Start timer */
@@ -137,44 +138,44 @@ int dhrystone_main()
 
       Proc_5();
       Proc_4();
-	/* Ch_1_Glob == 'A', Ch_2_Glob == 'B', Bool_Glob == true */
+      /* Ch_1_Glob == 'A', Ch_2_Glob == 'B', Bool_Glob == true */
       Int_1_Loc = 2;
       Int_2_Loc = 3;
-      strcpy (Str_2_Loc, "DHRYSTONE PROGRAM, 2'ND STRING");
+      strcpy(Str_2_Loc, "DHRYSTONE PROGRAM, 2'ND STRING");
       Enum_Loc = Ident_2;
-      Bool_Glob = ! Func_2 (Str_1_Loc, Str_2_Loc);
-	/* Bool_Glob == 1 */
-      while (Int_1_Loc < Int_2_Loc)  /* loop body executed once */
+      Bool_Glob = !Func_2(Str_1_Loc, Str_2_Loc);
+      /* Bool_Glob == 1 */
+      while (Int_1_Loc < Int_2_Loc) /* loop body executed once */
       {
-	Int_3_Loc = 5 * Int_1_Loc - Int_2_Loc;
-	  /* Int_3_Loc == 7 */
-	Proc_7 (Int_1_Loc, Int_2_Loc, &Int_3_Loc);
-	  /* Int_3_Loc == 7 */
-	Int_1_Loc += 1;
+        Int_3_Loc = 5 * Int_1_Loc - Int_2_Loc;
+        /* Int_3_Loc == 7 */
+        Proc_7(Int_1_Loc, Int_2_Loc, &Int_3_Loc);
+        /* Int_3_Loc == 7 */
+        Int_1_Loc += 1;
       } /* while */
-	/* Int_1_Loc == 3, Int_2_Loc == 3, Int_3_Loc == 7 */
-      Proc_8 (Arr_1_Glob, Arr_2_Glob, Int_1_Loc, Int_3_Loc);
-	/* Int_Glob == 5 */
-      Proc_1 (Ptr_Glob);
+      /* Int_1_Loc == 3, Int_2_Loc == 3, Int_3_Loc == 7 */
+      Proc_8(Arr_1_Glob, Arr_2_Glob, Int_1_Loc, Int_3_Loc);
+      /* Int_Glob == 5 */
+      Proc_1(Ptr_Glob);
       for (Ch_Index = 'A'; Ch_Index <= Ch_2_Glob; ++Ch_Index)
-			       /* loop body executed twice */
+      /* loop body executed twice */
       {
-	if (Enum_Loc == Func_1 (Ch_Index, 'C'))
-	    /* then, not executed */
-	  {
-	  Proc_6 (Ident_1, &Enum_Loc);
-	  strcpy (Str_2_Loc, "DHRYSTONE PROGRAM, 3'RD STRING");
-	  Int_2_Loc = Run_Index;
-	  Int_Glob = Run_Index;
-	  }
+        if (Enum_Loc == Func_1(Ch_Index, 'C'))
+        /* then, not executed */
+        {
+          Proc_6(Ident_1, &Enum_Loc);
+          strcpy(Str_2_Loc, "DHRYSTONE PROGRAM, 3'RD STRING");
+          Int_2_Loc = Run_Index;
+          Int_Glob = Run_Index;
+        }
       }
-	/* Int_1_Loc == 3, Int_2_Loc == 3, Int_3_Loc == 7 */
+      /* Int_1_Loc == 3, Int_2_Loc == 3, Int_3_Loc == 7 */
       Int_2_Loc = Int_2_Loc * Int_1_Loc;
       Int_1_Loc = Int_2_Loc / Int_3_Loc;
       Int_2_Loc = 7 * (Int_2_Loc - Int_3_Loc) - Int_1_Loc;
-	/* Int_1_Loc == 1, Int_2_Loc == 13, Int_3_Loc == 7 */
-      Proc_2 (&Int_1_Loc);
-	/* Int_1_Loc == 5 */
+      /* Int_1_Loc == 1, Int_2_Loc == 13, Int_3_Loc == 7 */
+      Proc_2(&Int_1_Loc);
+      /* Int_1_Loc == 5 */
 
     } /* loop "for Run_Index" */
 
@@ -190,18 +191,20 @@ int dhrystone_main()
     User_Time = End_Time - Begin_Time;
     User_Inst = End_Inst - Begin_Inst;
 
-    debug_printf("User time: %u, User Inst: %u\n", 
-      User_Time, User_Inst);
+    debug_printf("User time: %u, User Inst: %u\n",
+                 User_Time, User_Inst);
 
     if (User_Time < Too_Small_Time)
     {
       debug_printf("Start Time: %d, End Time: %d\n", Begin_Time, End_Time);
-      
+
       debug_printf("Measured time too small to obtain meaningful results\n");
       Number_Of_Runs = Number_Of_Runs * 10;
       debug_printf("\n");
       return 1;
-    } else Done = true;
+    }
+    else
+      Done = true;
   }
 
   debug_printf("Final values of the variables used in the benchmark:\n");
@@ -219,7 +222,7 @@ int dhrystone_main()
   debug_printf("Arr_2_Glob[8][7]:    %d\n", Arr_2_Glob[8][7]);
   debug_printf("        should be:   Number_Of_Runs + 10\n");
   debug_printf("Ptr_Glob->\n");
-  debug_printf("  Ptr_Comp:          %d\n", (long) Ptr_Glob->Ptr_Comp);
+  debug_printf("  Ptr_Comp:          %d\n", (long)Ptr_Glob->Ptr_Comp);
   debug_printf("        should be:   (implementation-dependent)\n");
   debug_printf("  Discr:             %d\n", Ptr_Glob->Discr);
   debug_printf("        should be:   %d\n", 0);
@@ -230,7 +233,7 @@ int dhrystone_main()
   debug_printf("  Str_Comp:          %s\n", Ptr_Glob->variant.var_1.Str_Comp);
   debug_printf("        should be:   DHRYSTONE PROGRAM, SOME STRING\n");
   debug_printf("Next_Ptr_Glob->\n");
-  debug_printf("  Ptr_Comp:          %d\n", (long) Next_Ptr_Glob->Ptr_Comp);
+  debug_printf("  Ptr_Comp:          %d\n", (long)Next_Ptr_Glob->Ptr_Comp);
   debug_printf("        should be:   (implementation-dependent), same as above\n");
   debug_printf("  Discr:             %d\n", Next_Ptr_Glob->Discr);
   debug_printf("        should be:   %d\n", 0);
@@ -239,7 +242,7 @@ int dhrystone_main()
   debug_printf("  Int_Comp:          %d\n", Next_Ptr_Glob->variant.var_1.Int_Comp);
   debug_printf("        should be:   %d\n", 18);
   debug_printf("  Str_Comp:          %s\n",
-                                Next_Ptr_Glob->variant.var_1.Str_Comp);
+               Next_Ptr_Glob->variant.var_1.Str_Comp);
   debug_printf("        should be:   DHRYSTONE PROGRAM, SOME STRING\n");
   debug_printf("Int_1_Loc:           %d\n", Int_1_Loc);
   debug_printf("        should be:   %d\n", 5);
@@ -255,92 +258,92 @@ int dhrystone_main()
   debug_printf("        should be:   DHRYSTONE PROGRAM, 2'ND STRING\n");
   debug_printf("\n");
 
-
   Microseconds = ((User_Time / Number_Of_Runs) * Mic_secs_Per_Second) / HZ;
   Dhrystones_Per_Second = (HZ * Number_Of_Runs) / User_Time;
 
   debug_printf("Microseconds for one run through Dhrystone: %u\n", Microseconds);
   debug_printf("Dhrystones per Second:                      %u\n", Dhrystones_Per_Second);
 
+  // int dkips = (Dhrystones_Per_Second * 1000) / 1757;
+  // debug_printf("DKIPS: %u\n", dkips);
+
+  // int ipc_1000 = (User_Inst * 1000) / User_Time;
+  // debug_printf("IPC * 1000: %u\n", ipc_1000);
+
   return 0;
 }
 
+void Proc_1(Ptr_Val_Par)
+    /******************/
 
-void Proc_1 (Ptr_Val_Par)
-/******************/
-
-REG Rec_Pointer Ptr_Val_Par;
-    /* executed once */
+    REG Rec_Pointer Ptr_Val_Par;
+/* executed once */
 {
-  REG Rec_Pointer Next_Record = Ptr_Val_Par->Ptr_Comp;  
-                                        /* == Ptr_Glob_Next */
+  REG Rec_Pointer Next_Record = Ptr_Val_Par->Ptr_Comp;
+  /* == Ptr_Glob_Next */
   /* Local variable, initialized with Ptr_Val_Par->Ptr_Comp,    */
   /* corresponds to "rename" in Ada, "with" in Pascal           */
-  
-  structassign (*Ptr_Val_Par->Ptr_Comp, *Ptr_Glob); 
+
+  structassign(*Ptr_Val_Par->Ptr_Comp, *Ptr_Glob);
   Ptr_Val_Par->variant.var_1.Int_Comp = 5;
-  Next_Record->variant.var_1.Int_Comp 
-        = Ptr_Val_Par->variant.var_1.Int_Comp;
+  Next_Record->variant.var_1.Int_Comp = Ptr_Val_Par->variant.var_1.Int_Comp;
   Next_Record->Ptr_Comp = Ptr_Val_Par->Ptr_Comp;
-  Proc_3 (&Next_Record->Ptr_Comp);
-    /* Ptr_Val_Par->Ptr_Comp->Ptr_Comp 
-                        == Ptr_Glob->Ptr_Comp */
+  Proc_3(&Next_Record->Ptr_Comp);
+  /* Ptr_Val_Par->Ptr_Comp->Ptr_Comp
+                      == Ptr_Glob->Ptr_Comp */
   if (Next_Record->Discr == Ident_1)
-    /* then, executed */
+  /* then, executed */
   {
     Next_Record->variant.var_1.Int_Comp = 6;
-    Proc_6 (Ptr_Val_Par->variant.var_1.Enum_Comp, 
+    Proc_6(Ptr_Val_Par->variant.var_1.Enum_Comp,
            &Next_Record->variant.var_1.Enum_Comp);
     Next_Record->Ptr_Comp = Ptr_Glob->Ptr_Comp;
-    Proc_7 (Next_Record->variant.var_1.Int_Comp, 10, 
+    Proc_7(Next_Record->variant.var_1.Int_Comp, 10,
            &Next_Record->variant.var_1.Int_Comp);
   }
   else /* not executed */
-    structassign (*Ptr_Val_Par, *Ptr_Val_Par->Ptr_Comp);
+    structassign(*Ptr_Val_Par, *Ptr_Val_Par->Ptr_Comp);
 } /* Proc_1 */
 
-
-void Proc_2 (Int_Par_Ref)
-/******************/
+void Proc_2(Int_Par_Ref)
+    /******************/
     /* executed once */
     /* *Int_Par_Ref == 1, becomes 4 */
 
-One_Fifty   *Int_Par_Ref;
+    One_Fifty *Int_Par_Ref;
 {
-  One_Fifty  Int_Loc;  
-  Enumeration   Enum_Loc;
+  One_Fifty Int_Loc;
+  Enumeration Enum_Loc;
 
   Int_Loc = *Int_Par_Ref + 10;
   do /* executed once */
     if (Ch_1_Glob == 'A')
-      /* then, executed */
+    /* then, executed */
     {
       Int_Loc -= 1;
       *Int_Par_Ref = Int_Loc - Int_Glob;
       Enum_Loc = Ident_1;
-    } /* if */
+    }                          /* if */
   while (Enum_Loc != Ident_1); /* true */
 } /* Proc_2 */
 
-
-void Proc_3 (Ptr_Ref_Par)
-/******************/
+void Proc_3(Ptr_Ref_Par)
+    /******************/
     /* executed once */
     /* Ptr_Ref_Par becomes Ptr_Glob */
 
-Rec_Pointer *Ptr_Ref_Par;
+    Rec_Pointer *Ptr_Ref_Par;
 
 {
   if (Ptr_Glob != Null)
     /* then, executed */
     *Ptr_Ref_Par = Ptr_Glob->Ptr_Comp;
-  Proc_7 (10, Int_Glob, &Ptr_Glob->variant.var_1.Int_Comp);
+  Proc_7(10, Int_Glob, &Ptr_Glob->variant.var_1.Int_Comp);
 } /* Proc_3 */
 
-
-void Proc_4 () /* without parameters */
+void Proc_4() /* without parameters */
 /*******/
-    /* executed once */
+/* executed once */
 {
   Boolean Bool_Loc;
 
@@ -349,10 +352,9 @@ void Proc_4 () /* without parameters */
   Ch_2_Glob = 'B';
 } /* Proc_4 */
 
-
-void Proc_5 () /* without parameters */
+void Proc_5() /* without parameters */
 /*******/
-    /* executed once */
+/* executed once */
 {
   Ch_1_Glob = 'A';
   Bool_Glob = false;

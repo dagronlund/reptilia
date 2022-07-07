@@ -1,16 +1,11 @@
-//!import std/std_pkg
-//!import std/std_register
-//!import xilinx/xilinx_block_ram_simple
+//!import std/std_pkg.sv
+//!import std/std_register.sv
+//!import xilinx/xilinx_block_ram_simple.sv
+//!import mem/mem_intf.sv
+//!wrapper mem/mem_sequential_read_write_wrapper.sv
 
-`ifdef __LINTER__
-    `include "../std/std_util.svh"
-    `include "mem_util.svh"
-`else
-    `include "std_util.svh"
-    `include "mem_util.svh"
-`endif
-
-`timescale 1ns/1ps
+`include "std/std_util.svh"
+`include "mem/mem_util.svh"
 
 module mem_sequential_read_write
     import std_pkg::*;
@@ -18,7 +13,7 @@ module mem_sequential_read_write
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
     parameter int MANUAL_ADDR_WIDTH = 0, // Set other than zero to override
-    parameter int ENABLE_OUTPUT_REG = 0,
+    parameter bit ENABLE_OUTPUT_REG = 0,
     parameter HEX_FILE = ""
 )(
     input wire clk, 
@@ -33,9 +28,18 @@ module mem_sequential_read_write
     `STATIC_MATCH_MEM(mem_read_in, mem_read_out)
     `STATIC_MATCH_MEM(mem_read_in, mem_write_in)
 
-    localparam int DATA_WIDTH = $bits(mem_read_in.data);
-    localparam int ID_WIDTH = $bits(mem_read_in.id);
-    localparam int ADDR_WIDTH = (MANUAL_ADDR_WIDTH == 0) ? $bits(mem_read_in.addr) : MANUAL_ADDR_WIDTH;
+    typedef bit [mem_read_in.ADDR_WIDTH-1:0] addr_width_temp_t;
+    localparam int INTERNAL_ADDR_WIDTH = $bits(addr_width_temp_t);
+    typedef bit [mem_read_in.DATA_WIDTH-1:0] data_width_temp_t;
+    localparam int DATA_WIDTH = $bits(data_width_temp_t);
+    typedef bit [mem_read_in.MASK_WIDTH-1:0] mask_width_temp_t;
+    localparam int MASK_WIDTH = $bits(mask_width_temp_t);
+    typedef bit [mem_read_in.ID_WIDTH-1:0] id_width_temp_t;
+    localparam int ID_WIDTH = $bits(id_width_temp_t);
+
+    // localparam int DATA_WIDTH = $bits(mem_read_in.data);
+    // localparam int ID_WIDTH = $bits(mem_read_in.id);
+    localparam int ADDR_WIDTH = (MANUAL_ADDR_WIDTH == 0) ? INTERNAL_ADDR_WIDTH : MANUAL_ADDR_WIDTH;
     localparam int DATA_LENGTH = 2**ADDR_WIDTH;
 
     // Custom flow control is used here since in most SRAMs new values cannot be written without
@@ -43,8 +47,8 @@ module mem_sequential_read_write
     logic write_enable, read_enable, read_output_enable;
 
     // Nothing can backflow the write channel so its always ready
-    assign mem_write_in.ready = 'b1;
-    assign write_enable = mem_write_in.valid;
+    always_comb mem_write_in.ready = 'b1;
+    always_comb write_enable = mem_write_in.valid;
 
     generate
     if (TECHNOLOGY == STD_TECHNOLOGY_FPGA_XILINX) begin

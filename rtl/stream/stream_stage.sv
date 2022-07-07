@@ -1,14 +1,10 @@
-//!import std/std_pkg
-//!import std/std_register
-//!import stream/stream_pkg
+//!import std/std_pkg.sv
+//!import std/std_register.sv
+//!import stream/stream_pkg.sv
+//!import stream/stream_intf.sv
+//!wrapper stream/stream_stage_wrapper.sv
 
-`timescale 1ns/1ps
-
-`ifdef __LINTER__
-    `include "../std/std_util.svh"
-`else
-    `include "std_util.svh"
-`endif
+`include "std/std_util.svh"
 
 /*
 Implements a valid/ready controlled pipeline stage
@@ -41,8 +37,10 @@ module stream_stage
 
     `STATIC_ASSERT($bits(T) == $bits(stream_in.payload))
     `STATIC_ASSERT($bits(T) == $bits(stream_out.payload))
-    // `STATIC_ASSERT(T == type(stream_in.payload))
-    // `STATIC_ASSERT(T == type(stream_out.payload))
+
+    typedef bit [$bits(stream_out.T_LOGIC)-1:0] payload_width_temp_t;
+    localparam int PAYLOAD_WIDTH = $bits(payload_width_temp_t);
+    typedef logic [PAYLOAD_WIDTH-1:0] payload_t;
 
     generate
     if (PIPELINE_MODE == STREAM_PIPELINE_MODE_TRANSPARENT) begin
@@ -71,7 +69,7 @@ module stream_stage
 
         std_register #(
             .CLOCK_INFO(CLOCK_INFO),
-            .T(T),
+            .T(payload_t),
             .RESET_VECTOR('b0)
         ) payload_register_inst (
             .clk, .rst(std_get_reset(CLOCK_INFO, 0)),
@@ -146,7 +144,7 @@ module stream_stage
 
         std_register #(
             .CLOCK_INFO(CLOCK_INFO),
-            .T(T),
+            .T(payload_t),
             .RESET_VECTOR('b0)
         ) buffer0_register_inst (
             .clk, .rst(std_get_reset(CLOCK_INFO, 0)),
@@ -157,7 +155,7 @@ module stream_stage
 
         std_register #(
             .CLOCK_INFO(CLOCK_INFO),
-            .T(T),
+            .T(payload_t),
             .RESET_VECTOR('b0)
         ) buffer1_register_inst (
             .clk, .rst(std_get_reset(CLOCK_INFO, 0)),
@@ -207,7 +205,7 @@ module stream_stage
 
         std_register #(
             .CLOCK_INFO(CLOCK_INFO),
-            .T(T),
+            .T(payload_t),
             .RESET_VECTOR('b0)
         ) payload_register_inst (
             .clk, .rst(std_get_reset(CLOCK_INFO, 0)),
