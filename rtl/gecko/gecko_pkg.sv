@@ -344,9 +344,10 @@ package gecko_pkg;
     } gecko_math_operation_t;
 
     function automatic gecko_math_operation_t gecko_math_operation_step(
-        input gecko_math_operation_t op,
+        input gecko_math_operation_t op_input,
         logic [5:0] current_iteration
     );
+        gecko_math_operation_t op = op_input;
         logic carry = 1'b0;
         int i;
 
@@ -355,7 +356,8 @@ package gecko_pkg;
             if (current_iteration == 'b0) begin
                 // Swap lesser value into operator_value to save cycles
                 if (op.operand_value < op.operator_value) begin
-                    {op.operand_value, op.operator_value} = {op.operator_value, op.operand_value};
+                    op.operand_value = op.operator_value;
+                    op.operator_value = op.operand_value;
                 end
             end else begin
                 if (op.operator_value[0]) begin
@@ -365,7 +367,6 @@ package gecko_pkg;
                 op.operator_value = {1'b0, op.operator_value[31:1]};
                 op.done = (op.operator_value == 'b0);
             end
-            return op;
         end
         RISCV32M_FUNCT3_MULH: begin
             // Use Booth's Algorithm
@@ -378,7 +379,6 @@ package gecko_pkg;
             op.result = {op.result[31], op.result[31:1]};
             op.operator_value = {1'b0, op.operator_value[31:1]};
             op.done = (op.operator_value == 'b0);
-            return op;
         end
         // TODO: Fix performance of MULHSU (does not always need 34 cycles)
         RISCV32M_FUNCT3_MULHSU: begin
@@ -412,7 +412,6 @@ package gecko_pkg;
                 end
                 op.result = {carry, op.result[31:1]};
             end
-            return op;
         end
         RISCV32M_FUNCT3_MULHU: begin
             if (op.operator_value[0]) begin
@@ -421,7 +420,6 @@ package gecko_pkg;
             op.result = {carry, op.result[31:1]};
             op.operator_value = {1'b0, op.operator_value[31:1]};
             op.done = (op.operator_value == 'b0);
-            return op;
         end
         // TODO: CRITICAL: Support signed division (I hate thinking about it)
         RISCV32M_FUNCT3_DIV, RISCV32M_FUNCT3_REM,
@@ -481,11 +479,10 @@ package gecko_pkg;
             //         Q(i) := 1
             //     end
             // end
-
-            return op;
         end
         endcase
 
+        return op;
     endfunction
 
     // Gecko core configuration ------------------------------------------------

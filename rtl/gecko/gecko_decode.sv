@@ -79,7 +79,7 @@ module gecko_decode
     stream_intf.out ecall_command, // gecko_ecall_operation_t
 
     // Non-flow Controlled
-    stream_intf.in jump_command, // gecko_jump_operation_t
+    stream_intf.view jump_command, // gecko_jump_operation_t
     stream_intf.in writeback_result, // gecko_operation_t
 
     // Vivado does not like zero-width arrays

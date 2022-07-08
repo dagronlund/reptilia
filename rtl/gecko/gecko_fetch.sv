@@ -58,7 +58,7 @@ module gecko_fetch
     input wire clk, 
     input wire rst,
 
-    stream_intf.in jump_command, // gecko_jump_operation_t
+    stream_intf.view jump_command, // gecko_jump_operation_t
 
     stream_intf.out instruction_command, // gecko_instruction_operation_t
     mem_intf.out instruction_request

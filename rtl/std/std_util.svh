@@ -1,17 +1,6 @@
 `ifndef __STD_UTIL__
 `define __STD_UTIL__
 
-function int MAX(int a, int b);
-    return (a > b) ? a : b;
-endfunction
-
-function int MIN(int a, int b);
-    return (a < b) ? a : b;
-endfunction
-
-// let MAX(a,b) = (a > b) ? a : b;
-// let MIN(a,b) = (a < b) ? a : b;
-
 `define STRINGIFY(str) `"str`"
 
 `define STATIC_ASSERT(condition) \
