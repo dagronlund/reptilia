@@ -105,7 +105,6 @@ class VerilatorProgram:
         objects_slow = ["classes_slow", "support_slow", "global_slow"]
         max_builds = multiprocessing.cpu_count() // 2
         info(f"Building with {max_builds} processes...")
-        # max_builds = 1
 
         # Build verilator object files
         for object_group in objects_fast + objects_slow:
@@ -130,16 +129,6 @@ class VerilatorProgram:
                 _wait_builds(object_builds, pending_builds=max_builds - 1)
         _wait_builds(object_builds)
 
-        # object_dependencies.append()
-
-        # for object_file, object_build in object_builds.items():
-        #     info(f"{object_file}...")
-        #     object_build.wait()
-        #     stdout, stderr = object_build.communicate()
-        #     stdout, stderr = stdout.decode("utf-8"), stderr.decode("utf-8")
-        #     if object_build.returncode != 0:
-        #         error(f"g++ error compiling {object_file}!\n{stdout}\n{stderr}")
-
         # Compile verilator output
         try:
             subprocess.run(
@@ -149,9 +138,6 @@ class VerilatorProgram:
                     "-Iobj_dir/",
                     os.path.expandvars("-I$VERILATOR_ROOT/include"),
                     self.cpp_file,
-                    # os.path.expandvars("$VERILATOR_ROOT/include/verilated_vcd_c.cpp"),
-                    # os.path.expandvars("$VERILATOR_ROOT/include/verilated.cpp"),
-                    # "obj_dir/V" + self.module_name + "__ALL.cpp",
                     "-O2",
                     "-o",
                     "bin/" + self.module_name + "_simulator",
