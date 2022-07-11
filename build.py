@@ -8,12 +8,12 @@ from __future__ import annotations
 import os
 import copy
 import glob
-import subprocess
 from typing import Dict
 from pathlib import Path
 
-from util import debug, info, warning, error
+from util import info, error
 from riscv import RiscvProgram
+from verilator import VerilatorProgram
 
 
 def get_includes_imports(path):
@@ -55,6 +55,7 @@ class SourceFile:
         self.includes, self.imports, self.wrapper, self.no_lint = get_includes_imports(
             path
         )
+        self.dependencies = None
 
     def _get_dependencies(
         self,
@@ -89,11 +90,17 @@ class SourceFile:
             )
         return dependencies
 
-    def get_dependencies(self, source_files):
-        dependencies = self._get_dependencies(copy.deepcopy(source_files), {})
-        if self.wrapper is not None:
-            dependencies += [self.wrapper]
-        return dependencies
+    def get_dependencies(self, source_files=None):
+        "Returns a list of all the SV dependencies listed in included order"
+        if source_files is None and self.dependencies is None:
+            error(
+                f"{self.path} asked for dependencies without being given source files first!"
+            )
+        if self.dependencies is None:
+            self.dependencies = self._get_dependencies(copy.deepcopy(source_files), {})
+            if self.wrapper is not None:
+                self.dependencies += [self.wrapper]
+        return self.dependencies
 
 
 def search_headers(path):
@@ -129,8 +136,10 @@ def main():
     # Make sure bin/riscv-tests/ folder exists
     Path("bin/riscv-tests/").mkdir(parents=True, exist_ok=True)
 
-    print("Compiling test programs...")
     compiled_programs = {}
+    assembled_programs = []
+
+    print("Compiling test programs...")
     compiled_programs["dhrystone"] = RiscvProgram(
         "dhrystone",
         [
@@ -145,7 +154,6 @@ def main():
         opt="-O2",
     )
 
-    assembled_programs = []
     assembled_programs.append(
         RiscvProgram(
             "basic",
@@ -192,84 +200,20 @@ def main():
                     f"""File {path} imports {import_path} which does not exist!
                         {source_files.keys()}"""
                 )
+    for _, source_file in source_files.items():
+        source_file.get_dependencies(source_files=source_files)
 
     print("Running verilator...")
     for path, source_file in source_files.items():
+        if path in top_level and len(compiled_programs) > 0:
+            _, program = next(iter(compiled_programs.items()))
+        else:
+            program = None
+
         info(f"{path}...")
-        sources = source_file.get_dependencies(source_files)
-
-        module_name = path.split("/")[-1].split(".sv")[0]
-        if source_file.no_lint:
-            warning("Skipping linting due to //!no_lint...")
-            continue
-        # Run verilator
-        try:
-            param_args = []
-            if path in top_level and len(compiled_programs) > 0:
-                _, compiled_program = next(iter(compiled_programs.items()))
-                param_args.append(
-                    f"-GMEMORY_ADDR_WIDTH={compiled_program.address_width}"
-                )
-                param_args.append(
-                    f'-GSTARTUP_PROGRAM="bin/{compiled_program.name}.mem"'
-                )
-                debug(f"Using param args: {param_args}")
-
-            subprocess.run(
-                [
-                    os.path.expandvars("$VERILATOR_ROOT/bin/verilator"),
-                    "--cc" if path in top_level else "-lint-only",
-                    "--trace" if path in top_level else "",
-                    "--trace-structs",
-                    # "--trace-max-array",
-                    # "1000000",
-                    # "--trace-max-width",
-                    # "1000000",
-                    "--prefix",
-                    "V" + module_name,
-                    "-Irtl/",
-                    '+define+__SYNTH_ONLY__=1"',
-                ]
-                + param_args
-                + sources,
-                capture_output=True,
-                check=True,
-            )
-        except subprocess.CalledProcessError as process_error:
-            error(f"Verilator failed to build file {path}!")
-            for source in sources:
-                print(f"\t{source}")
-            print(process_error.output.decode("utf-8"))
-            print(process_error.stderr.decode("utf-8"))
-            raise process_error
-        # Compile verilator output
-        if path in top_level:
-            cpp_file = "tb_cpp/" + path.split("rtl/")[-1].split(".sv")[0] + "_tb.cpp"
-            try:
-                subprocess.run(
-                    [
-                        "g++-11",
-                        # os.path.expandvars("$LLVM_ROOT/bin/clang"),
-                        "-Iobj_dir/",
-                        os.path.expandvars("-I$VERILATOR_ROOT/include"),
-                        cpp_file,
-                        os.path.expandvars(
-                            "$VERILATOR_ROOT/include/verilated_vcd_c.cpp"
-                        ),
-                        os.path.expandvars("$VERILATOR_ROOT/include/verilated.cpp"),
-                        "obj_dir/V" + module_name + "__ALL.cpp",
-                        # "-O2",
-                        "-o",
-                        "bin/" + module_name + "_simulator",
-                    ],
-                    capture_output=True,
-                    check=True,
-                )
-            except subprocess.CalledProcessError as process_error:
-                error(f"g++ failed to build file {cpp_file} (from {path})!")
-                print(process_error.output.decode("utf-8"))
-                print(process_error.stderr.decode("utf-8"))
-                raise process_error
+        _ = VerilatorProgram(
+            source_file, lint_only=path not in top_level, program=program
+        )
 
 
 if __name__ == "__main__":
