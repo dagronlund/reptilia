@@ -3,26 +3,30 @@
 #include <stdint.h>
 #include <stdarg.h>
 
-void riscv_ebreak(int status)
-{
-    register int arg0 __asm__("a0") = status;
-    __asm__ volatile("ebreak"
-                     :
-                     : "r"(arg0));
-}
+// void riscv_ebreak(int status)
+// {
+//     register int arg0 __asm__("a0") = status;
+//     __asm__ volatile("ebreak"
+//                      :
+//                      : "r"(arg0));
+// }
 
-void riscv_ecall(int func, int value)
-{
-    register int arg0 __asm__("a0") = func;
-    register int arg1 __asm__("a1") = value;
-    __asm__ volatile("ecall"
-                     :
-                     : "r"(arg0), "r"(arg1));
-}
+// void riscv_ecall(int func, int value)
+// {
+//     register int arg0 __asm__("a0") = func;
+//     register int arg1 __asm__("a1") = value;
+//     __asm__ volatile("ecall"
+//                      :
+//                      : "r"(arg0), "r"(arg1));
+// }
 
 void _putchar(char c)
 {
-    riscv_ecall(0, c);
+    register int arg0 __asm__("a0") = c;
+    __asm__ volatile("csrw 0x801, a0"
+                     :
+                     : "r"(arg0));
+    // riscv_ecall(0, c);
 }
 
 void _putstring(char *s)

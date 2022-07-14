@@ -54,6 +54,14 @@ uint32_t Begin_Time, End_Time, User_Time;
 long Microseconds,
     Dhrystones_Per_Second;
 
+uint32_t decode_good_counter;
+uint32_t output_full_counter;
+uint32_t input_empty_counter;
+uint32_t register_missing_counter;
+uint32_t instruction_mispredicted_counter;
+uint32_t instruction_memory_stalled_counter;
+uint32_t instruction_control_stalled_counter;
+
 void Proc_1(REG Rec_Pointer Ptr_Val_Par);
 void Proc_2(One_Fifty *Int_Par_Ref);
 void Proc_3(Rec_Pointer *Ptr_Ref_Par);
@@ -186,6 +194,14 @@ int dhrystone_main()
     // Stop_Timer();
     End_Inst = rdinstret();
     End_Time = rdtime();
+
+    decode_good_counter = read_csr(0xC03);
+    output_full_counter = read_csr(0xC04);
+    input_empty_counter = read_csr(0xC05);
+    register_missing_counter = read_csr(0xC06);
+    instruction_mispredicted_counter = read_csr(0xC07);
+    instruction_memory_stalled_counter = read_csr(0xC08);
+    instruction_control_stalled_counter = read_csr(0xC09);
     // setStats(0);
 
     User_Time = End_Time - Begin_Time;
@@ -264,11 +280,14 @@ int dhrystone_main()
   debug_printf("Microseconds for one run through Dhrystone: %u\n", Microseconds);
   debug_printf("Dhrystones per Second:                      %u\n", Dhrystones_Per_Second);
 
-  // int dkips = (Dhrystones_Per_Second * 1000) / 1757;
-  // debug_printf("DKIPS: %u\n", dkips);
-
-  // int ipc_1000 = (User_Inst * 1000) / User_Time;
-  // debug_printf("IPC * 1000: %u\n", ipc_1000);
+  debug_printf("IPC:                         %u/%u\n", User_Inst, User_Time);
+  debug_printf("Decode Good:                 %u\n", decode_good_counter);
+  debug_printf("Output Full:                 %u\n", output_full_counter);
+  debug_printf("Input Empty:                 %u\n", input_empty_counter);
+  debug_printf("Register Missing:            %u\n", register_missing_counter);
+  debug_printf("Instruction Mispredicted:    %u\n", instruction_mispredicted_counter);
+  debug_printf("Instruction Memory Stalled:  %u\n", instruction_memory_stalled_counter);
+  debug_printf("Instruction Control Stalled: %u\n", instruction_control_stalled_counter);
 
   return 0;
 }

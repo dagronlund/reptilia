@@ -102,16 +102,27 @@ package gecko_decode_pkg;
             RISCV32I_FUNCT3_SYS_CSRRW, RISCV32I_FUNCT3_SYS_CSRRS, 
             RISCV32I_FUNCT3_SYS_CSRRC, RISCV32I_FUNCT3_SYS_CSRRWI, 
             RISCV32I_FUNCT3_SYS_CSRRSI, RISCV32I_FUNCT3_SYS_CSRRCI: begin
-                case (instruction_fields.funct12)
-                RISCV32I_CSR_CYCLE, RISCV32I_CSR_TIME, RISCV32I_CSR_INSTRET, 
-                RISCV32I_CSR_CYCLEH, RISCV32I_CSR_TIMEH, RISCV32I_CSR_INSTRETH: begin
-                    status.system_flag = 'b1;
-                end
-                RISCV32F_CSR_FFLAGS, RISCV32F_CSR_FRM, RISCV32F_CSR_FCSR, RISCV32V_CSR_VL: begin
-                    status.float_flag = 'b1;
-                end
-                default: status.error_flag = 'b1;
-                endcase
+                // case (instruction_fields.funct12)
+                // // RISCV32I_CSR_CYCLE, RISCV32I_CSR_TIME, RISCV32I_CSR_INSTRET, 
+                // // RISCV32I_CSR_CYCLEH, RISCV32I_CSR_TIMEH, RISCV32I_CSR_INSTRETH: begin
+                    
+                // // end
+                // RISCV32F_CSR_FFLAGS, RISCV32F_CSR_FRM, RISCV32F_CSR_FCSR, RISCV32V_CSR_VL: begin
+                //     status.float_flag = 'b1;
+                // end
+                // default: begin
+                //     if (RISCV32I_CSR_CYCLE <= instruction_fields.funct12 && 
+                //             instruction_fields.funct12 < RISCV32I_CSR_CYCLE + 'd32) begin
+                //         status.system_flag = 'b1;
+                //     end else if (RISCV32I_CSR_CYCLEH <= instruction_fields.funct12 && 
+                //             instruction_fields.funct12 < RISCV32I_CSR_CYCLEH + 'd32) begin
+                //         status.system_flag = 'b1;
+                //     end else begin
+                //         status.error_flag = 'b1;
+                //     end
+                // end
+                // endcase
+                status.system_flag = 'b1;
             end
             default: begin
                 status.error_flag = 'b1;
@@ -123,54 +134,54 @@ package gecko_decode_pkg;
         end
         endcase
 
-        case (riscv32f_opcode_t'(instruction_fields.opcode))
-        RISCV32F_OPCODE_FLW, RISCV32F_OPCODE_FSW,
-        RISCV32F_OPCODE_FMADD_S, RISCV32F_OPCODE_FMSUB_S,
-        RISCV32F_OPCODE_FNMSUB_S, RISCV32F_OPCODE_FNMADD_S, RISCV32F_OPCODE_FP_OP_S: begin
-            status.float_flag = 'b1;
-            status.error_flag = 'b0;
-        end
-        default: begin end
-        endcase
+        // case (riscv32f_opcode_t'(instruction_fields.opcode))
+        // RISCV32F_OPCODE_FLW, RISCV32F_OPCODE_FSW,
+        // RISCV32F_OPCODE_FMADD_S, RISCV32F_OPCODE_FMSUB_S,
+        // RISCV32F_OPCODE_FNMSUB_S, RISCV32F_OPCODE_FNMADD_S, RISCV32F_OPCODE_FP_OP_S: begin
+        //     status.float_flag = 'b1;
+        //     status.error_flag = 'b0;
+        // end
+        // default: begin end
+        // endcase
         
-        case (riscv32v_opcode_t'(instruction_fields.opcode))
-        RISCV32V_OPCODE_OP: begin
-            case(riscv32v_funct3_t'(instruction_fields.funct3))
-            RISCV32V_FUNCT3_OP_FVV: begin // Floating Point Vector-Vector
-                case (riscv32v_funct6_t'(instruction_fields.funct6))
-                RISCV32V_FUNCT6_VFADD, RISCV32V_FUNCT6_VFSUB, RISCV32V_FUNCT6_VFDIV, 
-                RISCV32V_FUNCT6_VFSQRT, RISCV32V_FUNCT6_VFMUL, RISCV32V_FUNCT6_VFMACC,
-                RISCV32V_FUNCT6_VFNMACC, RISCV32V_FUNCT6_VFMSAC, RISCV32V_FUNCT6_VFNMSAC: begin
-                    status.float_flag = 'b1;
-                    status.error_flag = 'b0;
-                end
-                default: begin end
-                endcase
-            end
-            RISCV32V_FUNCT3_OP_FVF: begin // Floating Point Vector-Scalar
-                case (riscv32v_funct6_t'(instruction_fields.funct6))
-                RISCV32V_FUNCT6_VFADD, RISCV32V_FUNCT6_VFSUB, RISCV32V_FUNCT6_VFDIV,
-                RISCV32V_FUNCT6_VFSQRT, RISCV32V_FUNCT6_VFRDIV, RISCV32V_FUNCT6_VFMUL: begin
-                    status.float_flag = 'b1;
-                    status.error_flag = 'b0;
-                end
-                default: begin end
-                endcase
-            end
-            RISCV32V_FUNCT3_OP_IVI: begin // Integer Vector-Immediate (Slideup/Slidedown)
-                case (riscv32v_funct6_t'(instruction_fields.funct6))
-                RISCV32V_FUNCT6_VSLIDEUP, RISCV32V_FUNCT6_VSLIDEDOWN: begin
-                    status.float_flag = 'b1;
-                    status.error_flag = 'b0;
-                end
-                default: begin end
-                endcase
-            end
-            default: begin end
-            endcase
-        end
-        default: begin end
-        endcase
+        // case (riscv32v_opcode_t'(instruction_fields.opcode))
+        // RISCV32V_OPCODE_OP: begin
+        //     case(riscv32v_funct3_t'(instruction_fields.funct3))
+        //     RISCV32V_FUNCT3_OP_FVV: begin // Floating Point Vector-Vector
+        //         case (riscv32v_funct6_t'(instruction_fields.funct6))
+        //         RISCV32V_FUNCT6_VFADD, RISCV32V_FUNCT6_VFSUB, RISCV32V_FUNCT6_VFDIV, 
+        //         RISCV32V_FUNCT6_VFSQRT, RISCV32V_FUNCT6_VFMUL, RISCV32V_FUNCT6_VFMACC,
+        //         RISCV32V_FUNCT6_VFNMACC, RISCV32V_FUNCT6_VFMSAC, RISCV32V_FUNCT6_VFNMSAC: begin
+        //             status.float_flag = 'b1;
+        //             status.error_flag = 'b0;
+        //         end
+        //         default: begin end
+        //         endcase
+        //     end
+        //     RISCV32V_FUNCT3_OP_FVF: begin // Floating Point Vector-Scalar
+        //         case (riscv32v_funct6_t'(instruction_fields.funct6))
+        //         RISCV32V_FUNCT6_VFADD, RISCV32V_FUNCT6_VFSUB, RISCV32V_FUNCT6_VFDIV,
+        //         RISCV32V_FUNCT6_VFSQRT, RISCV32V_FUNCT6_VFRDIV, RISCV32V_FUNCT6_VFMUL: begin
+        //             status.float_flag = 'b1;
+        //             status.error_flag = 'b0;
+        //         end
+        //         default: begin end
+        //         endcase
+        //     end
+        //     RISCV32V_FUNCT3_OP_IVI: begin // Integer Vector-Immediate (Slideup/Slidedown)
+        //         case (riscv32v_funct6_t'(instruction_fields.funct6))
+        //         RISCV32V_FUNCT6_VSLIDEUP, RISCV32V_FUNCT6_VSLIDEDOWN: begin
+        //             status.float_flag = 'b1;
+        //             status.error_flag = 'b0;
+        //         end
+        //         default: begin end
+        //         endcase
+        //     end
+        //     default: begin end
+        //     endcase
+        // end
+        // default: begin end
+        // endcase
         
         return status;
     endfunction
@@ -534,19 +545,19 @@ package gecko_decode_pkg;
         return float_op;
     endfunction
 
-    function automatic gecko_ecall_operation_t create_ecall_op(
-            input riscv32_fields_t instruction_fields,
-            input riscv32_reg_addr_t execute_saved_reg,
-            input riscv32_reg_value_t rs1_value, rs2_value,
-            input gecko_reg_status_t reg_status,
-            input gecko_jump_flag_t jump_flag
-    );
-        gecko_ecall_operation_t ecall_op;
+    // function automatic gecko_ecall_operation_t create_ecall_op(
+    //         input riscv32_fields_t instruction_fields,
+    //         input riscv32_reg_addr_t execute_saved_reg,
+    //         input riscv32_reg_value_t rs1_value, rs2_value,
+    //         input gecko_reg_status_t reg_status,
+    //         input gecko_jump_flag_t jump_flag
+    // );
+    //     gecko_ecall_operation_t ecall_op;
 
-        ecall_op.operation = rs1_value[7:0];
-        ecall_op.data = rs2_value[7:0];
+    //     ecall_op.operation = rs1_value[7:0];
+    //     ecall_op.data = rs2_value[7:0];
 
-        return ecall_op;
-    endfunction
+    //     return ecall_op;
+    // endfunction
 
 endpackage

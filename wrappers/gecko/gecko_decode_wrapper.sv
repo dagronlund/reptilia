@@ -39,15 +39,13 @@ module gecko_decode_wrapper
     input  wire                          float_command_ready,
     output gecko_float_operation_t       float_command_data,
 
-    output logic                         ecall_command_valid,
-    input  wire                          ecall_command_ready,
-    output gecko_ecall_operation_t       ecall_command_data,
-
     input gecko_forwarded_t [0:0] forwarded_results,
 
-    output gecko_retired_count_t retired_instructions,
+    output gecko_performance_stats_t performance_stats,
+    output gecko_debug_info_t debug_info,
+
     output logic exit_flag,
-    output logic [7:0] exit_code
+    output logic error_flag
 );
 
     mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) instruction_result (.clk, .rst);
@@ -56,7 +54,6 @@ module gecko_decode_wrapper
     stream_intf #(.T(gecko_system_operation_t))      system_command       (.clk, .rst);
     stream_intf #(.T(gecko_execute_operation_t))     execute_command      (.clk, .rst);
     stream_intf #(.T(gecko_float_operation_t))       float_command        (.clk, .rst);
-    stream_intf #(.T(gecko_ecall_operation_t))       ecall_command        (.clk, .rst);
     stream_intf #(.T(gecko_jump_operation_t))        jump_command         (.clk, .rst);
     stream_intf #(.T(gecko_operation_t))             writeback_result     (.clk, .rst);
 
@@ -95,16 +92,6 @@ module gecko_decode_wrapper
     always_comb float_command.ready = float_command_ready;
     always_comb float_command_data  = float_command.payload;
 
-    always_comb ecall_command_valid = ecall_command.valid;
-    always_comb ecall_command.ready = ecall_command_ready;
-    always_comb ecall_command_data  = ecall_command.payload;
-
-    // gecko_retired_count_t retired_instructions;
-    // logic exit_flag;
-    // logic [7:0] exit_code;
-
-    // gecko_forwarded_t [0:0] forwarded_results;
-
     gecko_decode inst (
         .clk, 
         .rst,
@@ -115,15 +102,16 @@ module gecko_decode_wrapper
         .system_command,
         .execute_command,
         .float_command,
-        .ecall_command,
 
         .jump_command,
         .writeback_result,
 
         .forwarded_results,
-        .retired_instructions,
+
+        .performance_stats,
+        .debug_info,
         .exit_flag,
-        .exit_code
+        .error_flag
     );
 
 endmodule

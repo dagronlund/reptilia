@@ -130,11 +130,10 @@ def main():
     ]
     top_level = ["rtl/gecko/cores/gecko_nano.sv"]
 
-    # Make sure bin/ folder exists
+    # Make sure bin/ folder(s) exists
     Path("bin/").mkdir(parents=True, exist_ok=True)
-
-    # Make sure bin/riscv-tests/ folder exists
     Path("bin/riscv-tests/").mkdir(parents=True, exist_ok=True)
+    Path("bin/verilator/").mkdir(parents=True, exist_ok=True)
 
     compiled_programs = {}
     assembled_programs = []
@@ -168,16 +167,16 @@ def main():
         )
     )
 
-    for path in glob.glob("riscv-tests/isa/rv32ui/*.S"):
-        name = Path(path).stem
-        assembled_programs.append(
-            RiscvProgram(
-                "riscv-tests/" + name,
-                [path],
-                linker_script="tests/gecko_assembled.ld",
-                include_folders=["riscv-tests/isa/macros/scalar/", "tests/"],
-            )
-        )
+    # for path in glob.glob("riscv-tests/isa/rv32ui/*.S"):
+    #     name = Path(path).stem
+    #     assembled_programs.append(
+    #         RiscvProgram(
+    #             "riscv-tests/" + name,
+    #             [path],
+    #             linker_script="tests/gecko_assembled.ld",
+    #             include_folders=["riscv-tests/isa/macros/scalar/", "tests/"],
+    #         )
+    #     )
 
     print("Finding RTL dependencies...")
     header_files = {}

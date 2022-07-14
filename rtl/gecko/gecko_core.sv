@@ -10,7 +10,6 @@
 //!import gecko/gecko_execute.sv
 //!import gecko/gecko_writeback.sv
 //!import gecko/gecko_system.sv
-//!import gecko/gecko_print.sv
 //!wrapper gecko/gecko_core_wrapper.sv
 
 `include "std/std_util.svh"
@@ -40,9 +39,14 @@ module gecko_core
     mem_intf.out float_mem_request,
     mem_intf.in float_mem_result,
 
-    stream_intf.out print_out,
+    output gecko_debug_info_t debug_info,
 
-    output logic faulted_flag, finished_flag
+    stream_intf.in  tty_in, // logic [7:0]
+    stream_intf.out tty_out, // logic [7:0]
+
+    output logic       exit_flag,
+    output logic       error_flag,
+    output logic [7:0] exit_code
 );
 
     `STATIC_ASSERT($size(inst_request.addr) == 32)
@@ -55,7 +59,6 @@ module gecko_core
 
     stream_intf #(.T(gecko_execute_operation_t)) execute_command (.clk, .rst);
     stream_intf #(.T(gecko_system_operation_t)) system_command (.clk, .rst);
-    stream_intf #(.T(gecko_ecall_operation_t)) ecall_command (.clk, .rst);
     stream_intf #(.T(gecko_float_operation_t)) float_command (.clk, .rst);
 
     stream_intf #(.T(gecko_operation_t)) execute_result (.clk, .rst);
@@ -72,7 +75,7 @@ module gecko_core
     stream_intf #(.T(gecko_mem_operation_t)) mem_command_in (.clk, .rst);
     stream_intf #(.T(gecko_mem_operation_t)) mem_command_out (.clk, .rst);
 
-    gecko_retired_count_t retired_instructions;
+    gecko_performance_stats_t performance_stats;
 
     always_comb memory_result.valid = mem_command_out.valid && data_result.valid;
     always_comb memory_result.payload = gecko_get_load_operation(mem_command_out.payload, data_result.data);
@@ -95,10 +98,6 @@ module gecko_core
         .PIPELINE_MODE(CONFIG.fetch_pipeline_mode),
         .START_ADDR(CONFIG.start_addr),
         .BRANCH_PREDICTOR_CONFIG(CONFIG.branch_predictor_config)
-        // .BRANCH_PREDICTOR_TYPE(BRANCH_PREDICTOR_TYPE),
-        // .BRANCH_PREDICTOR_TARGET_ADDR_WIDTH(BRANCH_PREDICTOR_TARGET_ADDR_WIDTH),
-        // .BRANCH_PREDICTOR_HISTORY_WIDTH(BRANCH_PREDICTOR_HISTORY_WIDTH),
-        // .BRANCH_PREDICTOR_LOCAL_ADDR_WIDTH(BRANCH_PREDICTOR_LOCAL_ADDR_WIDTH)
     ) gecko_fetch_inst (
         .clk, .rst,
 
@@ -142,15 +141,11 @@ module gecko_core
         .stream_out(instruction_command_break)
     );
 
-    logic exit_flag;
-    logic [7:0] exit_code;
-
     gecko_decode #(
         .CLOCK_INFO(CLOCK_INFO),
         .TECHNOLOGY(TECHNOLOGY),
         .PIPELINE_MODE(CONFIG.decode_pipeline_mode),
         .NUM_FORWARDED(3),
-        .ENABLE_PRINT(CONFIG.enable_print_out),
         .ENABLE_FLOAT(CONFIG.enable_floating_point),
         .ENABLE_INTEGER_MATH(CONFIG.enable_integer_math)
     ) gecko_decode_inst (
@@ -163,20 +158,18 @@ module gecko_core
         .execute_command,
         .float_command,
 
-        .ecall_command,
-
         .jump_command,
 
         .writeback_result,
 
         .forwarded_results({execute_forwarded, memory_forwarded, writeback_forwarded}),
 
-        .exit_flag, .exit_code,
-        .retired_instructions
-    );
+        .exit_flag, 
+        .error_flag,
 
-    always_comb finished_flag = exit_flag && (exit_code == 'b0);
-    always_comb faulted_flag = exit_flag && (exit_code != 'b0);
+        .performance_stats,
+        .debug_info
+    );
 
     gecko_execute #(
         .CLOCK_INFO(CLOCK_INFO),
@@ -211,24 +204,19 @@ module gecko_core
         .CLOCK_INFO(CLOCK_INFO),
         .TECHNOLOGY(TECHNOLOGY),
         .PIPELINE_MODE(CONFIG.system_pipeline_mode),
+        .ENABLE_TTY_IO(CONFIG.enable_tty_io),
         .ENABLE_PERFORMANCE_COUNTERS(CONFIG.enable_performance_counters)
     ) gecko_system_inst (
         .clk, .rst,
 
-        .retired_instructions,
+        .performance_stats,
 
         .system_command,
-        .system_result
-    );
+        .system_result,
 
-    gecko_print #(
-        .CLOCK_INFO(CLOCK_INFO),
-        .TECHNOLOGY(TECHNOLOGY),
-        .PIPELINE_MODE(CONFIG.print_pipeline_mode)
-    ) gecko_print_inst (
-        .clk, .rst,
-        .ecall_command,
-        .print_out
+        .tty_in,
+        .tty_out,
+        .exit_code
     );
 
     generate
@@ -300,40 +288,5 @@ module gecko_core
         .writeback_results_in, 
         .writeback_result
     );
-
-`ifdef __SIMULATION__
-    initial begin
-        // Clear file
-        automatic integer file = $fopen("log.txt", "w");
-        $fclose(file);
-
-        while ('b1) begin
-            while (finished_flag || faulted_flag) @ (posedge clk);
-            file = $fopen("log.txt", "w+");
-            $display("Opened file");
-            @ (posedge clk);
-            while (1) begin
-                if (print_out.valid && print_out.ready) begin
-                    $fwrite(file, "%c", print_out.payload);
-                end
-                if (faulted_flag || finished_flag) begin
-                    $display("Closed file");
-                    $fclose(file);
-                    break;
-                end
-                @ (posedge clk);
-            end
-            file = $fopen("status.txt", "w");
-            if (faulted_flag) begin
-                $display("Exit Error!!!");
-                $fwrite(file, "Failure");
-            end else begin
-                $display("Exit Success!!!");
-                $fwrite(file, "Success");
-            end
-            $fclose(file);
-        end
-    end
-`endif
 
 endmodule

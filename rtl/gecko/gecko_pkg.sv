@@ -67,10 +67,10 @@ package gecko_pkg;
         endcase
     endfunction
 
-    parameter gecko_reg_status_t GECKO_REG_STATUS_VALID = 'b0;
-    parameter gecko_reg_status_t GECKO_REG_STATUS_FULL = (-1);
+    parameter gecko_reg_status_t GECKO_REG_STATUS_VALID = '0;
+    parameter gecko_reg_status_t GECKO_REG_STATUS_FULL = '1;
 
-    parameter gecko_speculative_count_t GECKO_SPECULATIVE_FULL = (-1);
+    parameter gecko_speculative_count_t GECKO_SPECULATIVE_FULL = '1;
 
     typedef enum logic {
         GECKO_NORMAL = 'h0,
@@ -194,10 +194,10 @@ package gecko_pkg;
         riscv32_funct12_t sys_csr;
     } gecko_float_operation_t;
 
-    typedef struct packed {
-        logic [7:0] operation;
-        logic [7:0] data;
-    } gecko_ecall_operation_t;
+    // typedef struct packed {
+    //     logic [7:0] operation;
+    //     logic [7:0] data;
+    // } gecko_ecall_operation_t;
 
     // Internal Gecko Helper Functions -----------------------------------------
 
@@ -511,17 +511,19 @@ package gecko_pkg;
         gecko_branch_predictor_config_t branch_predictor_config;
         // Features
         bit enable_performance_counters;
-        bit enable_print_out;
+        bit enable_tty_io;
+        // bit enable_print_out;
         bit enable_floating_point;
         bit enable_integer_math;
     } gecko_config_t;
 
     function automatic gecko_branch_predictor_config_t gecko_get_basic_branch_predictor_config();
+        int addr_width = 5;
         return gecko_branch_predictor_config_t'{
             mode: GECKO_BRANCH_PREDICTOR_MODE_SIMPLE,
-            target_addr_width: 5,
-            history_width: 5,
-            local_addr_width: 5
+            target_addr_width: addr_width,
+            history_width: addr_width,
+            local_addr_width: addr_width
         };
     endfunction
 
@@ -544,10 +546,32 @@ package gecko_pkg;
             float_memory_latency: float_memory_latency,
             branch_predictor_config: gecko_get_basic_branch_predictor_config(),
             enable_performance_counters: 1,
-            enable_print_out: 1,
+            enable_tty_io: 1,
+            // enable_print_out: 1,
             enable_floating_point: 0,
             enable_integer_math: 0
         };
     endfunction    
+
+    // Gecko performance metrics -----------------------------------------------
+
+    typedef struct packed {
+        gecko_retired_count_t retired_instructions;
+        logic decode_good;
+        logic output_full;
+        logic input_empty;
+        logic register_missing;
+        logic instruction_mispredicted;
+        logic instruction_memory_stalled;
+        logic instruction_control_stalled;
+    } gecko_performance_stats_t;
+
+    typedef struct packed {
+        logic        jump_valid;
+        logic        register_write;
+        logic [4:0]  register_addr;
+        logic [31:0] jump_address;
+        logic [31:0] register_data;
+    } gecko_debug_info_t;
 
 endpackage

@@ -12,4 +12,5 @@ bss_loop_test:
     la      sp, __stack
     la      gp, __global_pointer$
     call    main
+    csrw    0x800, a0 
     ebreak

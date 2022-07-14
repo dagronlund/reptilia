@@ -110,7 +110,7 @@ class VerilatorProgram:
         for object_group in objects_fast + objects_slow:
             for source_path in cpp_dependencies[object_group]:
                 source_name = Path(source_path).stem
-                object_path = f"bin/{source_name}.o"
+                object_path = f"bin/verilator/{source_name}.o"
                 object_builds[object_path] = subprocess.Popen(
                     [
                         "g++-11",
@@ -138,6 +138,9 @@ class VerilatorProgram:
                     "-Iobj_dir/",
                     os.path.expandvars("-I$VERILATOR_ROOT/include"),
                     self.cpp_file,
+                    # os.path.expandvars("$VERILATOR_ROOT/include/verilated_vcd_c.cpp"),
+                    # os.path.expandvars("$VERILATOR_ROOT/include/verilated.cpp"),
+                    # "obj_dir/V" + self.module_name + "__ALL.cpp",
                     "-O2",
                     "-o",
                     "bin/" + self.module_name + "_simulator",

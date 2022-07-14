@@ -8,15 +8,24 @@ module gecko_sytem_wrapper
     stream_intf #(.T(gecko_system_operation_t)) system_command (.clk, .rst);
     stream_intf #(.T(gecko_operation_t))        system_result  (.clk, .rst);
 
-    gecko_retired_count_t retired_instructions;
+    stream_intf #(.T(logic [7:0])) tty_in (.clk, .rst);
+    stream_intf #(.T(logic [7:0])) tty_out (.clk, .rst);
+
+    logic [7:0] exit_code;
+
+    gecko_performance_stats_t performance_stats;
 
     gecko_system inst (
         .clk, 
         .rst,
 
-        .retired_instructions,
+        .performance_stats,
         .system_command,
-        .system_result
+        .system_result,
+
+        .tty_in,
+        .tty_out,
+        .exit_code
     );
 
 endmodule

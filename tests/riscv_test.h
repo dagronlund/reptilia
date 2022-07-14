@@ -13,11 +13,11 @@
 #define TESTNUM gp
 
 #define RVTEST_PASS \
-    li a0, 0; \
+    csrwi 0x800, 0; \
     ebreak;
 
 #define RVTEST_FAIL \
-    li a0, 1; \
+    csrwi 0x800, 1; \
     ebreak;
 
 #endif

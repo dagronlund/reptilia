@@ -34,9 +34,14 @@ module gecko_nano
     input wire clk, 
     input wire rst,
 
-    stream_intf.out print_out,
+    output gecko_debug_info_t debug_info,
 
-    output logic faulted_flag, finished_flag
+    stream_intf.in  tty_in, // logic [7:0]
+    stream_intf.out tty_out, // logic [7:0]
+
+    output logic       exit_flag,
+    output logic       error_flag,
+    output logic [7:0] exit_code
 );
 
     mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) inst_request (.clk, .rst);
@@ -85,10 +90,14 @@ module gecko_nano
         .float_mem_request,
         .float_mem_result,
 
-        .print_out,
+        .debug_info,
 
-        .finished_flag,
-        .faulted_flag
+        .tty_in,
+        .tty_out,
+
+        .exit_flag,
+        .error_flag,
+        .exit_code
     );
 
 endmodule

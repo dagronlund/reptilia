@@ -6,6 +6,7 @@
 //!import gecko/gecko_pkg.sv
 //!import stream/stream_intf.sv
 //!import std/std_register.sv
+//!import std/std_counter_pipelined.sv
 //!import stream/stream_stage.sv
 //!import stream/stream_controller.sv
 //!wrapper gecko/gecko_system_wrapper.sv
@@ -13,54 +14,6 @@
 `include "std/std_util.svh"
 `include "mem/mem_util.svh"
 
-/*
-This module contains all the basic RISC-V performance counters, plus support for 
-limited (custom) timer interrupts starting at 0xCA0. Right now those timers are 
-(two-ish) general purpose counter timers that can be used for a normal timer or 
-as a watchdog timer. If two or more timers go off at the same time the lowest 
-number timer address will be the one jumped to, so in most situations timer zero
-should be used for a watchdog if the system needs one. When interrupts are
-encountered they cause the processor to jump to the vector table, which is a
-configurable memory base address, and every timer is assigned an entry in the
-vector table.
-
-VECTOR_TABLE + (0 to 15 words): Reserved
-VECTOR_TABLE + (16 to 31 words): Timers 0 through n
-
-The enable register is set to one in order to start the timer, and can be 
-toggled to reset the timer (ideally use the status/reset register). When the 
-timer does expire and the vector table is jumped to, the timer will change the 
-enable  bit to zero. This is to prevent the user from accidentally creating a 
-timer that  triggers every couple cycles or so and prevents any user code from 
-ever turning it off.
-
-Reading from the status register will show if the timer has been triggered in 
-bit zero. This is only really useful if a lower priority timer was triggered and 
-the program wants to see if any other timers went off at the same time. Writing 
-to the status register will reset the timer counter to the duration last written
-to the duration register. This is most useful in the case of a watchdog timer
-where the timer must be reset before the watchdog duration expires. Resetting a
-timer that is not currently enabled will have no effect.
-
-The duration register when written to will change the default duration for the 
-timer when it is reset, but will not change the current countdown until such a 
-reset occurs. Likewise reading from the duration register will report the 
-current countdown of the timer and not the duration last written. 
-
-The return address register is read-only and contains the program counter of the
-instruction that was going to be executed if the counter interrupt did not
-occur. The interrupt handler when it is complete should restore the normal
-program registers before then jumping to this address. In order to not pollute
-the registers once they have been restored, a special ECALL instruction can be
-used to jump directly to this address.
-
-0xCA0: Timer0 Enable (1-bit)
-0xCA1: Timer0 Status/Reset (1-bit)
-0xCA2: Timer0 Duration (32-bits)
-0xCA3: Timer0 Return Address (32-bits)
-...
-
-*/
 module gecko_system
     import std_pkg::*;
     import stream_pkg::*;
@@ -72,39 +25,59 @@ module gecko_system
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
-    parameter bit ENABLE_PERFORMANCE_COUNTERS = 1
+    parameter bit ENABLE_TTY_IO = 0,
+    parameter bit ENABLE_PERFORMANCE_COUNTERS = 0
 )(
     input wire clk, 
     input wire rst,
-    input gecko_retired_count_t retired_instructions,
+    input gecko_performance_stats_t performance_stats,
     stream_intf.in system_command, // gecko_system_operation_t
-    stream_intf.out system_result // gecko_operation_t
+    stream_intf.out system_result, // gecko_operation_t
+
+    stream_intf.in     tty_in, // logic [7:0]
+    stream_intf.out    tty_out, // logic [7:0]
+    output logic [7:0] exit_code
 );
 
-    // TODO: Use different counters for RDCYCLE and RDTIME to support processor pausing
-    logic [32:0] next_clock_counter_partial, next_instruction_counter_partial;
-    logic [32:0] clock_counter_partial, instruction_counter_partial;
-    logic [63:0] next_clock_counter, next_instruction_counter;
-    logic [63:0] clock_counter, instruction_counter;
+    typedef logic [7:0]  byte_t;
+    typedef logic [31:0] word_t;
 
-    logic consume, produce, enable;
+    function automatic riscv32_reg_value_t update_csr(
+            input riscv32_reg_value_t current_value,
+            input gecko_system_operation_t op
+    );
+        case (op.sys_op)
+        RISCV32I_FUNCT3_SYS_CSRRW:  return op.rs1_value;
+        RISCV32I_FUNCT3_SYS_CSRRS:  return current_value | op.rs1_value;
+        RISCV32I_FUNCT3_SYS_CSRRC:  return current_value & ~op.rs1_value;
+        RISCV32I_FUNCT3_SYS_CSRRWI: return op.imm_value;
+        RISCV32I_FUNCT3_SYS_CSRRSI: return current_value | op.imm_value;
+        RISCV32I_FUNCT3_SYS_CSRRCI: return current_value & ~op.imm_value;
+        default:                    return '0;
+        endcase
+    endfunction
 
-    stream_intf #(.T(gecko_operation_t)) next_system_result (.clk, .rst);
+    logic consume_command, produce_result, enable;
+    logic consume_tty, produce_tty;
+
+    stream_intf #(.T(gecko_operation_t)) system_result_next (.clk, .rst);
+    stream_intf #(.T(logic [7:0]))       tty_in_buffered    (.clk, .rst);
+    stream_intf #(.T(logic [7:0]))       tty_out_next       (.clk, .rst);
 
     stream_controller #(
-        .NUM_INPUTS(1),
-        .NUM_OUTPUTS(1)
+        .NUM_INPUTS(2),
+        .NUM_OUTPUTS(2)
     ) stream_controller_inst (
         .clk, .rst,
 
-        .valid_input({system_command.valid}),
-        .ready_input({system_command.ready}),
+        .valid_input({system_command.valid, tty_in_buffered.valid}),
+        .ready_input({system_command.ready, tty_in_buffered.ready}),
         
-        .valid_output({next_system_result.valid}),
-        .ready_output({next_system_result.ready}),
+        .valid_output({system_result_next.valid, tty_out_next.valid}),
+        .ready_output({system_result_next.ready, tty_out_next.ready}),
 
-        .consume({consume}),
-        .produce({produce}),
+        .consume({consume_command, consume_tty}),
+        .produce({produce_result,  produce_tty}),
 
         .enable
     );
@@ -115,111 +88,146 @@ module gecko_system
         .T(gecko_operation_t)
     ) system_result_stage_inst (
         .clk, .rst,
-        .stream_in(next_system_result), .stream_out(system_result)
+        .stream_in(system_result_next), .stream_out(system_result)
     );
+
+    stream_stage #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .PIPELINE_MODE(STREAM_PIPELINE_MODE_BUFFERED),
+        .T(logic [7:0])
+    ) tty_in_stage_inst (
+        .clk, .rst,
+        .stream_in(tty_in), .stream_out(tty_in_buffered)
+    );
+
+    stream_stage #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .PIPELINE_MODE(STREAM_PIPELINE_MODE_BUFFERED),
+        .T(logic [7:0])
+    ) tty_out_stage_inst (
+        .clk, .rst,
+        .stream_in(tty_out_next), .stream_out(tty_out)
+    );
+
+    // TODO: Use different counters for RDCYCLE and RDTIME to support processor pausing
+    logic [31:0] perf_counter_increments [9];
+    always_comb perf_counter_increments = '{
+        32'b1, // clock cycles
+        {27'b0, performance_stats.retired_instructions},
+        {31'b0, performance_stats.decode_good},
+        {31'b0, performance_stats.output_full},
+        {31'b0, performance_stats.input_empty},
+        {31'b0, performance_stats.register_missing},
+        {31'b0, performance_stats.instruction_mispredicted},
+        {31'b0, performance_stats.instruction_memory_stalled},
+        {31'b0, performance_stats.instruction_control_stalled}
+    };
+
+    logic [63:0] perf_counters [9];
+
+    genvar k;
+    generate
+    for (k = 0; k < 9; k++) begin
+        std_counter_pipelined #(
+            .CLOCK_INFO(CLOCK_INFO),
+            .PIPELINE_WIDTH(32),
+            .PIPELINE_COUNT(2),
+            .RESET_VECTOR('b0)
+        ) counter_inst (
+            .clk, .rst,
+            .increment(perf_counter_increments[k]),
+            .value(perf_counters[k]),
+            .overflowed()
+        );
+    end
+    endgenerate
+
+    logic [7:0] exit_code_next;
 
     std_register #(
         .CLOCK_INFO(CLOCK_INFO),
-        .T(logic [32:0]),
+        .T(logic [7:0]),
         .RESET_VECTOR('b0)
-    ) clock_counter_partial_register_inst (
+    ) exit_code_register_inst (
         .clk, .rst,
-        .enable('b1),
-        .next(next_clock_counter_partial),
-        .value(clock_counter_partial)
-    );
-
-    std_register #(
-        .CLOCK_INFO(CLOCK_INFO),
-        .T(logic [32:0]),
-        .RESET_VECTOR('b0)
-    ) instruction_counter_partial_register_inst (
-        .clk, .rst,
-        .enable('b1),
-        .next(next_instruction_counter_partial),
-        .value(instruction_counter_partial)
-    );
-
-    std_register #(
-        .CLOCK_INFO(CLOCK_INFO),
-        .T(logic [63:0]),
-        .RESET_VECTOR('b0)
-    ) clock_counter_register_inst (
-        .clk, .rst,
-        .enable('b1),
-        .next(next_clock_counter),
-        .value(clock_counter)
-    );
-
-    std_register #(
-        .CLOCK_INFO(CLOCK_INFO),
-        .T(logic [63:0]),
-        .RESET_VECTOR('b0)
-    ) instruction_counter_register_inst (
-        .clk, .rst,
-        .enable('b1),
-        .next(next_instruction_counter),
-        .value(instruction_counter)
+        .enable,
+        .next(exit_code_next),
+        .value(exit_code)
     );
 
     always_comb begin
         automatic gecko_system_operation_t command_in;
 
-        next_clock_counter_partial = {1'b0, clock_counter_partial[31:0]} + 'b1;
-        next_instruction_counter_partial = {1'b0, instruction_counter_partial[31:0]} + {28'b0, retired_instructions};
-
-        next_clock_counter[31:0] = clock_counter_partial[31:0];
-        next_clock_counter[63:32] = clock_counter[63:32] + {31'b0, clock_counter_partial[32]};
-
-        next_instruction_counter[31:0] = instruction_counter_partial[31:0];
-        next_instruction_counter[63:32] = instruction_counter[63:32] + {31'b0, instruction_counter_partial[32]};
-
         command_in = gecko_system_operation_t'(system_command.payload);
 
-        consume = 'b1;
+        consume_command = 'b1;
+        consume_tty = 'b0;
+        produce_tty = 'b0;
 
-        next_system_result.payload.addr = command_in.reg_addr;
-        next_system_result.payload.speculative = 'b0;
-        next_system_result.payload.reg_status = command_in.reg_status;
-        next_system_result.payload.jump_flag = command_in.jump_flag;
-        next_system_result.payload.value = 'b0;
+        exit_code_next = exit_code;
+        tty_out_next.payload = 'b0;
+
+        system_result_next.payload.addr = command_in.reg_addr;
+        system_result_next.payload.speculative = 'b0;
+        system_result_next.payload.reg_status = command_in.reg_status;
+        system_result_next.payload.jump_flag = command_in.jump_flag;
+        system_result_next.payload.value = 'b0;
 
         if (ENABLE_PERFORMANCE_COUNTERS) begin
             case (command_in.csr)
-            RISCV32I_CSR_CYCLE: next_system_result.payload.value = clock_counter[31:0];
-            RISCV32I_CSR_TIME: next_system_result.payload.value = clock_counter[31:0];
-            RISCV32I_CSR_INSTRET: next_system_result.payload.value = instruction_counter[31:0];
-            RISCV32I_CSR_CYCLEH: next_system_result.payload.value = clock_counter[63:32];
-            RISCV32I_CSR_TIMEH: next_system_result.payload.value = clock_counter[63:32];
-            RISCV32I_CSR_INSTRETH: next_system_result.payload.value = instruction_counter[63:32];
+            RISCV32I_CSR_CYCLE: system_result_next.payload.value = perf_counters[0][31:0];
+            RISCV32I_CSR_TIME: system_result_next.payload.value = perf_counters[0][31:0];
+            RISCV32I_CSR_INSTRET: system_result_next.payload.value = perf_counters[1][31:0];
+
+            12'hC03: system_result_next.payload.value = perf_counters[2][31:0];
+            12'hC04: system_result_next.payload.value = perf_counters[3][31:0];
+            12'hC05: system_result_next.payload.value = perf_counters[4][31:0];
+            12'hC06: system_result_next.payload.value = perf_counters[5][31:0];
+            12'hC07: system_result_next.payload.value = perf_counters[6][31:0];
+            12'hC08: system_result_next.payload.value = perf_counters[7][31:0];
+            12'hC09: system_result_next.payload.value = perf_counters[8][31:0];
+
+            RISCV32I_CSR_CYCLEH: system_result_next.payload.value = perf_counters[0][63:32];
+            RISCV32I_CSR_TIMEH: system_result_next.payload.value = perf_counters[0][63:32];
+            RISCV32I_CSR_INSTRETH: system_result_next.payload.value = perf_counters[1][63:32];
             default: begin end
             endcase
         end
 
+        tty_out_next.payload = byte_t'(update_csr('b0, command_in));
+
+        if (ENABLE_TTY_IO) begin
+            case (command_in.csr)
+            12'h800: system_result_next.payload.value = word_t'(exit_code);
+            12'h801: system_result_next.payload.value = 'b0;
+            12'h802: system_result_next.payload.value = word_t'(tty_in_buffered.payload);
+            default: begin end
+            endcase
+        end
+
+        produce_result = (command_in.reg_addr != 'b0); // Don't produce writeback to x0
+
         case (command_in.sys_op)
         RISCV32I_FUNCT3_SYS_ENV: begin // System Op
-            produce = 'b0;
+            produce_result = 'b0;
         end
-        RISCV32I_FUNCT3_SYS_CSRRW: begin // Read Write
-            produce = (command_in.reg_addr != 'b0); // Don't produce writeback to x0
-        end
-        RISCV32I_FUNCT3_SYS_CSRRS: begin // Read Set
-            produce = (command_in.reg_addr != 'b0); // Don't produce writeback to x0
-        end
-        RISCV32I_FUNCT3_SYS_CSRRC: begin // Read Clear
-            produce = (command_in.reg_addr != 'b0); // Don't produce writeback to x0
-        end
-        RISCV32I_FUNCT3_SYS_CSRRWI: begin // Read Write Imm
-            produce = (command_in.reg_addr != 'b0); // Don't produce writeback to x0
-        end
-        RISCV32I_FUNCT3_SYS_CSRRSI: begin // Read Set Imm
-            produce = (command_in.reg_addr != 'b0); // Don't produce writeback to x0
-        end
-        RISCV32I_FUNCT3_SYS_CSRRCI: begin // Read Clear Imm
-            produce = (command_in.reg_addr != 'b0); // Don't produce writeback to x0
+        RISCV32I_FUNCT3_SYS_CSRRW, 
+        RISCV32I_FUNCT3_SYS_CSRRS, 
+        RISCV32I_FUNCT3_SYS_CSRRC,
+        RISCV32I_FUNCT3_SYS_CSRRWI, 
+        RISCV32I_FUNCT3_SYS_CSRRSI, 
+        RISCV32I_FUNCT3_SYS_CSRRCI: begin // CSR Op
+            if (ENABLE_TTY_IO) begin
+                case (command_in.csr)
+                12'h800: exit_code_next = byte_t'(update_csr(word_t'(exit_code), command_in));
+                12'h801: produce_tty = 'b1;
+                12'h802: consume_tty = 'b1;
+                default: begin end
+                endcase
+            end
         end
         default: begin
-            produce = 'b0;
+            produce_result = 'b0;
         end
         endcase
     end
