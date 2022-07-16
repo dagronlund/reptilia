@@ -280,21 +280,21 @@ package gecko_decode_pkg;
     function automatic gecko_decode_operands_status_t gecko_decode_find_operand_status(
             input riscv32_fields_t instruction_fields,
             input riscv32_reg_addr_t ex_saved,
-            input gecko_reg_status_t rd_front_status, rd_rear_status,
-            input gecko_reg_status_t rs1_front_status, rs1_rear_status,
-            input gecko_reg_status_t rs2_front_status, rs2_rear_status
+            input gecko_reg_status_t rd_status,
+            input gecko_reg_status_t rs1_status,
+            input gecko_reg_status_t rs2_status
     );
         riscv32_reg_addr_t rd, rs1, rs2;
-        gecko_reg_status_t rd_status, rs1_status, rs2_status;
+        // gecko_reg_status_t rd_status, rs1_status, rs2_status;
         gecko_decode_operands_status_t op_status, op_required;
 
         rd = instruction_fields.rd;
         rs1 = instruction_fields.rs1;
         rs2 = instruction_fields.rs2;
 
-        rd_status = rd_front_status - rd_rear_status;
-        rs1_status = rs1_front_status - rs1_rear_status;
-        rs2_status = rs2_front_status - rs2_rear_status;
+        // rd_status = rd_front_status - rd_rear_status;
+        // rs1_status = rs1_front_status - rs1_rear_status;
+        // rs2_status = rs2_front_status - rs2_rear_status;
 
         op_status = '{
                 rs1_valid: is_register_readable(rs1, ex_saved, rs1_status),
