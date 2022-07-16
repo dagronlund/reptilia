@@ -107,19 +107,20 @@ module gecko_decode
     typedef gecko_speculative_entry_t [NUM_SPECULATIVE_COUNTERS-1:0] gecko_speculative_status_t;
 
     typedef struct packed {
-        logic rs1_valid, rs2_valid;
+        logic               rs1_valid, rs2_valid;
+        riscv32_reg_addr_t  rs1_addr,  rs2_addr;
         riscv32_reg_value_t rs1_value, rs2_value;
-    } gecko_decode_forwarded_search_t;
+    } gecko_rs1_rs2_status_t;
 
-    function automatic gecko_decode_forwarded_search_t get_forwarded_values(
-            input riscv32_fields_t instruction_fields,
+    function automatic gecko_rs1_rs2_status_t get_forwarded_values(
+            input gecko_rs1_rs2_status_t status,
             input gecko_forwarded_t [NUM_FORWARDED_SAFE-1:0] forwarded_results,
             input gecko_reg_status_t rs1_status_front_last, 
             input gecko_reg_status_t rs2_status_front_last,
             input gecko_speculative_status_t speculative_status,
             input logic during_speculation
     );
-        gecko_decode_forwarded_search_t search = '{default: 'b0};
+        gecko_rs1_rs2_status_t status_next = status;
 
         // Find forwarded results
         for (int i = 0; i < NUM_FORWARDED; i++) begin
@@ -131,23 +132,23 @@ module gecko_decode
                         !speculative_status[forwarded_results[i].jump_flag].mispredicted)) begin
 
                     // Check forwarding for result of rs1
-                    if (forwarded_results[i].addr == instruction_fields.rs1 &&
+                    if (forwarded_results[i].addr == status.rs1_addr &&
                             forwarded_results[i].reg_status == rs1_status_front_last) begin
-                        search.rs1_value = forwarded_results[i].value;
-                        search.rs1_valid = 'b1;
+                        status_next.rs1_value = forwarded_results[i].value;
+                        status_next.rs1_valid = 'b1;
                     end
 
                     // Check forwarding for result of rs2
-                    if (forwarded_results[i].addr == instruction_fields.rs2 &&
+                    if (forwarded_results[i].addr == status.rs2_addr &&
                             forwarded_results[i].reg_status == rs2_status_front_last) begin
-                        search.rs2_value = forwarded_results[i].value;
-                        search.rs2_valid = 'b1;
+                        status_next.rs2_value = forwarded_results[i].value;
+                        status_next.rs2_valid = 'b1;
                     end
                 end
             end
         end
 
-        return search;
+        return status_next;
     endfunction
 
     stream_controller8_output_t stream_controller_result;
@@ -386,13 +387,14 @@ module gecko_decode
 
     logic flush_instruction, send_operation, decode_exit, during_speculation /* verilator isolate_assignments*/;
 
+    gecko_rs1_rs2_status_t rs1_rs2_status;
+
     always_comb begin
         automatic gecko_decode_operands_status_t operands_status;
         automatic riscv32_reg_value_t rs1_value_forwarded, rs2_value_forwarded;
         automatic gecko_reg_status_t rd_status, rd_counter;
 
         automatic logic increment_speculative_counter, clear_speculative_mispredict;
-        automatic gecko_decode_forwarded_search_t forwarded_search;
 
         // Reassign payloads to typed values
         instruction_op = gecko_instruction_operation_t'(instruction_command.payload);
@@ -459,9 +461,14 @@ module gecko_decode
                 rs2_status
         );
 
+        rs1_rs2_status = '{
+            rs1_valid: operands_status.rs1_valid, rs2_valid: operands_status.rs2_valid,
+            rs1_addr:  instruction_fields.rs1,    rs2_addr:  instruction_fields.rs2,
+            rs1_value: rs1_value,                 rs2_value: rs2_value 
+        };
         // Find any forwarded values if they exist
-        forwarded_search = get_forwarded_values(
-                instruction_fields,
+        rs1_rs2_status = get_forwarded_values(
+                rs1_rs2_status,
                 forwarded_results,
                 rs1_status_front_last, 
                 rs2_status_front_last,
@@ -469,18 +476,13 @@ module gecko_decode
                 during_speculation
         );
 
-        operands_status.rs1_valid |= forwarded_search.rs1_valid;
-        operands_status.rs2_valid |= forwarded_search.rs2_valid;
-        rs1_value_forwarded = forwarded_search.rs1_valid ? forwarded_search.rs1_value : rs1_value;
-        rs2_value_forwarded = forwarded_search.rs2_valid ? forwarded_search.rs2_value : rs2_value;
-
         // Build commands
         next_execute_command.payload = create_execute_op(
                 instruction_fields, 
                 instruction_op,
                 next_execute_saved, 
-                rs1_value_forwarded, 
-                rs2_value_forwarded,
+                rs1_rs2_status.rs1_value, 
+                rs1_rs2_status.rs2_value,
                 rd_read_status_front,
                 next_speculative_flag_rear,
                 during_speculation
@@ -489,8 +491,8 @@ module gecko_decode
         next_system_command.payload = create_system_op(
                 instruction_fields, 
                 next_execute_saved, 
-                rs1_value_forwarded, 
-                rs2_value_forwarded,
+                rs1_rs2_status.rs1_value, 
+                rs1_rs2_status.rs2_value,
                 rd_read_status_front,
                 next_speculative_flag_rear
         );
@@ -498,8 +500,8 @@ module gecko_decode
         next_float_command.payload = create_float_op(
                 instruction_fields, 
                 next_execute_saved, 
-                rs1_value_forwarded, 
-                rs2_value_forwarded,
+                rs1_rs2_status.rs1_value, 
+                rs1_rs2_status.rs2_value,
                 rd_read_status_front,
                 next_speculative_flag_rear
         );
@@ -519,7 +521,7 @@ module gecko_decode
                 flush_instruction = 'b1;
                 performance_stats_next.instruction_mispredicted = 'b1;
             // Wait if instruction registers are not ready yet
-            end else if (!operands_status.rs1_valid || !operands_status.rs2_valid || !operands_status.rd_valid) begin
+            end else if (!rs1_rs2_status.rs1_valid || !rs1_rs2_status.rs2_valid || !operands_status.rd_valid) begin
                 consume_instruction = 'b0;
                 flush_instruction = 'b0;
                 performance_stats_next.register_missing = 'b1;
