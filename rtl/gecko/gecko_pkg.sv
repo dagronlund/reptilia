@@ -20,10 +20,10 @@ package gecko_pkg;
     typedef logic [3:0] gecko_store_mask_t;
 
     // Configurable Types
-    typedef logic gecko_jump_flag_t;
+    typedef logic [1:0] gecko_jump_flag_t;
     typedef logic [2:0] gecko_reg_status_t;
-    typedef logic [2:0] gecko_speculative_count_t;
-    typedef logic [4:0] gecko_retired_count_t;
+    // typedef logic [2:0] gecko_inst_count_t;
+    // typedef logic [4:0] gecko_retired_count_t;
     typedef logic [7:0] gecko_prediction_history_t;
 
     typedef enum logic [1:0] {
@@ -52,25 +52,25 @@ package gecko_pkg;
             input logic took_branch
     );
         unique case (history)
-        GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN: 
-            return took_branch ? GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN : 
-                    GECKO_BRANCH_PREDICTOR_HISTORY_TAKEN;
-        GECKO_BRANCH_PREDICTOR_HISTORY_TAKEN: 
-            return took_branch ? GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN : 
-                    GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_NOT_TAKEN;
-        GECKO_BRANCH_PREDICTOR_HISTORY_NOT_TAKEN: 
-            return took_branch ? GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN : 
-                    GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_NOT_TAKEN;
-        GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_NOT_TAKEN: 
-            return took_branch ? GECKO_BRANCH_PREDICTOR_HISTORY_NOT_TAKEN : 
-                    GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_NOT_TAKEN;
+        GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN: return took_branch ? 
+                GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN : 
+                GECKO_BRANCH_PREDICTOR_HISTORY_TAKEN;
+        GECKO_BRANCH_PREDICTOR_HISTORY_TAKEN: return took_branch ? 
+                GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN : 
+                GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_NOT_TAKEN;
+        GECKO_BRANCH_PREDICTOR_HISTORY_NOT_TAKEN: return took_branch ? 
+                GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN : 
+                GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_NOT_TAKEN;
+        GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_NOT_TAKEN: return took_branch ? 
+                GECKO_BRANCH_PREDICTOR_HISTORY_NOT_TAKEN : 
+                GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_NOT_TAKEN;
         endcase
     endfunction
 
     parameter gecko_reg_status_t GECKO_REG_STATUS_VALID = '0;
     parameter gecko_reg_status_t GECKO_REG_STATUS_FULL = '1;
 
-    parameter gecko_speculative_count_t GECKO_SPECULATIVE_FULL = '1;
+    // parameter gecko_speculative_count_t GECKO_SPECULATIVE_FULL = '1;
 
     typedef enum logic {
         GECKO_NORMAL = 'h0,
@@ -110,16 +110,17 @@ package gecko_pkg;
         riscv32_reg_addr_t addr;
         gecko_reg_status_t reg_status;
         gecko_jump_flag_t jump_flag;
-        logic speculative;
         riscv32_reg_value_t value;
+        logic mispredicted;
     } gecko_operation_t;
 
     typedef struct packed {
+        logic valid;
         riscv32_reg_addr_t addr;
-        logic valid, speculative;
         gecko_jump_flag_t jump_flag;
         gecko_reg_status_t reg_status;
         riscv32_reg_value_t value;
+        logic mispredicted;
     } gecko_forwarded_t;
 
     typedef struct packed {
@@ -127,12 +128,13 @@ package gecko_pkg;
         gecko_pc_t current_pc, actual_next_pc;
         gecko_prediction_t prediction;
         logic halt;
+        logic mispredicted;
     } gecko_jump_operation_t;
 
     typedef struct packed {
         gecko_pc_t pc, next_pc;
         gecko_prediction_t prediction;
-        gecko_jump_flag_t jump_flag;
+        logic pc_updated;
     } gecko_instruction_operation_t;
 
     typedef struct packed {
@@ -141,6 +143,7 @@ package gecko_pkg;
         gecko_jump_flag_t jump_flag;
         riscv32i_funct3_ls_t op;
         gecko_byte_offset_t offset;
+        logic mispredicted;
     } gecko_mem_operation_t;
 
     typedef struct packed {
@@ -166,7 +169,7 @@ package gecko_pkg;
         riscv32_reg_addr_t reg_addr;
         gecko_reg_status_t reg_status;
         gecko_jump_flag_t jump_flag;
-        logic speculative;
+        logic pc_updated;
         logic halt;
 
         gecko_execute_type_t op_type;
@@ -194,11 +197,6 @@ package gecko_pkg;
         riscv32_funct12_t sys_csr;
     } gecko_float_operation_t;
 
-    // typedef struct packed {
-    //     logic [7:0] operation;
-    //     logic [7:0] data;
-    // } gecko_ecall_operation_t;
-
     // Internal Gecko Helper Functions -----------------------------------------
 
     function automatic gecko_forwarded_t gecko_construct_forward(
@@ -210,7 +208,7 @@ package gecko_pkg;
             reg_status: op.reg_status,
             jump_flag: op.jump_flag,
             valid: valid,
-            speculative: op.speculative,
+            mispredicted: op.mispredicted,
             value: op.value
         };
     endfunction
@@ -328,7 +326,7 @@ package gecko_pkg;
             addr: mem_op.addr,
             reg_status: mem_op.reg_status,
             jump_flag: mem_op.jump_flag,
-            speculative: 'b0
+            mispredicted: mem_op.mispredicted
         };
     endfunction
 
@@ -547,7 +545,6 @@ package gecko_pkg;
             branch_predictor_config: gecko_get_basic_branch_predictor_config(),
             enable_performance_counters: 1,
             enable_tty_io: 1,
-            // enable_print_out: 1,
             enable_floating_point: 0,
             enable_integer_math: 0
         };
@@ -556,14 +553,12 @@ package gecko_pkg;
     // Gecko performance metrics -----------------------------------------------
 
     typedef struct packed {
-        gecko_retired_count_t retired_instructions;
-        logic decode_good;
-        logic output_full;
-        logic input_empty;
-        logic register_missing;
+        logic instruction_completed;
         logic instruction_mispredicted;
-        logic instruction_memory_stalled;
+        logic instruction_data_stalled;
         logic instruction_control_stalled;
+        logic frontend_stalled;
+        logic backend_stalled;
     } gecko_performance_stats_t;
 
     typedef struct packed {

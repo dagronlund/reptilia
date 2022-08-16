@@ -30,6 +30,7 @@ package gecko_decode_pkg;
         logic execute_flag;
         logic system_flag;
         logic float_flag;
+        logic exit_flag;
         logic error_flag;
     } gecko_decode_opcode_status_t;
 
@@ -82,46 +83,36 @@ package gecko_decode_pkg;
         return current_execute_saved;
     endfunction
 
-    function automatic gecko_decode_opcode_status_t get_opcode_status(
-            input riscv32_fields_t instruction_fields
+    function automatic gecko_decode_opcode_status_t decode_opcode(
+            input riscv32_fields_t instruction_fields,
+            input logic enable_integer_math,
+            input logic enable_floating_point
     );
         gecko_decode_opcode_status_t status = '{default: 'b0};
         case (riscv32i_opcode_t'(instruction_fields.opcode))
-        RISCV32I_OPCODE_OP, RISCV32I_OPCODE_IMM, RISCV32I_OPCODE_LUI, 
-        RISCV32I_OPCODE_AUIPC, RISCV32I_OPCODE_LOAD: begin
+        RISCV32I_OPCODE_OP, 
+        RISCV32I_OPCODE_IMM, 
+        RISCV32I_OPCODE_LUI, 
+        RISCV32I_OPCODE_AUIPC, 
+        RISCV32I_OPCODE_LOAD: begin
             status.execute_flag = (instruction_fields.rd != 'b0);
         end
-        RISCV32I_OPCODE_STORE, RISCV32I_OPCODE_JAL, 
-        RISCV32I_OPCODE_JALR, RISCV32I_OPCODE_BRANCH: begin
+        RISCV32I_OPCODE_STORE, 
+        RISCV32I_OPCODE_JAL, 
+        RISCV32I_OPCODE_JALR, 
+        RISCV32I_OPCODE_BRANCH: begin
             status.execute_flag = 'b1;
         end
         RISCV32I_OPCODE_SYSTEM: begin
             case (riscv32i_funct3_sys_t'(instruction_fields.funct3))
-            RISCV32I_FUNCT3_SYS_ENV: begin
-            end
-            RISCV32I_FUNCT3_SYS_CSRRW, RISCV32I_FUNCT3_SYS_CSRRS, 
-            RISCV32I_FUNCT3_SYS_CSRRC, RISCV32I_FUNCT3_SYS_CSRRWI, 
-            RISCV32I_FUNCT3_SYS_CSRRSI, RISCV32I_FUNCT3_SYS_CSRRCI: begin
-                // case (instruction_fields.funct12)
-                // // RISCV32I_CSR_CYCLE, RISCV32I_CSR_TIME, RISCV32I_CSR_INSTRET, 
-                // // RISCV32I_CSR_CYCLEH, RISCV32I_CSR_TIMEH, RISCV32I_CSR_INSTRETH: begin
-                    
-                // // end
-                // RISCV32F_CSR_FFLAGS, RISCV32F_CSR_FRM, RISCV32F_CSR_FCSR, RISCV32V_CSR_VL: begin
-                //     status.float_flag = 'b1;
-                // end
-                // default: begin
-                //     if (RISCV32I_CSR_CYCLE <= instruction_fields.funct12 && 
-                //             instruction_fields.funct12 < RISCV32I_CSR_CYCLE + 'd32) begin
-                //         status.system_flag = 'b1;
-                //     end else if (RISCV32I_CSR_CYCLEH <= instruction_fields.funct12 && 
-                //             instruction_fields.funct12 < RISCV32I_CSR_CYCLEH + 'd32) begin
-                //         status.system_flag = 'b1;
-                //     end else begin
-                //         status.error_flag = 'b1;
-                //     end
-                // end
-                // endcase
+            RISCV32I_FUNCT3_SYS_ENV: begin end
+            RISCV32I_FUNCT3_SYS_CSRRW, 
+            RISCV32I_FUNCT3_SYS_CSRRS, 
+            RISCV32I_FUNCT3_SYS_CSRRC, 
+            RISCV32I_FUNCT3_SYS_CSRRWI, 
+            RISCV32I_FUNCT3_SYS_CSRRSI, 
+            RISCV32I_FUNCT3_SYS_CSRRCI: begin
+                // TODO: Validate CSR addresses
                 status.system_flag = 'b1;
             end
             default: begin
@@ -133,6 +124,14 @@ package gecko_decode_pkg;
             status.error_flag = 'b1;
         end
         endcase
+        status.exit_flag = status.error_flag ||
+                           is_instruction_ebreak(instruction_fields);
+
+        // status.error_flag |= (ENABLE_FLOAT == 0) && 
+        //                     opcode_status.float_flag;
+        // status.error_flag |= (ENABLE_INTEGER_MATH == 0) && 
+        //                     opcode_status.execute_flag && 
+        //                     next_execute_command.payload.op_type == GECKO_EXECUTE_TYPE_MUL_DIV;
 
         // case (riscv32f_opcode_t'(instruction_fields.opcode))
         // RISCV32F_OPCODE_FLW, RISCV32F_OPCODE_FSW,
@@ -206,6 +205,12 @@ package gecko_decode_pkg;
         endcase
     endfunction
 
+    function automatic logic is_instruction_system(
+            input riscv32_fields_t instruction_fields
+    );
+        return instruction_fields.opcode == RISCV32I_OPCODE_SYSTEM;
+    endfunction    
+
     function automatic logic is_instruction_ecall(
             input riscv32_fields_t instruction_fields
     );
@@ -222,22 +227,28 @@ package gecko_decode_pkg;
                 (instruction_fields.funct12 == RISCV32I_CSR_EBREAK);
     endfunction
 
-    function automatic logic does_opcode_writeback (
+    function automatic riscv32_reg_addr_t get_instruction_writeback (
             input riscv32_fields_t instruction_fields
     );
         case (riscv32i_opcode_t'(instruction_fields.opcode))
-        RISCV32I_OPCODE_OP, RISCV32I_OPCODE_IMM,
-        RISCV32I_OPCODE_LOAD, RISCV32I_OPCODE_LUI,
-        RISCV32I_OPCODE_AUIPC, RISCV32I_OPCODE_JAL,
-        RISCV32I_OPCODE_JALR, RISCV32I_OPCODE_FENCE: return (instruction_fields.rd != 'b0);
-        RISCV32I_OPCODE_STORE, RISCV32I_OPCODE_BRANCH: return 'b0;
+        RISCV32I_OPCODE_OP, 
+        RISCV32I_OPCODE_IMM,
+        RISCV32I_OPCODE_LOAD, 
+        RISCV32I_OPCODE_LUI,
+        RISCV32I_OPCODE_AUIPC, 
+        RISCV32I_OPCODE_JAL,
+        RISCV32I_OPCODE_JALR, 
+        RISCV32I_OPCODE_FENCE: return instruction_fields.rd;
+        RISCV32I_OPCODE_STORE, 
+        RISCV32I_OPCODE_BRANCH: return 'b0;
         RISCV32I_OPCODE_SYSTEM: begin
             case (riscv32i_funct3_sys_t'(instruction_fields.funct3))
-            RISCV32I_FUNCT3_SYS_CSRRW, RISCV32I_FUNCT3_SYS_CSRRS, 
-            RISCV32I_FUNCT3_SYS_CSRRC, RISCV32I_FUNCT3_SYS_CSRRWI, 
-            RISCV32I_FUNCT3_SYS_CSRRSI, RISCV32I_FUNCT3_SYS_CSRRCI: begin
-                return (instruction_fields.rd != 'b0);
-            end
+            RISCV32I_FUNCT3_SYS_CSRRW, 
+            RISCV32I_FUNCT3_SYS_CSRRS, 
+            RISCV32I_FUNCT3_SYS_CSRRC, 
+            RISCV32I_FUNCT3_SYS_CSRRWI, 
+            RISCV32I_FUNCT3_SYS_CSRRSI, 
+            RISCV32I_FUNCT3_SYS_CSRRCI: return instruction_fields.rd;
             default: return 'b0;
             endcase
         end
@@ -247,14 +258,18 @@ package gecko_decode_pkg;
         case (riscv32f_opcode_t'(instruction_fields.opcode))
         RISCV32F_OPCODE_FP_OP_S: begin
             case (riscv32f_funct7_t'(instruction_fields.funct7))
-            RISCV32F_FUNCT7_FCVT_W_S, RISCV32F_FUNCT7_FMV_X_W, 
-            RISCV32F_FUNCT7_FCMP_S: return (instruction_fields.rd != 'b0);
+            RISCV32F_FUNCT7_FCVT_W_S, 
+            RISCV32F_FUNCT7_FMV_X_W, 
+            RISCV32F_FUNCT7_FCMP_S: return instruction_fields.rd;
             default: return 'b0;
             endcase
         end
-        // RISCV32F_OPCODE_FLW, RISCV32F_OPCODE_FSW,
-        // RISCV32F_OPCODE_FMADD_S, RISCV32F_OPCODE_FMSUB_S,
-        // RISCV32F_OPCODE_FNMSUB_S, RISCV32F_OPCODE_FNMADD_S: begin
+        // RISCV32F_OPCODE_FLW,
+        // RISCV32F_OPCODE_FSW,
+        // RISCV32F_OPCODE_FMADD_S,
+        // RISCV32F_OPCODE_FMSUB_S,
+        // RISCV32F_OPCODE_FNMSUB_S,
+        // RISCV32F_OPCODE_FNMADD_S: begin
         //     return 'b0;
         // end
         default: begin end
@@ -263,12 +278,26 @@ package gecko_decode_pkg;
         return 'b0;
     endfunction
 
+    function automatic riscv32_reg_addr_t get_execute_writeback (
+            input riscv32_fields_t instruction_fields
+    );
+        case (riscv32i_opcode_t'(instruction_fields.opcode))
+        RISCV32I_OPCODE_OP, 
+        RISCV32I_OPCODE_IMM,
+        RISCV32I_OPCODE_LUI,
+        RISCV32I_OPCODE_AUIPC, 
+        RISCV32I_OPCODE_JAL,
+        RISCV32I_OPCODE_JALR: return instruction_fields.rd;
+        default: return 'b0;
+        endcase
+    endfunction
+
     function automatic logic is_register_readable(
             input riscv32_reg_addr_t reg_addr,
-            input riscv32_reg_addr_t execute_saved_reg,
+            input riscv32_reg_addr_t saved_reg,
             input gecko_reg_status_t reg_status
     );
-        return (reg_addr == execute_saved_reg || reg_status == GECKO_REG_STATUS_VALID);
+        return (reg_addr == saved_reg || reg_status == GECKO_REG_STATUS_VALID);
     endfunction
 
     function automatic logic is_register_writeable(
@@ -279,7 +308,8 @@ package gecko_decode_pkg;
 
     function automatic gecko_decode_operands_status_t gecko_decode_find_operand_status(
             input riscv32_fields_t instruction_fields,
-            input riscv32_reg_addr_t ex_saved,
+            input logic pc_updated,
+            input riscv32_reg_addr_t saved_reg,
             input gecko_reg_status_t rd_status,
             input gecko_reg_status_t rs1_status,
             input gecko_reg_status_t rs2_status
@@ -292,8 +322,8 @@ package gecko_decode_pkg;
         rs2 = instruction_fields.rs2;
 
         op_status = '{
-                rs1_valid: is_register_readable(rs1, ex_saved, rs1_status),
-                rs2_valid: is_register_readable(rs2, ex_saved, rs2_status),
+                rs1_valid: is_register_readable(rs1, pc_updated ? 'b0 : saved_reg, rs1_status),
+                rs2_valid: is_register_readable(rs2, pc_updated ? 'b0 : saved_reg, rs2_status),
                 rd_valid: is_register_writeable(rd_status)
         };
 
@@ -370,22 +400,20 @@ package gecko_decode_pkg;
     function automatic gecko_execute_operation_t create_execute_op(
             input riscv32_fields_t instruction_fields,
             input gecko_instruction_operation_t instruction_op,
-            input riscv32_reg_addr_t execute_saved_reg,
+            input riscv32_reg_addr_t saved_reg,
             input riscv32_reg_value_t rs1_value, rs2_value,
             input gecko_reg_status_t reg_status,
-            input gecko_jump_flag_t jump_flag,
-            input logic speculative_operation
+            input gecko_jump_flag_t jump_flag
     );
         gecko_execute_operation_t execute_op;
-        execute_op.speculative = 'b0;
         execute_op.halt = 'b0;
 
         // Default Execute Command Values
         execute_op.reg_addr = instruction_fields.rd;
 
-        execute_op.reuse_rs1 = (execute_saved_reg != 'b0 && execute_saved_reg == instruction_fields.rs1);
-        execute_op.reuse_rs2 = (execute_saved_reg != 'b0 && execute_saved_reg == instruction_fields.rs2);
-        execute_op.reuse_mem = (execute_saved_reg != 'b0 && execute_saved_reg == instruction_fields.rs2);
+        execute_op.reuse_rs1 = (!instruction_op.pc_updated && saved_reg != 'b0 && saved_reg == instruction_fields.rs1);
+        execute_op.reuse_rs2 = (!instruction_op.pc_updated && saved_reg != 'b0 && saved_reg == instruction_fields.rs2);
+        execute_op.reuse_mem = (!instruction_op.pc_updated && saved_reg != 'b0 && saved_reg == instruction_fields.rs2);
         execute_op.reuse_jump = 'b0;
 
         execute_op.rs1_value = rs1_value;
@@ -401,7 +429,7 @@ package gecko_decode_pkg;
 
         execute_op.reg_status = reg_status;
         execute_op.jump_flag = jump_flag;
-        execute_op.speculative = speculative_operation;
+        execute_op.pc_updated = instruction_op.pc_updated;
 
         case (riscv32i_opcode_t'(instruction_fields.opcode))
         RISCV32I_OPCODE_OP: begin
@@ -473,8 +501,7 @@ package gecko_decode_pkg;
             execute_op.alu_alternate = GECKO_NORMAL;
             
             execute_op.jump_value = rs1_value;
-            execute_op.reuse_jump = (execute_saved_reg != 'b0 && 
-                    execute_saved_reg == instruction_fields.rs1);
+            execute_op.reuse_jump = execute_op.reuse_rs1;
 
             execute_op.rs1_value = instruction_op.pc;
             execute_op.rs2_value = 'd4;
@@ -500,7 +527,6 @@ package gecko_decode_pkg;
 
     function automatic gecko_system_operation_t create_system_op(
             input riscv32_fields_t instruction_fields,
-            input riscv32_reg_addr_t execute_saved_reg,
             input riscv32_reg_value_t rs1_value, rs2_value,
             input gecko_reg_status_t reg_status,
             input gecko_jump_flag_t jump_flag
@@ -520,7 +546,6 @@ package gecko_decode_pkg;
 
     function automatic gecko_float_operation_t create_float_op(
             input riscv32_fields_t instruction_fields,
-            input riscv32_reg_addr_t execute_saved_reg,
             input riscv32_reg_value_t rs1_value, rs2_value,
             input gecko_reg_status_t reg_status,
             input gecko_jump_flag_t jump_flag
@@ -539,20 +564,5 @@ package gecko_decode_pkg;
 
         return float_op;
     endfunction
-
-    // function automatic gecko_ecall_operation_t create_ecall_op(
-    //         input riscv32_fields_t instruction_fields,
-    //         input riscv32_reg_addr_t execute_saved_reg,
-    //         input riscv32_reg_value_t rs1_value, rs2_value,
-    //         input gecko_reg_status_t reg_status,
-    //         input gecko_jump_flag_t jump_flag
-    // );
-    //     gecko_ecall_operation_t ecall_op;
-
-    //     ecall_op.operation = rs1_value[7:0];
-    //     ecall_op.data = rs2_value[7:0];
-
-    //     return ecall_op;
-    // endfunction
 
 endpackage

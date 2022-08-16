@@ -4,6 +4,13 @@
 //!import gecko/gecko_pkg.sv
 //!import mem/mem_combinational.sv
 
+// Stores the values of the register file in combinational memory (read addr to
+// read data is 0 cycles), along with their respective statuses. The register
+// status is stored in two memories, one each for the front and rear status. The
+// front status is updated when a register is planned to be written to, and the
+// rear status is updated when a register is done being written to. By comparing
+// the difference between the front and rear status the validity of the register
+// can be determined.
 module gecko_decode_regfile
     import std_pkg::*;
     import riscv_pkg::*;

@@ -91,7 +91,9 @@ int main(int argc, char **argv) {
 
     if (debug) {
         trace_pc.open("bin/debug/trace_pc.log");
+        trace_pc << "pc" << std::endl;
         trace_reg.open("bin/debug/trace_regs.log");
+        trace_reg << "reg, addr" << std::endl;
     }
 
     const auto start_time = std::chrono::system_clock::now();
@@ -103,7 +105,7 @@ int main(int argc, char **argv) {
     tb->dut->tty_out_ready = 1;
 
     // Tick the clock until we are done
-    for (int i = 0; i < 1000000; i++) {
+    for (int i = 0; i < 100000; i++) {
         tb->tick();
         if (tb->dut->tty_out_valid) {
             char c = (char) tb->dut->tty_out_data;
@@ -117,11 +119,11 @@ int main(int argc, char **argv) {
             int register_data = tb->dut->debug_info_register_data;
 
             if (jump_valid) {
-                trace_pc << "0x" << std::setfill('0') << std::hex << std::setw(8) << jump_address << std::endl;
+                trace_pc << ">0x" << std::setfill('0') << std::hex << std::setw(8) << jump_address << std::endl;
             }
 
             if (register_write) {
-                trace_reg << "0x" << std::setfill('0') << std::hex << std::setw(2) << register_addr << " " <<
+                trace_reg << "0x" << std::setfill('0') << std::hex << std::setw(2) << register_addr << ", " <<
                              "0x" << std::setfill('0') << std::hex << std::setw(8) << register_data << std::endl;
             }
         }

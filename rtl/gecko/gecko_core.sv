@@ -4,6 +4,7 @@
 //!import riscv/riscv32_pkg.sv
 //!import riscv/riscv32i_pkg.sv
 //!import gecko/gecko_pkg.sv
+//!import stream/stream_connect.sv
 //!import stream/stream_stage_multiple.sv
 //!import gecko/gecko_fetch.sv
 //!import gecko/gecko_decode.sv
@@ -77,10 +78,13 @@ module gecko_core
 
     gecko_performance_stats_t performance_stats;
 
-    always_comb memory_result.valid = mem_command_out.valid && data_result.valid;
+    // Turn memory result into normal register result, ignoring data if mispredicted
+    always_comb memory_result.valid = mem_command_out.valid && 
+            (data_result.valid || 
+            mem_command_out.payload.mispredicted);
     always_comb memory_result.payload = gecko_get_load_operation(mem_command_out.payload, data_result.data);
     always_comb mem_command_out.ready = memory_result.ready;
-    always_comb data_result.ready = memory_result.ready;
+    always_comb data_result.ready = memory_result.ready && !mem_command_out.payload.mispredicted;
 
     gecko_forwarded_t execute_forwarded;
     gecko_forwarded_t writeback_forwarded;
@@ -241,41 +245,11 @@ module gecko_core
 
     stream_intf #(.T(gecko_operation_t)) writeback_results_in [4] (.clk, .rst);
 
-    stream_stage #(
-        .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT),
-        .T(gecko_operation_t)
-    ) stream_tie_inst0(
-        .clk,
-        .rst,
-        .stream_in(execute_result), 
-        .stream_out(writeback_results_in[0]));
-    
-    stream_stage #(
-        .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT),
-        .T(gecko_operation_t)
-    ) stream_tie_inst1(
-        .clk,
-        .rst,
-        .stream_in(memory_result), 
-        .stream_out(writeback_results_in[1]));
-
-    stream_stage #(
-        .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT),
-        .T(gecko_operation_t)
-    ) stream_tie_inst2(
-        .clk,
-        .rst,
-        .stream_in(system_result), 
-        .stream_out(writeback_results_in[2]));
-    
-    stream_stage #(
-        .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT),
-        .T(gecko_operation_t)
-    ) stream_tie_inst3(
-        .clk,
-        .rst,
-        .stream_in(float_result), 
-        .stream_out(writeback_results_in[3]));
+    stream_connect #(.T(gecko_operation_t)) 
+        stream_connect0(.stream_in(execute_result), .stream_out(writeback_results_in[0])),
+        stream_connect1(.stream_in(memory_result),  .stream_out(writeback_results_in[1])),
+        stream_connect2(.stream_in(system_result),  .stream_out(writeback_results_in[2])),
+        stream_connect3(.stream_in(float_result),   .stream_out(writeback_results_in[3]));
 
     gecko_writeback #(
         .CLOCK_INFO(CLOCK_INFO),

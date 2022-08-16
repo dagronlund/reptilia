@@ -176,10 +176,8 @@ module gecko_fetch
         .reset_done(branch_table_reset_done)
     );
 
-    logic enable_fetch_state;
-
-    gecko_pc_t current_pc, next_pc;
-    gecko_jump_flag_t current_jump_flag, next_jump_flag;
+    gecko_pc_t pc, pc_next;
+    logic pc_updated, pc_updated_next;
     logic halt_flag;
 
     std_register #(
@@ -188,20 +186,20 @@ module gecko_fetch
         .RESET_VECTOR(START_ADDR)
     ) pc_register_inst (
         .clk, .rst,
-        .enable(enable_fetch_state),
-        .next(next_pc),
-        .value(current_pc)
+        .enable('b1),
+        .next(pc_next),
+        .value(pc)
     );
 
     std_register #(
         .CLOCK_INFO(CLOCK_INFO),
-        .T(gecko_jump_flag_t),
+        .T(logic),
         .RESET_VECTOR('b0)
-    ) prediction_register_inst (
+    ) pc_updated_register_inst (
         .clk, .rst,
-        .enable(enable_fetch_state),
-        .next(next_jump_flag),
-        .value(current_jump_flag)
+        .enable('b1),
+        .next(pc_updated_next),
+        .value(pc_updated)
     );
 
     std_register #(
@@ -284,24 +282,6 @@ module gecko_fetch
     always_comb begin
         produce = !halt_flag && branch_table_reset_done;
 
-        // stream_controller #(
-        //     .NUM_INPUTS(1),
-        //     .NUM_OUTPUTS(2)
-        // ) stream_controller_inst (
-        //     .clk, .rst,
-
-        //     .valid_input('b1),
-        //     .ready_input(ready_input_null),
-
-        //     .valid_output({next_instruction_command.valid, next_instruction_request.valid}),
-        //     .ready_output({next_instruction_command.ready, next_instruction_request.ready}),
-
-        //     .consume('b1),
-        //     .produce({produce, produce}),
-
-        //     .enable
-        // );
-
         stream_controller_result = stream_controller8(stream_controller8_input_t'{
             valid_input:  {7'b0, 1'b1},
             ready_output: {6'b0, next_instruction_command.ready, next_instruction_request.ready},
@@ -311,24 +291,22 @@ module gecko_fetch
         {next_instruction_command.valid, next_instruction_request.valid} = stream_controller_result.valid_output[1:0];
         enable = stream_controller_result.enable;
 
-        enable_fetch_state = (produce && enable) || (jump_command.valid && jump_command.payload.update_pc);
-
         // Read from branch table
-        branch_table_read_addr = current_pc[(BRANCH_PREDICTOR_CONFIG.target_addr_width+2-1):2];
+        branch_table_read_addr = pc[(BRANCH_PREDICTOR_CONFIG.target_addr_width+2-1):2];
 
         // Determine if entry exists in branch table and has matching address
         branch_table_hit = branch_table_read_data.valid && 
-                (branch_table_read_data.tag == current_pc[31:BRANCH_PREDICTOR_CONFIG.target_addr_width+2]);
+                (branch_table_read_data.tag == pc[31:BRANCH_PREDICTOR_CONFIG.target_addr_width+2]);
 
         // Determine if branch is predicted taken
-        local_history_normal_read_addr = current_pc[(BRANCH_PREDICTOR_CONFIG.local_addr_width+2-1):2];
+        local_history_normal_read_addr = pc[(BRANCH_PREDICTOR_CONFIG.local_addr_width+2-1):2];
         unique case (BRANCH_PREDICTOR_CONFIG.mode)
         GECKO_BRANCH_PREDICTOR_MODE_NONE: begin
             history_table_addr = 'b0;
         end
         GECKO_BRANCH_PREDICTOR_MODE_SIMPLE: begin
-            `INLINE_ASSERT($bits(history_table_addr) == $bits(current_pc[(BRANCH_PREDICTOR_CONFIG.target_addr_width+2-1):2]))
-            history_table_addr = current_pc[(BRANCH_PREDICTOR_CONFIG.target_addr_width+2-1):2];
+            `INLINE_ASSERT($bits(history_table_addr) == $bits(pc[(BRANCH_PREDICTOR_CONFIG.target_addr_width+2-1):2]))
+            history_table_addr = pc[(BRANCH_PREDICTOR_CONFIG.target_addr_width+2-1):2];
         end
         GECKO_BRANCH_PREDICTOR_MODE_GLOBAL: begin
             `INLINE_ASSERT($bits(history_table_addr) == $bits(current_global_history))
@@ -342,26 +320,33 @@ module gecko_fetch
 
         predicted_taken = gecko_branch_predictor_is_taken(history_table_data) || branch_table_read_data.jump_instruction;
 
-        // Take branch if a prediction target exists and we are predicted to take it
-        if (BRANCH_PREDICTOR_CONFIG.mode != GECKO_BRANCH_PREDICTOR_MODE_NONE && branch_table_hit && predicted_taken) begin
-            next_pc = branch_table_read_data.predicted_next;
-        end else begin
-            next_pc = current_pc + 'd4;
+        pc_next = pc;
+        pc_updated_next = pc_updated;
+
+        // Update pc and pc_updated if the fetch state is enabled
+        if (produce && enable) begin
+            // Take branch if a prediction target exists and we are predicted to take it
+            if (BRANCH_PREDICTOR_CONFIG.mode != GECKO_BRANCH_PREDICTOR_MODE_NONE && 
+                    branch_table_hit && predicted_taken) begin
+                pc_next = branch_table_read_data.predicted_next;
+            end else begin
+                pc_next = pc + 'd4;
+            end
+            pc_updated_next = 'b0;
         end
 
-        // Override next_pc decision if a jump command comes in
-        if (jump_command.valid && jump_command.payload.update_pc) begin
-            next_pc = jump_command.payload.actual_next_pc;
-            next_jump_flag = current_jump_flag + 'b1;
-        end else begin
-            next_jump_flag = current_jump_flag;
+        // Override pc_next decision if a jump command comes in
+        if (jump_command.valid && jump_command.payload.update_pc && 
+                                 !jump_command.payload.mispredicted) begin
+            pc_next = jump_command.payload.actual_next_pc;
+            pc_updated_next = 'b1;
         end
 
         // Pass outputs to memory and command streams
         next_instruction_command.payload = '{
-            pc: current_pc,
-            next_pc: next_pc,
-            jump_flag: current_jump_flag,
+            pc: pc,
+            next_pc: pc_next,
+            pc_updated: pc_updated,
             prediction: '{
                 miss: !branch_table_hit, // TODO: Consider removing this flag, it is not used
                 history: history_table_data
@@ -370,11 +355,11 @@ module gecko_fetch
 
         next_instruction_request.read_enable = 'b1;
         next_instruction_request.write_enable = 'b0;
-        next_instruction_request.addr = current_pc;
+        next_instruction_request.addr = pc;
         next_instruction_request.data = 'b0;
 
         // Update branch target table from jump commands (always accepts)
-        branch_table_write_enable = jump_command.valid;
+        branch_table_write_enable = jump_command.valid && !jump_command.payload.mispredicted;
         branch_table_write_addr = jump_command.payload.current_pc[(BRANCH_PREDICTOR_CONFIG.target_addr_width+2-1):2];
         branch_table_write_data = '{
             valid: 'b1,
@@ -396,7 +381,8 @@ module gecko_fetch
 
         // Update history table
         unique case (BRANCH_PREDICTOR_CONFIG.mode)
-        GECKO_BRANCH_PREDICTOR_MODE_NONE, GECKO_BRANCH_PREDICTOR_MODE_SIMPLE: begin
+        GECKO_BRANCH_PREDICTOR_MODE_NONE, 
+        GECKO_BRANCH_PREDICTOR_MODE_SIMPLE: begin
             `INLINE_ASSERT($bits(history_table_update_addr) == $bits(branch_table_write_addr))
             history_table_update_addr = branch_table_write_addr;
         end

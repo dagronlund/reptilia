@@ -110,24 +110,22 @@ module gecko_system
     );
 
     // TODO: Use different counters for RDCYCLE and RDTIME to support processor pausing
-    logic [31:0] perf_counter_increments [9];
+    logic [31:0] perf_counter_increments [7];
     always_comb perf_counter_increments = '{
         32'b1, // clock cycles
-        {27'b0, performance_stats.retired_instructions},
-        {31'b0, performance_stats.decode_good},
-        {31'b0, performance_stats.output_full},
-        {31'b0, performance_stats.input_empty},
-        {31'b0, performance_stats.register_missing},
+        {31'b0, performance_stats.instruction_completed},
         {31'b0, performance_stats.instruction_mispredicted},
-        {31'b0, performance_stats.instruction_memory_stalled},
-        {31'b0, performance_stats.instruction_control_stalled}
+        {31'b0, performance_stats.instruction_data_stalled},
+        {31'b0, performance_stats.instruction_control_stalled},
+        {31'b0, performance_stats.frontend_stalled},
+        {31'b0, performance_stats.backend_stalled}
     };
 
-    logic [63:0] perf_counters [9];
+    logic [63:0] perf_counters [7];
 
     genvar k;
     generate
-    for (k = 0; k < 9; k++) begin
+    for (k = 0; k < 7; k++) begin
         std_counter_pipelined #(
             .CLOCK_INFO(CLOCK_INFO),
             .PIPELINE_WIDTH(32),
@@ -167,8 +165,8 @@ module gecko_system
         exit_code_next = exit_code;
         tty_out_next.payload = 'b0;
 
+        system_result_next.payload = '{default: 'b0};
         system_result_next.payload.addr = command_in.reg_addr;
-        system_result_next.payload.speculative = 'b0;
         system_result_next.payload.reg_status = command_in.reg_status;
         system_result_next.payload.jump_flag = command_in.jump_flag;
         system_result_next.payload.value = 'b0;
@@ -184,8 +182,6 @@ module gecko_system
             12'hC05: system_result_next.payload.value = perf_counters[4][31:0];
             12'hC06: system_result_next.payload.value = perf_counters[5][31:0];
             12'hC07: system_result_next.payload.value = perf_counters[6][31:0];
-            12'hC08: system_result_next.payload.value = perf_counters[7][31:0];
-            12'hC09: system_result_next.payload.value = perf_counters[8][31:0];
 
             RISCV32I_CSR_CYCLEH: system_result_next.payload.value = perf_counters[0][63:32];
             RISCV32I_CSR_TIMEH: system_result_next.payload.value = perf_counters[0][63:32];

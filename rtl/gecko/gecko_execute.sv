@@ -115,6 +115,20 @@ module gecko_execute
     iteration_t current_iteration, next_iteration;
     gecko_math_operation_t current_math_op, next_math_op;
 
+    logic mispredicted, mispredicted_next;
+
+    std_register #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .T(logic),
+        .RESET_VECTOR('b0)
+    ) mispredicted_register (
+        .clk, 
+        .rst,
+        .enable,
+        .next(mispredicted_next),
+        .value(mispredicted)
+    );
+
     std_register #(
         .CLOCK_INFO(CLOCK_INFO),
         .T(riscv32_reg_value_t),
@@ -160,6 +174,12 @@ module gecko_execute
 
         cmd_in = gecko_execute_operation_t'(execute_command.payload);
 
+        // Clear mispredicted if the instruction stream updated
+        mispredicted_next = mispredicted;
+        if (execute_command.payload.pc_updated) begin
+            mispredicted_next = 'b0;
+        end
+
         next_iteration = current_iteration;
         next_math_op = current_math_op;
 
@@ -191,12 +211,13 @@ module gecko_execute
         alu_result = gecko_get_full_math_result(a, b, alt);
         store_result = gecko_get_store_result(c, alu_result.add_sub_result[1:0], cmd_in.op.ls);
 
+        next_execute_result.payload = '{default: 'b0};
         next_execute_result.payload.value = alu_result.add_sub_result;
         next_execute_result.payload.addr = cmd_in.reg_addr;
-        next_execute_result.payload.speculative = cmd_in.speculative;
         next_execute_result.payload.reg_status = cmd_in.reg_status;
         next_execute_result.payload.jump_flag = cmd_in.jump_flag;
 
+        next_mem_command.payload = '{default: 'b0};
         next_mem_command.payload.addr = cmd_in.reg_addr;
         next_mem_command.payload.op = cmd_in.op.ls;
         next_mem_command.payload.offset = 'b0;
@@ -285,6 +306,8 @@ module gecko_execute
                 end
 
                 next_jump_command.payload.update_pc = (next_jump_command.payload.actual_next_pc != cmd_in.next_pc);
+
+                mispredicted_next = next_jump_command.payload.update_pc;
             end
             GECKO_EXECUTE_TYPE_JUMP: begin
                 produce_execute = (cmd_in.reg_addr != 'b0) && !cmd_in.halt;
@@ -294,6 +317,8 @@ module gecko_execute
                 next_jump_command.payload.actual_next_pc = d + cmd_in.immediate_value;
                 next_jump_command.payload.jumped = 'b1;
                 next_jump_command.payload.update_pc = (next_jump_command.payload.actual_next_pc != cmd_in.next_pc);
+
+                mispredicted_next = next_jump_command.payload.update_pc;
             end
             GECKO_EXECUTE_TYPE_MUL_DIV: begin
                 if (ENABLE_INTEGER_MATH) begin
@@ -339,6 +364,17 @@ module gecko_execute
             end
             default: begin end
             endcase
+
+            if (mispredicted && !execute_command.payload.pc_updated) begin
+                // Do not produce memory access if mispredicted
+                produce_mem_request = 'b0;
+                // Mark memory and execute instructions as mispredicted
+                next_mem_command.payload.mispredicted = 'b1;
+                next_execute_result.payload.mispredicted = 'b1;
+                next_jump_command.payload.mispredicted = 'b1;
+                // Do not clear the mispredicted register if an earlier jump was mispredicted
+                mispredicted_next = mispredicted;
+            end 
         end
     end
 

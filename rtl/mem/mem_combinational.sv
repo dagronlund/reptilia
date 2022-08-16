@@ -13,7 +13,8 @@ module mem_combinational
     parameter int DATA_WIDTH = 1,
     parameter int ADDR_WIDTH = 5,
     parameter int READ_PORTS = 1,
-    parameter bit AUTO_RESET = 0
+    parameter bit AUTO_RESET = 0,
+    parameter bit [DATA_WIDTH-1:0] AUTO_RESET_VALUE = '0
 )(
     input wire clk, 
     input wire rst,
@@ -69,7 +70,7 @@ module mem_combinational
             if (current_reset_state) begin
                 write_enable_internal = 1'b1;
                 write_addr_internal = current_reset_counter;
-                write_data_in_internal = 'b0;
+                write_data_in_internal = AUTO_RESET_VALUE;
             end else begin
                 write_enable_internal = write_enable;
                 write_addr_internal = write_addr;
