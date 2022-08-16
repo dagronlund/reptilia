@@ -6,6 +6,10 @@
 #include <string>
 
 #include "Vgecko_nano.h"
+#include "Vgecko_nano_gecko_nano_wrapper.h"
+#include "Vgecko_nano_gecko_nano__M10_Sz2_TBz3_TCz4.h"
+#include "Vgecko_nano_gecko_core__pi2.h"
+#include "Vgecko_nano_gecko_decode__pi8.h"
 #include "verilated_vcd_c.h"
 #include "verilated.h"
 
@@ -112,11 +116,11 @@ int main(int argc, char **argv) {
             printf("%c", c);
         }
         if (debug) {
-            int jump_valid = tb->dut->debug_info_jump_valid;
-            int register_write = tb->dut->debug_info_register_write;
-            int register_addr = tb->dut->debug_info_register_addr;
-            int jump_address = tb->dut->debug_info_jump_address;
-            int register_data = tb->dut->debug_info_register_data;
+            int jump_valid = tb->dut->gecko_nano_wrapper->inst->core->gecko_decode_inst->debug_jump_valid;
+            int register_write = tb->dut->gecko_nano_wrapper->inst->core->gecko_decode_inst->debug_register_write;
+            int register_addr = tb->dut->gecko_nano_wrapper->inst->core->gecko_decode_inst->debug_register_addr;
+            int jump_address = tb->dut->gecko_nano_wrapper->inst->core->gecko_decode_inst->debug_jump_address;
+            int register_data = tb->dut->gecko_nano_wrapper->inst->core->gecko_decode_inst->debug_register_data;
 
             if (jump_valid) {
                 trace_pc << ">0x" << std::setfill('0') << std::hex << std::setw(8) << jump_address << std::endl;

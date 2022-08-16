@@ -42,7 +42,6 @@ module gecko_decode_wrapper
     input gecko_forwarded_t [0:0] forwarded_results,
 
     output gecko_performance_stats_t performance_stats,
-    output gecko_debug_info_t debug_info,
 
     output logic exit_flag,
     output logic error_flag
@@ -109,7 +108,6 @@ module gecko_decode_wrapper
         .forwarded_results,
 
         .performance_stats,
-        .debug_info,
         .exit_flag,
         .error_flag
     );

@@ -34,8 +34,6 @@ module gecko_nano
     input wire clk, 
     input wire rst,
 
-    output gecko_debug_info_t debug_info,
-
     stream_intf.in  tty_in, // logic [7:0]
     stream_intf.out tty_out, // logic [7:0]
 
@@ -89,8 +87,6 @@ module gecko_nano
 
         .float_mem_request,
         .float_mem_result,
-
-        .debug_info,
 
         .tty_in,
         .tty_out,

@@ -561,12 +561,4 @@ package gecko_pkg;
         logic backend_stalled;
     } gecko_performance_stats_t;
 
-    typedef struct packed {
-        logic        jump_valid;
-        logic        register_write;
-        logic [4:0]  register_addr;
-        logic [31:0] jump_address;
-        logic [31:0] register_data;
-    } gecko_debug_info_t;
-
 endpackage

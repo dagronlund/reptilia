@@ -66,7 +66,6 @@ module gecko_decode
     input gecko_forwarded_t [NUM_FORWARDED_SAFE-1:0] forwarded_results,
 
     output gecko_performance_stats_t performance_stats,
-    output gecko_debug_info_t debug_info,
 
     output logic exit_flag,
     output logic error_flag
@@ -200,7 +199,6 @@ module gecko_decode
     riscv32_reg_addr_t execute_saved, next_execute_saved;
 
     gecko_performance_stats_t performance_stats_next;
-    gecko_debug_info_t debug_info_next;
 
     logic [1:0] state_temp;
     always_comb state = state_t'(state_temp);
@@ -225,17 +223,6 @@ module gecko_decode
         .enable('b1),
         .next(performance_stats_next),
         .value(performance_stats)
-    );
-
-    std_register #(
-        .CLOCK_INFO(CLOCK_INFO),
-        .T(gecko_debug_info_t),
-        .RESET_VECTOR('b0)
-    ) debug_info_register_inst (
-        .clk, .rst,
-        .enable('b1),
-        .next(debug_info_next),
-        .value(debug_info)
     );
 
     std_register #(
@@ -498,16 +485,20 @@ module gecko_decode
             performance_stats_next.backend_stalled = 'b1;
         end
 
-        // Construct debug info
-        debug_info_next = '{
-            jump_valid: jump_command.valid && 
-                       !jump_cmd_in.mispredicted && 
-                       (jump_cmd_in.branched || jump_cmd_in.jumped),
-            jump_address: jump_cmd_in.actual_next_pc,
-            register_write: rd_write_value_enable,
-            register_addr: writeback_in.addr,
-            register_data: writeback_in.value
-        };
     end
+
+    logic        debug_jump_valid /*verilator public*/;
+    logic        debug_register_write /*verilator public*/;
+    logic [4:0]  debug_register_addr /*verilator public*/;
+    logic [31:0] debug_jump_address /*verilator public*/;
+    logic [31:0] debug_register_data /*verilator public*/;
+
+    always_comb debug_jump_valid = jump_command.valid && 
+                                  !jump_cmd_in.mispredicted && 
+                                  (jump_cmd_in.branched || jump_cmd_in.jumped);
+    always_comb debug_jump_address = jump_cmd_in.actual_next_pc;
+    always_comb debug_register_write = rd_write_value_enable;
+    always_comb debug_register_addr = writeback_in.addr;
+    always_comb debug_register_data = writeback_in.value;
 
 endmodule

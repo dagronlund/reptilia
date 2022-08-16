@@ -40,8 +40,6 @@ module gecko_core
     mem_intf.out float_mem_request,
     mem_intf.in float_mem_result,
 
-    output gecko_debug_info_t debug_info,
-
     stream_intf.in  tty_in, // logic [7:0]
     stream_intf.out tty_out, // logic [7:0]
 
@@ -171,8 +169,7 @@ module gecko_core
         .exit_flag, 
         .error_flag,
 
-        .performance_stats,
-        .debug_info
+        .performance_stats
     );
 
     gecko_execute #(
