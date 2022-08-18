@@ -2,7 +2,9 @@ module gecko_execute_wrapper
     import gecko_pkg::*;
 (
     input wire clk, 
-    input wire rst
+    input wire rst,
+
+    output logic instruction_executed
 );
 
     mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) mem_request (.clk, .rst);
@@ -21,7 +23,9 @@ module gecko_execute_wrapper
         .mem_command,
         .mem_request,
         .execute_result,
-        .jump_command
+        .jump_command,
+
+        .instruction_executed
     );
 
 endmodule

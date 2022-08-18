@@ -34,6 +34,9 @@ module gecko_system
     stream_intf.in system_command, // gecko_system_operation_t
     stream_intf.out system_result, // gecko_operation_t
 
+    input logic instruction_decoded,
+    input logic instruction_executed,
+
     stream_intf.in     tty_in, // logic [7:0]
     stream_intf.out    tty_out, // logic [7:0]
     output logic [7:0] exit_code
@@ -113,7 +116,7 @@ module gecko_system
     logic [31:0] perf_counter_increments [7];
     always_comb perf_counter_increments = '{
         32'b1, // clock cycles
-        {31'b0, performance_stats.instruction_completed},
+        {30'b0, {1'b0, instruction_decoded} + {1'b0, instruction_executed}},
         {31'b0, performance_stats.instruction_mispredicted},
         {31'b0, performance_stats.instruction_data_stalled},
         {31'b0, performance_stats.instruction_control_stalled},

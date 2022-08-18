@@ -94,6 +94,8 @@ module gecko_core
 
     always_comb jump_command.ready = 'b1;
 
+    logic instruction_decoded, instruction_executed;
+
     gecko_fetch #(
         .CLOCK_INFO(CLOCK_INFO),
         .TECHNOLOGY(TECHNOLOGY),
@@ -169,7 +171,9 @@ module gecko_core
         .exit_flag, 
         .error_flag,
 
-        .performance_stats
+        .performance_stats,
+
+        .instruction_decoded
     );
 
     gecko_execute #(
@@ -187,7 +191,9 @@ module gecko_core
 
         .execute_result,
 
-        .jump_command
+        .jump_command,
+
+        .instruction_executed
     );
 
     stream_stage_multiple #(
@@ -214,6 +220,9 @@ module gecko_core
 
         .system_command,
         .system_result,
+
+        .instruction_decoded,
+        .instruction_executed,
 
         .tty_in,
         .tty_out,

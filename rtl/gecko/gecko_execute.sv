@@ -38,7 +38,9 @@ module gecko_execute
     stream_intf.out mem_command, // gecko_mem_operation_t
     mem_intf.out mem_request,
     stream_intf.out execute_result, // gecko_operation_t
-    stream_intf.out jump_command // gecko_jump_operation_t
+    stream_intf.out jump_command, // gecko_jump_operation_t
+
+    output logic instruction_executed
 );
 
     typedef logic [5:0] iteration_t;
@@ -111,11 +113,10 @@ module gecko_execute
     );
 
     riscv32_reg_value_t current_execute_value;
-
     iteration_t current_iteration, next_iteration;
     gecko_math_operation_t current_math_op, next_math_op;
-
     logic mispredicted, mispredicted_next;
+    logic instruction_executed_next;
 
     std_register #(
         .CLOCK_INFO(CLOCK_INFO),
@@ -162,6 +163,18 @@ module gecko_execute
         .enable,
         .next(next_math_op),
         .value(current_math_op)
+    );
+
+    std_register #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .T(logic),
+        .RESET_VECTOR('b0)
+    ) instruction_executed_register (
+        .clk, 
+        .rst,
+        .enable('b1),
+        .next(instruction_executed_next),
+        .value(instruction_executed)
     );
 
     always_comb begin
@@ -374,8 +387,12 @@ module gecko_execute
                 next_jump_command.payload.mispredicted = 'b1;
                 // Do not clear the mispredicted register if an earlier jump was mispredicted
                 mispredicted_next = mispredicted;
-            end 
+            end
         end
     end
+
+    always_comb instruction_executed_next = 
+            (!mispredicted || execute_command.payload.pc_updated) &&
+            consume && enable;
 
 endmodule

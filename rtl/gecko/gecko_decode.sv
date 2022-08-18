@@ -68,7 +68,9 @@ module gecko_decode
     output gecko_performance_stats_t performance_stats,
 
     output logic exit_flag,
-    output logic error_flag
+    output logic error_flag,
+
+    output logic instruction_decoded
 );
 
     typedef enum logic [1:0] {
@@ -199,6 +201,7 @@ module gecko_decode
     riscv32_reg_addr_t execute_saved, next_execute_saved;
 
     gecko_performance_stats_t performance_stats_next;
+    logic instruction_decoded_next;
 
     logic [1:0] state_temp;
     always_comb state = state_t'(state_temp);
@@ -245,6 +248,18 @@ module gecko_decode
         .enable,
         .next(next_execute_saved),
         .value(execute_saved)
+    );
+
+    std_register #(
+        .CLOCK_INFO(CLOCK_INFO),
+        .T(logic),
+        .RESET_VECTOR('b0)
+    ) instruction_decoded_register (
+        .clk, 
+        .rst,
+        .enable('b1),
+        .next(instruction_decoded_next),
+        .value(instruction_decoded)
     );
 
     gecko_instruction_operation_t instruction_op;
@@ -308,7 +323,6 @@ module gecko_decode
     logic mispredicted /* verilator isolate_assignments*/;
     logic speculating /* verilator isolate_assignments*/;
     logic speculation_full /* verilator isolate_assignments*/;
-    logic instruction_increment;
 
     gecko_decode_speculative #(
         .CLOCK_INFO(CLOCK_INFO),
@@ -328,7 +342,6 @@ module gecko_decode
         .mispredicted,
         .speculating,
         .speculation_full,
-        .instruction_increment,
 
         .reset_done()
     );
@@ -471,10 +484,7 @@ module gecko_decode
         writeback_result.ready = 'b1;
 
         // Construct performance stats
-        performance_stats_next = '{
-            instruction_completed: instruction_increment,
-            default: 'b0
-        };
+        performance_stats_next = '{default: 'b0};
         if (stream_controller_result.enable) begin
             performance_stats_next.instruction_mispredicted = instruction_status.flush_instruction;
             performance_stats_next.instruction_data_stalled = instruction_status.stall_data;
@@ -485,6 +495,8 @@ module gecko_decode
             performance_stats_next.backend_stalled = 'b1;
         end
 
+        instruction_decoded_next = instruction_enable && 
+                (produce_system || produce_float);
     end
 
     logic        debug_jump_valid /*verilator public*/;

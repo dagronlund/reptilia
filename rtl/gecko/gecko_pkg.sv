@@ -553,7 +553,6 @@ package gecko_pkg;
     // Gecko performance metrics -----------------------------------------------
 
     typedef struct packed {
-        logic instruction_completed;
         logic instruction_mispredicted;
         logic instruction_data_stalled;
         logic instruction_control_stalled;

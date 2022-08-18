@@ -41,7 +41,6 @@ module gecko_decode_speculative
     output logic mispredicted,
     output logic speculating,
     output logic speculation_full,
-    output logic instruction_increment,
 
     output gecko_jump_flag_t execute_flag,
 
@@ -90,46 +89,6 @@ module gecko_decode_speculative
         .value(mispredicted)
     );
 
-    // Track instruction counts
-    counter_table_t counter_table, counter_table_next;
-
-    std_register #(
-        .CLOCK_INFO(CLOCK_INFO),
-        .T(counter_table_t),
-        .RESET_VECTOR('b0)
-    ) counter_table_register_inst (
-        .clk, .rst,
-        .enable('b1),
-        .next(counter_table_next),
-        .value(counter_table)
-    );
-
-    logic [COUNTER_WIDTH:0] counter, counter_next;
-
-    std_register #(
-        .CLOCK_INFO(CLOCK_INFO),
-        .T(logic [COUNTER_WIDTH:0]),
-        .RESET_VECTOR('b0)
-    ) counter_register_inst (
-        .clk, .rst,
-        .enable('b1),
-        .next(counter_next),
-        .value(counter)
-    );
-
-    logic instruction_increment_next;
-
-    std_register #(
-        .CLOCK_INFO(CLOCK_INFO),
-        .T(logic),
-        .RESET_VECTOR('b0)
-    ) instruction_increment_register_inst (
-        .clk, .rst,
-        .enable('b1),
-        .next(instruction_increment_next),
-        .value(instruction_increment)
-    );
-
     always_comb begin
         // Temporarily increment execute flag if the instruction stream updated
         // to reduce a cycle of waiting
@@ -158,23 +117,6 @@ module gecko_decode_speculative
 
         speculating      = front_flag != rear_flag;
         speculation_full = ((front_flag + 'b1) == rear_flag);
-
-        // Determine how many instructions have actually been executed
-        counter_table_next = counter_table;
-        counter_next = counter;
-        counter_table_next[front_flag] += (speculating && instruction_enable) ? 'b1 : 'b0;
-        counter_next += (!speculating && instruction_enable) ? 'b1 : 'b0;
-        counter_next -= (counter != 0) ? 'b1 : 'b0;
-        if (speculation_resolved) begin
-            counter_table_next[rear_flag] = 'b0;
-            if (!speculation_mispredicted) begin
-                counter_next += counter_table[rear_flag];
-            end
-        end
-        if (instruction_enable && instruction_updated) begin
-            counter_table_next[rear_flag + 'b1] = 'b0;
-        end
-        instruction_increment_next = counter != 0;
     end
 
 endmodule

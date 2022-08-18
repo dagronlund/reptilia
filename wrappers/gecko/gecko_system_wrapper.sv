@@ -2,7 +2,10 @@ module gecko_sytem_wrapper
     import gecko_pkg::*;
 (
     input wire clk, 
-    input wire rst
+    input wire rst,
+
+    input logic instruction_decoded,
+    input logic instruction_executed
 );
 
     stream_intf #(.T(gecko_system_operation_t)) system_command (.clk, .rst);
@@ -22,6 +25,9 @@ module gecko_sytem_wrapper
         .performance_stats,
         .system_command,
         .system_result,
+
+        .instruction_decoded,
+        .instruction_executed,
 
         .tty_in,
         .tty_out,
