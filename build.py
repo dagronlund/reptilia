@@ -122,6 +122,7 @@ def main():
     rtl_folders = [
         "rtl/std",
         "rtl/xilinx",
+        "rtl/asic",
         "rtl/mem",
         "rtl/stream",
         "rtl/riscv",

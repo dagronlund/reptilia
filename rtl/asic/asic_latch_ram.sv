@@ -1,6 +1,5 @@
-//!import std/std_pkg
-
-`timescale 1ns/1ps
+//!import std/std_pkg.sv
+//!import std/std_register.sv
 
 module asic_latch_ram
     import std_pkg::*;
@@ -35,14 +34,10 @@ module asic_latch_ram
     genvar k;
     generate
     for (k = 0; k < DATA_LENGTH; k++) begin
-        std_clock_gate #(
-            .CLOCK_INFO(CLOCK_INFO),
-            .TECHNOLOGY(TECHNOLOGY)
-        ) std_clock_gate_inst (
-            .clk_in(clk),
-            .clk_en(write_enable && (k[ADDR_WIDTH-1:0] == write_addr)),
-            .clk_out(write_clocks[k])
-        );
+        always_comb write_clocks[k] = 
+                clk && 
+                write_enable && 
+                (k[ADDR_WIDTH-1:0] == write_addr);
     end
     endgenerate
 
