@@ -22,48 +22,46 @@ package gecko_pkg;
     // Configurable Types
     typedef logic [1:0] gecko_jump_flag_t;
     typedef logic [2:0] gecko_reg_status_t;
-    // typedef logic [2:0] gecko_inst_count_t;
-    // typedef logic [4:0] gecko_retired_count_t;
     typedef logic [7:0] gecko_prediction_history_t;
 
     typedef enum logic [1:0] {
-        GECKO_BRANCH_PREDICTOR_MODE_NONE = 'h0,
-        GECKO_BRANCH_PREDICTOR_MODE_SIMPLE = 'h1,
-        GECKO_BRANCH_PREDICTOR_MODE_GLOBAL = 'h2,
-        GECKO_BRANCH_PREDICTOR_MODE_LOCAL = 'h3
-    } gecko_branch_predictor_mode_t;
+        GECKO_PREDICTOR_MODE_NONE = 'h0,
+        GECKO_PREDICTOR_MODE_SIMPLE = 'h1,
+        GECKO_PREDICTOR_MODE_GLOBAL = 'h2,
+        GECKO_PREDICTOR_MODE_LOCAL = 'h3
+    } gecko_predictor_mode_t;
 
     typedef enum logic [1:0] {
-        GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN = 'h0,
-        GECKO_BRANCH_PREDICTOR_HISTORY_TAKEN = 'h1,
-        GECKO_BRANCH_PREDICTOR_HISTORY_NOT_TAKEN = 'h2,
-        GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_NOT_TAKEN = 'h3
-    } gecko_branch_predictor_history_t;
+        GECKO_PREDICTOR_HISTORY_STRONG_TAKEN = 'h0,
+        GECKO_PREDICTOR_HISTORY_TAKEN = 'h1,
+        GECKO_PREDICTOR_HISTORY_NOT_TAKEN = 'h2,
+        GECKO_PREDICTOR_HISTORY_STRONG_NOT_TAKEN = 'h3
+    } gecko_predictor_history_t;
 
-    function automatic logic gecko_branch_predictor_is_taken(
-            input gecko_branch_predictor_history_t history
+    function automatic logic gecko_predictor_is_taken(
+            input gecko_predictor_history_t history
     );
-        return history == GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN || 
-                history == GECKO_BRANCH_PREDICTOR_HISTORY_TAKEN;
+        return history == GECKO_PREDICTOR_HISTORY_STRONG_TAKEN || 
+                history == GECKO_PREDICTOR_HISTORY_TAKEN;
     endfunction
 
-    function automatic gecko_branch_predictor_history_t gecko_branch_predictor_update_history(
-            input gecko_branch_predictor_history_t history,
+    function automatic gecko_predictor_history_t gecko_predictor_update_history(
+            input gecko_predictor_history_t history,
             input logic took_branch
     );
         unique case (history)
-        GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN: return took_branch ? 
-                GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN : 
-                GECKO_BRANCH_PREDICTOR_HISTORY_TAKEN;
-        GECKO_BRANCH_PREDICTOR_HISTORY_TAKEN: return took_branch ? 
-                GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN : 
-                GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_NOT_TAKEN;
-        GECKO_BRANCH_PREDICTOR_HISTORY_NOT_TAKEN: return took_branch ? 
-                GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_TAKEN : 
-                GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_NOT_TAKEN;
-        GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_NOT_TAKEN: return took_branch ? 
-                GECKO_BRANCH_PREDICTOR_HISTORY_NOT_TAKEN : 
-                GECKO_BRANCH_PREDICTOR_HISTORY_STRONG_NOT_TAKEN;
+        GECKO_PREDICTOR_HISTORY_STRONG_TAKEN: return took_branch ? 
+                GECKO_PREDICTOR_HISTORY_STRONG_TAKEN : 
+                GECKO_PREDICTOR_HISTORY_TAKEN;
+        GECKO_PREDICTOR_HISTORY_TAKEN: return took_branch ? 
+                GECKO_PREDICTOR_HISTORY_STRONG_TAKEN : 
+                GECKO_PREDICTOR_HISTORY_STRONG_NOT_TAKEN;
+        GECKO_PREDICTOR_HISTORY_NOT_TAKEN: return took_branch ? 
+                GECKO_PREDICTOR_HISTORY_STRONG_TAKEN : 
+                GECKO_PREDICTOR_HISTORY_STRONG_NOT_TAKEN;
+        GECKO_PREDICTOR_HISTORY_STRONG_NOT_TAKEN: return took_branch ? 
+                GECKO_PREDICTOR_HISTORY_NOT_TAKEN : 
+                GECKO_PREDICTOR_HISTORY_STRONG_NOT_TAKEN;
         endcase
     endfunction
 
@@ -101,7 +99,7 @@ package gecko_pkg;
 
     typedef struct packed {
         logic miss;
-        gecko_branch_predictor_history_t history;
+        gecko_predictor_history_t history;
     } gecko_prediction_t;
 
     // Internal Gecko Stream Datatypes -----------------------------------------
@@ -486,11 +484,11 @@ package gecko_pkg;
     // Gecko core configuration ------------------------------------------------
 
     typedef struct packed {
-        gecko_branch_predictor_mode_t mode;
+        gecko_predictor_mode_t mode;
         int                           target_addr_width;
         int                           history_width;
         int                           local_addr_width;
-    } gecko_branch_predictor_config_t;
+    } gecko_predictor_config_t;
 
     typedef struct packed {
         gecko_pc_t start_addr;
@@ -506,7 +504,7 @@ package gecko_pkg;
         int                    data_memory_latency;
         int                    float_memory_latency;
         // Branch predictor
-        gecko_branch_predictor_config_t branch_predictor_config;
+        gecko_predictor_config_t predictor_config;
         // Features
         bit enable_performance_counters;
         bit enable_tty_io;
@@ -515,10 +513,10 @@ package gecko_pkg;
         bit enable_integer_math;
     } gecko_config_t;
 
-    function automatic gecko_branch_predictor_config_t gecko_get_basic_branch_predictor_config();
+    function automatic gecko_predictor_config_t gecko_get_basic_predictor_config();
         int addr_width = 5;
-        return gecko_branch_predictor_config_t'{
-            mode: GECKO_BRANCH_PREDICTOR_MODE_SIMPLE,
+        return gecko_predictor_config_t'{
+            mode: GECKO_PREDICTOR_MODE_SIMPLE,
             target_addr_width: addr_width,
             history_width: addr_width,
             local_addr_width: addr_width
@@ -542,7 +540,7 @@ package gecko_pkg;
             instruction_memory_latency: instruction_memory_latency,
             data_memory_latency: data_memory_latency,
             float_memory_latency: float_memory_latency,
-            branch_predictor_config: gecko_get_basic_branch_predictor_config(),
+            predictor_config: gecko_get_basic_predictor_config(),
             enable_performance_counters: 1,
             enable_tty_io: 1,
             enable_floating_point: 0,

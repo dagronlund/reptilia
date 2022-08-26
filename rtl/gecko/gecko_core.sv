@@ -101,7 +101,7 @@ module gecko_core
         .TECHNOLOGY(TECHNOLOGY),
         .PIPELINE_MODE(CONFIG.fetch_pipeline_mode),
         .START_ADDR(CONFIG.start_addr),
-        .BRANCH_PREDICTOR_CONFIG(CONFIG.branch_predictor_config)
+        .PREDICTOR_CONFIG(CONFIG.predictor_config)
     ) gecko_fetch_inst (
         .clk, .rst,
 

@@ -140,7 +140,9 @@ module gecko_decode
             if (mispredicted && !pc_updated) begin
                 status.flush_instruction = 'b1;
             // Wait if instruction registers are not ready yet
-            end else if (!rs1_rs2_status.rs1_valid || !rs1_rs2_status.rs2_valid || !operands_status.rd_valid) begin
+            end else if (!rs1_rs2_status.rs1_valid || 
+                         !rs1_rs2_status.rs2_valid || 
+                         !operands_status.rd_valid) begin
                 status.stall_data = 'b1;
             // Only execute non-side-effect instructions while speculating
             end else if (speculating && is_instruction_system(instruction_fields)) begin
@@ -393,7 +395,8 @@ module gecko_decode
         // Assign next values to defaults
         next_error_flag = opcode_status.error_flag;
         if (opcode_status.execute_flag) begin
-            next_execute_saved = get_execute_writeback(riscv32_get_fields(instruction_result.data));
+            next_execute_saved = get_execute_writeback(
+                    riscv32_get_fields(instruction_result.data));
         end else begin
             next_execute_saved = 'b0;
         end
@@ -436,7 +439,8 @@ module gecko_decode
         instruction_enable = !instruction_status.stall_data && 
                              !instruction_status.stall_control && 
                              !instruction_status.flush_instruction;
-        instruction_branch_jump = is_opcode_control_flow(riscv32_get_fields(instruction_result.data));
+        instruction_branch_jump = is_opcode_control_flow(
+                riscv32_get_fields(instruction_result.data));
 
         consume_instruction = !instruction_status.stall_data && 
                               !instruction_status.stall_control;
@@ -455,8 +459,10 @@ module gecko_decode
 
         // Update state (RESET -> NORMAL -> EXIT)
         case (state)
-        GECKO_DECODE_RESET:  next_state = (reset_done) ? GECKO_DECODE_NORMAL : state;
-        GECKO_DECODE_NORMAL: next_state = (opcode_status.exit_flag) ? GECKO_DECODE_EXIT : state;
+        GECKO_DECODE_RESET:  next_state = (reset_done) ? 
+                                          GECKO_DECODE_NORMAL : state;
+        GECKO_DECODE_NORMAL: next_state = (opcode_status.exit_flag) ? 
+                                          GECKO_DECODE_EXIT : state;
         GECKO_DECODE_EXIT:   next_state = state;
         default:             next_state = GECKO_DECODE_RESET;
         endcase
@@ -472,7 +478,8 @@ module gecko_decode
         enable = stream_controller_result.enable && instruction_enable;
 
         // Update front register status
-        rd_read_enable = get_instruction_writeback(riscv32_get_fields(instruction_result.data)) != 'b0;
+        rd_read_enable = get_instruction_writeback(
+                riscv32_get_fields(instruction_result.data)) != 'b0;
         // Update register status regardless of throwing away speculation
         rd_write_enable = writeback_result.valid && writeback_result.ready;
         // Throw away writes to x0 and mispredicted results
@@ -484,15 +491,18 @@ module gecko_decode
         writeback_result.ready = 'b1;
 
         // Construct performance stats
-        performance_stats_next = '{default: 'b0};
         if (stream_controller_result.enable) begin
-            performance_stats_next.instruction_mispredicted = instruction_status.flush_instruction;
-            performance_stats_next.instruction_data_stalled = instruction_status.stall_data;
-            performance_stats_next.instruction_control_stalled = instruction_status.stall_control;
-        end else if (!instruction_result.valid || !instruction_command.valid) begin
-            performance_stats_next.frontend_stalled = 'b1;
+            performance_stats_next = '{
+                instruction_mispredicted: instruction_status.flush_instruction,
+                instruction_data_stalled: instruction_status.stall_data,
+                instruction_control_stalled: instruction_status.stall_control,
+                default: 'b0
+            }; 
+        end else if (!instruction_result.valid || 
+                     !instruction_command.valid) begin
+            performance_stats_next = '{frontend_stalled: 'b1, default: 'b0};
         end else begin
-            performance_stats_next.backend_stalled = 'b1;
+            performance_stats_next = '{backend_stalled: 'b1, default: 'b0};
         end
 
         instruction_decoded_next = instruction_enable && 
