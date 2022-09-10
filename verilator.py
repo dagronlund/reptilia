@@ -2,12 +2,9 @@
 "Helper class for compiling Verilator programs"
 
 import os
-import subprocess
 from pathlib import Path
-import multiprocessing
-import time
 
-from util import debug, info, warning, error
+from ninja.misc.ninja_syntax import Writer as NinjaWriter
 
 
 def _split_makefile_variable(line, global_file=False):
@@ -18,26 +15,69 @@ def _split_makefile_variable(line, global_file=False):
             continue
         variable = variable.strip()
         if global_file:
-            variable = os.path.expandvars(f"$VERILATOR_ROOT/include/{variable}.cpp")
+            variable = os.path.expandvars(f"verilator/include/{variable}.cpp")
         else:
             variable = f"obj_dir/{variable}.cpp"
         variables.append(variable)
     return variables
 
 
-def _wait_builds(builds, pending_builds=0):
-    while len(builds) > pending_builds:
-        for build_name, build_process in builds.items():
-            if build_process.poll() is not None:
-                if build_process.returncode != 0:
-                    stdout, stderr = build_process.communicate()
-                    stdout, stderr = stdout.decode("utf-8"), stderr.decode("utf-8")
-                    error(f"g++ error compiling {build_name}!\n{stdout}\n{stderr}")
-                    raise RuntimeError("Compiler error!")
-                debug(f"{build_name}...")
-                del builds[build_name]
-                break
-        time.sleep(0.01)
+def write_verilator_ninja_rules(writer):
+    ninja_writer = NinjaWriter(writer)
+    ninja_writer.comment("Rules for Verilator verilation")
+
+    # Set environment variable that verilator uses
+    verilator = "VERILATOR_ROOT=verilator/ verilator/bin/verilator"
+
+    flags = "--prefix V$name -Irtl/ +define+__SYNTH_ONLY__=1"
+    trace = "--trace --trace-structs --output-split 10000"
+    # "--trace-max-array 1000000 --trace-max-width 1000000"
+
+    # Create rule for linting SystemVerilog modules
+    ninja_writer.rule(
+        name="verilator_lint",
+        command=f"{verilator} -lint-only {flags} $in > $out",
+    )
+
+    # Create rule for verilating SystemVerilog modules
+    ninja_writer.rule(
+        name="verilator_verilate",
+        command=f"{verilator} --cc {trace} {flags} $args $in > $out",
+    )
+
+    ninja_writer.newline()
+
+
+def write_verilator_compile_ninja_rules(writer):
+    ninja_writer = NinjaWriter(writer)
+    ninja_writer.comment("Rules for Verilator compilation")
+
+    flags = ""
+    flags += " -Wno-bool-operation"
+    flags += " -Wno-parentheses-equality"
+    flags += " -Wno-tautological-bitwise-compare"
+    flags += " -Wno-sign-compare"
+    flags += " -Wno-uninitialized"
+    flags += " -Wno-unused-parameter"
+    flags += " -Wno-unused-variable"
+    flags += " -Wno-shadow"
+
+    includes = "-Ibin/obj_dir/ -Iverilator/include -Iverilator/include/vltstd"
+
+    # Create rule for compiling verilated source code
+    ninja_writer.rule(
+        name="verilator_compile",
+        command=f"g++-11 {includes} {flags} $args -c $in -o $out -MMD -MF $out.d",
+        depfile="$out.d",
+    )
+
+    # Create rule for linking verilated source code
+    ninja_writer.rule(
+        name="verilator_link",
+        command=f"g++-11 {includes} $args $in -o $out",
+    )
+
+    ninja_writer.newline()
 
 
 class VerilatorProgram:
@@ -52,115 +92,11 @@ class VerilatorProgram:
         self.source_file = source_file
         self.lint_only = lint_only
         self.program = program
-        self._verilate()
-        if not self.lint_only:
-            self._compile()
-
-    def _verilate(self):
-        # Run verilator
-        if self.source_file.no_lint:
-            warning("Skipping linting due to //!no_lint...")
-            return
-
-        try:
-            param_args = []
-            if self.program is not None:
-                param_args.append(f"-GMEMORY_ADDR_WIDTH={self.program.address_width}")
-                param_args.append(f'-GSTARTUP_PROGRAM="bin/{self.program.name}.mem"')
-                debug(f"\tUsing param args: {param_args}")
-
-            subprocess.run(
-                [
-                    os.path.expandvars("$VERILATOR_ROOT/bin/verilator"),
-                    "--cc" if not self.lint_only else "-lint-only",
-                    "--trace" if not self.lint_only else "",
-                    "--trace-structs",
-                    # "--trace-max-array",
-                    # "1000000",
-                    # "--trace-max-width",
-                    # "1000000",
-                    "--prefix",
-                    "V" + self.module_name,
-                    "-Irtl/",
-                    '+define+__SYNTH_ONLY__=1"',
-                ]
-                + param_args
-                + self.source_file.get_dependencies(),
-                capture_output=True,
-                check=True,
-            )
-        except subprocess.CalledProcessError as process_error:
-            error(f"Verilator failed to build file {self.path}!")
-            for source in self.source_file.get_dependencies():
-                print(f"\t{source}")
-            print(process_error.output.decode("utf-8"))
-            print(process_error.stderr.decode("utf-8"))
-            raise process_error
-
-    def _compile(self):
-        cpp_dependencies = self._parse_makefile()
-        object_builds = {}
-        object_paths = []
-        objects_fast = ["classes_fast", "support_fast", "global_fast"]
-        objects_slow = ["classes_slow", "support_slow", "global_slow"]
-        max_builds = multiprocessing.cpu_count() // 2
-        info(f"Building with {max_builds} processes...")
-
-        # Build verilator object files
-        for object_group in objects_fast + objects_slow:
-            for source_path in cpp_dependencies[object_group]:
-                source_name = Path(source_path).stem
-                object_path = f"bin/verilator/{source_name}.o"
-                object_builds[object_path] = subprocess.Popen(
-                    [
-                        "g++-11",
-                        "-c",
-                        "-Iobj_dir/",
-                        os.path.expandvars("-I$VERILATOR_ROOT/include"),
-                        os.path.expandvars("-I$VERILATOR_ROOT/include/vltstd"),
-                        source_path,
-                        "-o",
-                        object_path,
-                    ]
-                    + (["-O2"] if object_group in objects_fast else []),
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                )
-                object_paths.append(object_path)
-                _wait_builds(object_builds, pending_builds=max_builds - 1)
-        _wait_builds(object_builds)
-
-        # Compile verilator output
-        try:
-            subprocess.run(
-                [
-                    "g++-11",
-                    # os.path.expandvars("$LLVM_ROOT/bin/clang"),
-                    "-Iobj_dir/",
-                    os.path.expandvars("-I$VERILATOR_ROOT/include"),
-                    os.path.expandvars("-I$VERILATOR_ROOT/include/vltstd"),
-                    self.cpp_file,
-                    # os.path.expandvars("$VERILATOR_ROOT/include/verilated_vcd_c.cpp"),
-                    # os.path.expandvars("$VERILATOR_ROOT/include/verilated.cpp"),
-                    # "obj_dir/V" + self.module_name + "__ALL.cpp",
-                    "-O2",
-                    "-o",
-                    "bin/" + self.module_name + "_simulator",
-                ]
-                + object_paths,
-                capture_output=True,
-                check=True,
-            )
-        except subprocess.CalledProcessError as process_error:
-            error(f"g++ failed to build file {self.cpp_file} (from {self.path})!")
-            print(process_error.output.decode("utf-8"))
-            print(process_error.stderr.decode("utf-8"))
-            raise process_error
 
     def _parse_makefile(self):
         lines = []
         last_partial = False
-        with open("obj_dir/V" + self.module_name + "_classes.mk", "r") as file:
+        with open(f"obj_dir/V{self.module_name}_classes.mk", "r") as file:
             for line in file.readlines():
                 line = line.strip()
                 if len(line) > 0 and line[0] == "#":
@@ -173,16 +109,87 @@ class VerilatorProgram:
                 lines.append(line.strip())
         files = {}
         for line in lines:
-            if line.startswith("VM_CLASSES_FAST"):
-                files["classes_fast"] = _split_makefile_variable(line)
-            elif line.startswith("VM_CLASSES_SLOW"):
-                files["classes_slow"] = _split_makefile_variable(line)
-            elif line.startswith("VM_SUPPORT_FAST"):
-                files["support_fast"] = _split_makefile_variable(line)
-            elif line.startswith("VM_SUPPORT_SLOW"):
-                files["support_slow"] = _split_makefile_variable(line)
-            elif line.startswith("VM_GLOBAL_FAST"):
-                files["global_fast"] = _split_makefile_variable(line, global_file=True)
-            elif line.startswith("VM_GLOBAL_SLOW"):
-                files["global_slow"] = _split_makefile_variable(line, global_file=True)
+            categories = [
+                "VM_CLASSES_FAST",
+                "VM_CLASSES_SLOW",
+                "VM_SUPPORT_FAST",
+                "VM_SUPPORT_SLOW",
+            ]
+            global_categories = ["VM_GLOBAL_FAST", "VM_GLOBAL_SLOW"]
+            for category in categories:
+                if line.startswith(category):
+                    files[category] = (False, _split_makefile_variable(line))
+            for category in global_categories:
+                if line.startswith(category):
+                    files[category] = (
+                        True,
+                        _split_makefile_variable(line, global_file=True),
+                    )
         return files
+
+    def write_ninja_build_verilate(self, writer):
+        "Writes the ninja rules for verilating this module"
+        if self.source_file.no_lint:
+            return
+
+        ninja_writer = NinjaWriter(writer)
+        ninja_writer.comment(f"Build steps for {self.module_name}")
+
+        param_args = []
+        if self.program is not None:
+            param_args.append(f"-GMEMORY_ADDR_WIDTH={self.program.address_width}")
+            param_args.append(f'-GSTARTUP_PROGRAM="\\"bin/{self.program.name}.mem\\""')
+
+        log_path = Path(f"bin/lint/{self.path}").with_suffix(".log")
+        ninja_writer.build(
+            outputs=str(log_path),
+            rule="verilator_lint" if self.lint_only else "verilator_verilate",
+            inputs=self.source_file.get_dependencies(),
+            variables={"name": self.module_name, "args": " ".join(param_args)},
+            implicit=[f"bin/{self.program.name}.mem"]
+            if self.program is not None
+            else None,
+        )
+
+        ninja_writer.newline()
+
+    def write_ninja_build_verilate_compile(self, writer):
+        "Writes the ninja rules for compiling a verilated model"
+
+        ninja_writer = NinjaWriter(writer)
+        ninja_writer.comment(f"Build steps for {self.module_name}")
+
+        cpp_dependencies = self._parse_makefile()
+        categories_fast = ["VM_CLASSES_FAST", "VM_SUPPORT_FAST", "VM_GLOBAL_FAST"]
+        categories_slow = ["VM_CLASSES_SLOW", "VM_SUPPORT_SLOW", "VM_GLOBAL_SLOW"]
+
+        object_paths = []
+        for object_group in categories_fast + categories_slow:
+            is_global, source_paths = cpp_dependencies[object_group]
+            for source_path in source_paths:
+                # Determine where the source file is and where the destination object file is
+                if is_global:
+                    source_path = Path(source_path)
+                    object_path = Path(f"bin/obj_dir/{source_path.stem}.o")
+                else:
+                    source_path = Path("bin") / Path(source_path)
+                    object_path = Path(source_path).with_suffix(".o")
+
+                ninja_writer.build(
+                    outputs=str(object_path),
+                    rule="verilator_compile",
+                    inputs=str(source_path),
+                    variables={
+                        "args": "-O2" if object_group in categories_fast else ""
+                    },
+                )
+                object_paths.append(str(object_path))
+
+        ninja_writer.build(
+            outputs=f"bin/{self.module_name}_simulator",
+            rule="verilator_link",
+            inputs=object_paths + [self.cpp_file],
+            variables={"args": "-O2"},
+        )
+
+        ninja_writer.newline()

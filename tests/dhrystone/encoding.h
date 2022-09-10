@@ -171,7 +171,7 @@
 
 #define PTE_TABLE(PTE) (((PTE) & (PTE_V | PTE_R | PTE_W | PTE_X)) == PTE_V)
 
-#define __riscv
+// #define __riscv
 // #define __GNUC__
 
 #ifdef __riscv

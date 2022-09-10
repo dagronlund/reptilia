@@ -25,3 +25,10 @@ bin/
 misc/
 __pycache__/
 .vscode/
+
+# Ninja artifacts
+.ninja_log
+build.ninja
+build_riscv.ninja
+build_verilator.ninja
+build_verilator_compile.ninja

@@ -6,14 +6,21 @@ Builds the RTL with verilator
 from __future__ import annotations
 
 import os
+import subprocess
 import copy
 import glob
 from typing import Dict
 from pathlib import Path
+from filecmp import cmp as filecmp
+from shutil import copy as filecopy
 
-from util import info, error
-from riscv import RiscvProgram
-from verilator import VerilatorProgram
+from util import debug, info, error
+from riscv import RiscvProgram, write_riscv_ninja_rules
+from verilator import (
+    VerilatorProgram,
+    write_verilator_ninja_rules,
+    write_verilator_compile_ninja_rules,
+)
 
 
 def get_includes_imports(path):
@@ -133,14 +140,14 @@ def main():
 
     # Make sure bin/ folder(s) exists
     Path("bin/").mkdir(parents=True, exist_ok=True)
+    Path("bin/obj_dir").mkdir(parents=True, exist_ok=True)
     Path("bin/riscv-tests/").mkdir(parents=True, exist_ok=True)
     Path("bin/verilator/").mkdir(parents=True, exist_ok=True)
 
-    compiled_programs = {}
-    assembled_programs = []
+    riscv_programs = {}
 
-    print("Compiling test programs...")
-    compiled_programs["dhrystone"] = RiscvProgram(
+    info("Compiling RISCV programs...")
+    riscv_programs["dhrystone"] = RiscvProgram(
         "dhrystone",
         [
             "tests/lib/crt0.s",
@@ -153,40 +160,48 @@ def main():
         linker_script="tests/gecko_compiled.ld",
         opt="-O2",
     )
-
-    assembled_programs.append(
-        RiscvProgram(
-            "basic",
-            [
-                "tests/lib/crt0.s",
-                "tests/lib/libmem.c",
-                "tests/lib/libio.c",
-                "tests/basic/main.c",
-            ],
-            linker_script="tests/gecko_compiled.ld",
-            opt="-O2",
-        )
+    riscv_programs["basic"] = RiscvProgram(
+        "basic",
+        [
+            "tests/lib/crt0.s",
+            "tests/lib/libmem.c",
+            "tests/lib/libio.c",
+            "tests/basic/main.c",
+        ],
+        linker_script="tests/gecko_compiled.ld",
+        opt="-O2",
     )
 
-    # for path in glob.glob("riscv-tests/isa/rv32ui/*.S"):
-    #     name = Path(path).stem
-    #     assembled_programs.append(
-    #         RiscvProgram(
-    #             "riscv-tests/" + name,
-    #             [path],
-    #             linker_script="tests/gecko_assembled.ld",
-    #             include_folders=["riscv-tests/isa/macros/scalar/", "tests/"],
-    #         )
-    #     )
+    for path in glob.glob("riscv-tests/isa/rv32ui/*.S"):
+        name = Path(path).stem
+        riscv_programs[name] = RiscvProgram(
+            "riscv-tests/" + name + "/" + name,
+            [path],
+            linker_script="tests/gecko_assembled.ld",
+            include_folders=["riscv-tests/isa/macros/scalar/", "tests/"],
+        )
 
-    print("Finding RTL dependencies...")
+    with open("build_riscv.ninja", "w") as ninja_file:
+        write_riscv_ninja_rules(ninja_file)
+        for program in riscv_programs.values():
+            program.write_ninja_build(ninja_file)
+
+    subprocess.run(
+        ["ninja", "-f", "build_riscv.ninja"], capture_output=False, check=True
+    )
+
+    for program in riscv_programs.values():
+        program.get_program_stats()
+        # program.print_info()
+
+    info("Finding RTL dependencies...")
     header_files = {}
     source_files = {}
     for folder in rtl_folders:
         header_files = {**header_files, **search_headers(folder)}
         source_files = {**source_files, **search_sources(folder)}
 
-    print("Verifying RTL dependencies...")
+    info("Verifying RTL dependencies...")
     for path, source_file in source_files.items():
         for include_path in source_file.includes:
             if include_path not in header_files.keys():
@@ -203,17 +218,44 @@ def main():
     for _, source_file in source_files.items():
         source_file.get_dependencies(source_files=source_files)
 
-    print("Running verilator...")
-    for path, source_file in source_files.items():
-        if path in top_level and len(compiled_programs) > 0:
-            _, program = next(iter(compiled_programs.items()))
-        else:
+    info("Verilating RTL...")
+    verilated = []
+    with open("build_verilator.ninja", "w") as ninja_file:
+        write_verilator_ninja_rules(ninja_file)
+        for path, source_file in source_files.items():
+            lint_only = path not in top_level
             program = None
+            if not lint_only and len(riscv_programs) > 0:
+                _, program = next(iter(riscv_programs.items()))
+            v = VerilatorProgram(source_file, lint_only=lint_only, program=program)
+            v.write_ninja_build_verilate(ninja_file)
+            if not lint_only:
+                verilated.append(v)
 
-        info(f"{path}...")
-        _ = VerilatorProgram(
-            source_file, lint_only=path not in top_level, program=program
-        )
+    subprocess.run(
+        ["ninja", "-f", "build_verilator.ninja"],
+        capture_output=False,
+        check=True,
+    )
+
+    info("Merging obj_dir...")
+    for path in Path("obj_dir").rglob("*.*"):
+        new_path = Path("bin") / path
+        if not new_path.is_file() or not filecmp(str(path), str(new_path)):
+            debug(f"{new_path}")
+            filecopy(str(path), str(new_path))
+
+    info("Compiling RTL...")
+    with open("build_verilator_compile.ninja", "w") as ninja_file:
+        write_verilator_compile_ninja_rules(ninja_file)
+        for v in verilated:
+            v.write_ninja_build_verilate_compile(ninja_file)
+
+    subprocess.run(
+        ["ninja", "-f", "build_verilator_compile.ninja"],
+        capture_output=False,
+        check=True,
+    )
 
 
 if __name__ == "__main__":

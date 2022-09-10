@@ -2,3 +2,9 @@
 [submodule "riscv-tests"]
 	path = riscv-tests
 	url = https://github.com/riscv-software-src/riscv-tests.git
+[submodule "ninja"]
+	path = ninja
+	url = https://github.com/ninja-build/ninja.git
+[submodule "verilator"]
+	path = verilator
+	url = https://github.com/verilator/verilator.git

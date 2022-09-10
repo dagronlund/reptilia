@@ -2,10 +2,11 @@
 #define _DHRYSTONE_MAIN_
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-int dhrystone_main();
+    int dhrystone_main();
 
 #ifdef __cplusplus
 }
