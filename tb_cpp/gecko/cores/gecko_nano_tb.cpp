@@ -3,6 +3,8 @@
 #include <filesystem>
 #include <iostream>
 #include <fstream>
+#include <iterator>
+#include <vector>
 #include <string>
 
 #include "Vgecko_nano.h"
@@ -10,6 +12,8 @@
 #include "Vgecko_nano_gecko_nano__M10_Sz2_TBz3_TCz4.h"
 #include "Vgecko_nano_gecko_core__pi2.h"
 #include "Vgecko_nano_gecko_decode__pi8.h"
+#include "Vgecko_nano_mem_sequential_double__pi1.h"
+#include "Vgecko_nano_xilinx_block_ram_double__pi3.h"
 #include "verilated_vcd_c.h"
 #include "verilated.h"
 
@@ -81,14 +85,29 @@ int main(int argc, char **argv) {
     std::filesystem::create_directories("bin/");
     std::filesystem::create_directories("bin/debug/");
 
+    std::string program_path = std::string("");
     bool debug = false;
     for (int i = 1; i < argc; i++) {
         std::string s = std::string(argv[i]);
         if (s == "--debug" || s == "-d") {
-            printf("Debugging!!!\n\n\n");
             debug = true;
         }
+        if (s == "--binary" || s == "-b") {
+            if (i + 1 < argc) {
+                program_path = std::string(argv[i + 1]);
+                i++;
+            }
+        }
     }
+
+    if (program_path == "") {
+        printf("No program given!");
+        return 1;
+    }
+
+    std::ifstream program_input(program_path, std::ios::binary);
+    std::vector<unsigned char> program_buffer(
+            std::istreambuf_iterator<char>(program_input), {});
 
     std::ofstream trace_pc;
     std::ofstream trace_reg;
@@ -107,6 +126,25 @@ int main(int argc, char **argv) {
 
     tb->dut->tty_in_valid = 1;
     tb->dut->tty_out_ready = 1;
+
+    int memory_address_width = tb->dut->gecko_nano_wrapper->inst->mem->gen_xilinx__DOT__xilinx_block_ram_double_inst->ADDR_WIDTH;
+    int memory_data_width = tb->dut->gecko_nano_wrapper->inst->mem->gen_xilinx__DOT__xilinx_block_ram_double_inst->DATA_WIDTH;
+
+    int memory_bytes = (1 << memory_address_width) * (memory_data_width / 8);
+
+    if (program_buffer.size() > memory_bytes) {
+        printf("Program will not fit in memory!");
+        return 1;
+    }
+
+    // Load program into memory
+    for (int i = 0; i < (program_buffer.size() / 4); i += 1) {
+        uint32_t word = program_buffer[(i * 4) + 0] |
+                       (program_buffer[(i * 4) + 1] << 8) |
+                       (program_buffer[(i * 4) + 2] << 16) |
+                       (program_buffer[(i * 4) + 3] << 24);
+        tb->dut->gecko_nano_wrapper->inst->mem->gen_xilinx__DOT__xilinx_block_ram_double_inst->data[i] = word;
+    }
 
     // Tick the clock until we are done
     for (int i = 0; i < 100000; i++) {

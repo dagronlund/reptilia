@@ -5,8 +5,8 @@ module xilinx_block_ram_single
     import std_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
-    parameter int DATA_WIDTH = 32,
-    parameter int ADDR_WIDTH = 10,
+    parameter int DATA_WIDTH /*verilator public*/ = 32,
+    parameter int ADDR_WIDTH /*verilator public*/ = 10,
     parameter int MASK_WIDTH = DATA_WIDTH / 8,
     parameter bit ENABLE_OUTPUT_REG = 0,
     parameter HEX_FILE = ""
@@ -24,7 +24,7 @@ module xilinx_block_ram_single
 
     localparam DATA_LENGTH = 2**ADDR_WIDTH;
 
-    logic [DATA_WIDTH-1:0] data [DATA_LENGTH];
+    logic [DATA_WIDTH-1:0] data [DATA_LENGTH] /*verilator public*/;
 
     initial begin
         for (int i = 0; i < DATA_LENGTH; i++) begin

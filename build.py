@@ -148,7 +148,7 @@ def main():
 
     info("Compiling RISCV programs...")
     riscv_programs["dhrystone"] = RiscvProgram(
-        "dhrystone",
+        "dhrystone/dhrystone",
         [
             "tests/lib/crt0.s",
             "tests/lib/libmem.c",
@@ -161,7 +161,7 @@ def main():
         opt="-O2",
     )
     riscv_programs["basic"] = RiscvProgram(
-        "basic",
+        "basic/basic",
         [
             "tests/lib/crt0.s",
             "tests/lib/libmem.c",
@@ -224,11 +224,12 @@ def main():
         write_verilator_ninja_rules(ninja_file)
         for path, source_file in source_files.items():
             lint_only = path not in top_level
-            program = None
+            verilator_args = None
             if not lint_only and len(riscv_programs) > 0:
                 _, program = next(iter(riscv_programs.items()))
-            v = VerilatorProgram(source_file, lint_only=lint_only, program=program)
-            v.write_ninja_build_verilate(ninja_file)
+                verilator_args = [f"-GMEMORY_ADDR_WIDTH={program.address_width}"]
+            v = VerilatorProgram(source_file, lint_only=lint_only)
+            v.write_ninja_build_verilate(ninja_file, verilator_args=verilator_args)
             if not lint_only:
                 verilated.append(v)
 

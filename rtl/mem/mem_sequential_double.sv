@@ -55,7 +55,7 @@ module mem_sequential_double
     logic enable0, enable1, enable_output0, enable_output1;
 
     generate
-    if (TECHNOLOGY == STD_TECHNOLOGY_FPGA_XILINX) begin
+    if (TECHNOLOGY == STD_TECHNOLOGY_FPGA_XILINX) begin : gen_xilinx
 
         xilinx_block_ram_double #(
             .CLOCK_INFO(CLOCK_INFO),

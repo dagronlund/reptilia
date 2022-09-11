@@ -34,6 +34,7 @@ int main(int argc, char **argv)
                     if (DEST_ARRAY[i] != 0xAA)
                     {
                         tiny_printf("Memcpy overwrote wrong!");
+                        return 1;
                     }
                 }
                 else
@@ -41,6 +42,7 @@ int main(int argc, char **argv)
                     if (DEST_ARRAY[i] != i)
                     {
                         tiny_printf("Memcpy copied wrong!");
+                        return 1;
                     }
                 }
             }

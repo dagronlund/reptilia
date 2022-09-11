@@ -83,7 +83,7 @@ def write_verilator_compile_ninja_rules(writer):
 class VerilatorProgram:
     "Compiles Verilator testbenches from SystemVerilog sources"
 
-    def __init__(self, source_file, lint_only=False, program=None) -> None:
+    def __init__(self, source_file, lint_only=False) -> None:
         self.path = source_file.path
         self.module_name = self.path.split("/")[-1].split(".sv")[0]
         self.cpp_file = (
@@ -91,7 +91,6 @@ class VerilatorProgram:
         )
         self.source_file = source_file
         self.lint_only = lint_only
-        self.program = program
 
     def _parse_makefile(self):
         lines = []
@@ -127,7 +126,7 @@ class VerilatorProgram:
                     )
         return files
 
-    def write_ninja_build_verilate(self, writer):
+    def write_ninja_build_verilate(self, writer, verilator_args=None):
         "Writes the ninja rules for verilating this module"
         if self.source_file.no_lint:
             return
@@ -135,20 +134,15 @@ class VerilatorProgram:
         ninja_writer = NinjaWriter(writer)
         ninja_writer.comment(f"Build steps for {self.module_name}")
 
-        param_args = []
-        if self.program is not None:
-            param_args.append(f"-GMEMORY_ADDR_WIDTH={self.program.address_width}")
-            param_args.append(f'-GSTARTUP_PROGRAM="\\"bin/{self.program.name}.mem\\""')
+        if verilator_args is None:
+            verilator_args = []
 
         log_path = Path(f"bin/lint/{self.path}").with_suffix(".log")
         ninja_writer.build(
             outputs=str(log_path),
             rule="verilator_lint" if self.lint_only else "verilator_verilate",
             inputs=self.source_file.get_dependencies(),
-            variables={"name": self.module_name, "args": " ".join(param_args)},
-            implicit=[f"bin/{self.program.name}.mem"]
-            if self.program is not None
-            else None,
+            variables={"name": self.module_name, "args": " ".join(verilator_args)},
         )
 
         ninja_writer.newline()

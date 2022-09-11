@@ -4,8 +4,8 @@ module xilinx_distributed_ram
     import std_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
-    parameter int DATA_WIDTH = 1,
-    parameter int ADDR_WIDTH = 5,
+    parameter int DATA_WIDTH /*verilator public*/ = 1,
+    parameter int ADDR_WIDTH /*verilator public*/ = 5,
     parameter int READ_PORTS = 1
 )(
     input wire clk, 
@@ -23,7 +23,7 @@ module xilinx_distributed_ram
     localparam DATA_LENGTH = 2**ADDR_WIDTH;
 
     (* ram_style="distributed" *)
-    logic [DATA_WIDTH-1:0] data [DATA_LENGTH];
+    logic [DATA_WIDTH-1:0] data [DATA_LENGTH] /*verilator public*/;
 
     initial begin
         for (int i = 0; i < DATA_LENGTH; i++) begin
