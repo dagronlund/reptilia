@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import time
 import copy
 import glob
 from typing import Dict
@@ -14,7 +15,7 @@ from pathlib import Path
 from filecmp import cmp as filecmp
 from shutil import copy as filecopy
 
-from util import debug, info, error
+from util import info, error
 from riscv import RiscvProgram, write_riscv_ninja_rules
 from verilator import (
     VerilatorProgram,
@@ -243,7 +244,6 @@ def main():
     for path in Path("obj_dir").rglob("*.*"):
         new_path = Path("bin") / path
         if not new_path.is_file() or not filecmp(str(path), str(new_path)):
-            debug(f"{new_path}")
             filecopy(str(path), str(new_path))
 
     info("Compiling RTL...")
@@ -252,11 +252,14 @@ def main():
         for v in verilated:
             v.write_ninja_build_verilate_compile(ninja_file)
 
+    start = time.time()
     subprocess.run(
-        ["ninja", "-f", "build_verilator_compile.ninja"],
+        ["ninja", "-f", "build_verilator_compile.ninja", "-v"],
         capture_output=False,
         check=True,
     )
+    duration = time.time() - start
+    print(f"Time: {duration:.3}s...")
 
 
 if __name__ == "__main__":

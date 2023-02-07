@@ -9,7 +9,7 @@
 
 #include "Vgecko_nano.h"
 #include "Vgecko_nano_gecko_nano_wrapper.h"
-#include "Vgecko_nano_gecko_nano__M10_Sz2_TBz3_TCz4.h"
+#include "Vgecko_nano_gecko_nano__M10_TBz2_TCz3.h"
 #include "Vgecko_nano_gecko_core__pi2.h"
 #include "Vgecko_nano_gecko_decode__pi8.h"
 #include "Vgecko_nano_mem_sequential_double__pi1.h"
@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
     }
 
     if (program_path == "") {
-        printf("No program given!");
+        printf("No program given!\n");
         return 1;
     }
 
@@ -133,7 +133,7 @@ int main(int argc, char **argv) {
     int memory_bytes = (1 << memory_address_width) * (memory_data_width / 8);
 
     if (program_buffer.size() > memory_bytes) {
-        printf("Program will not fit in memory!");
+        printf("Program will not fit in memory!\n");
         return 1;
     }
 
@@ -199,7 +199,7 @@ int main(int argc, char **argv) {
 
     auto elapsed = std::chrono::system_clock::now() - start_time;
     uint64_t duration = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
-    printf("%d cycles in %lld us\n", tb->cycles, duration);
+    printf("%lu cycles in %lld us\n", tb->cycles, duration);
 
     exit(EXIT_SUCCESS);
 }

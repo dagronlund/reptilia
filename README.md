@@ -18,7 +18,7 @@ models with the test programs loaded into memory.
 ### Gecko
 Small RV32I core with flexible memory interfaces and lightweight AXI interfaces
 
-![](media/gecko_small.png "Gecko Logo")
+<img src="media/gecko.svg" alt="gecko" width="200"/>
 
 ### Basilisk
 Gecko core with both integer math, floating point, and vector extensions
@@ -26,7 +26,7 @@ Gecko core with both integer math, floating point, and vector extensions
 ## Repository Structure
 
 - `rtl/`
-	SystemVerilog (\*.sv) files containing modules that are going to be synthesized into logic
+	SystemVerilog modules/packages that are going to be synthesized into logic
 - `tb/`
 	SystemVerilog testbenches for verifying the RTL behavior
 - `tb_cpp/`

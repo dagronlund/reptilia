@@ -60,7 +60,7 @@ module asic_latch_ram
                 data[i] = sampled_write_data;
             end
         end
-    end    
+    end
 
     // Read data out
     always_comb begin

@@ -30,8 +30,8 @@ def write_verilator_ninja_rules(writer):
     verilator = "VERILATOR_ROOT=verilator/ verilator/bin/verilator"
 
     flags = "--prefix V$name -Irtl/ +define+__SYNTH_ONLY__=1"
-    trace = "--trace --trace-structs --output-split 10000"
-    # "--trace-max-array 1000000 --trace-max-width 1000000"
+    trace = "--trace --trace-structs --output-split 10000 --trace-max-array 1000000"
+    # " --trace-max-width 1000000"
 
     # Create rule for linting SystemVerilog modules
     ninja_writer.rule(
@@ -61,20 +61,22 @@ def write_verilator_compile_ninja_rules(writer):
     flags += " -Wno-unused-parameter"
     flags += " -Wno-unused-variable"
     flags += " -Wno-shadow"
+    flags += " -std=c++17"
+    flags += " -Wc++11-extensions"
 
     includes = "-Ibin/obj_dir/ -Iverilator/include -Iverilator/include/vltstd"
 
     # Create rule for compiling verilated source code
     ninja_writer.rule(
         name="verilator_compile",
-        command=f"g++-11 {includes} {flags} $args -c $in -o $out -MMD -MF $out.d",
+        command=f"g++ {includes} {flags} $args -c $in -o $out -MMD -MF $out.d",
         depfile="$out.d",
     )
 
     # Create rule for linking verilated source code
     ninja_writer.rule(
         name="verilator_link",
-        command=f"g++-11 {includes} $args $in -o $out",
+        command=f"g++ {includes} {flags} $args $in -o $out",
     )
 
     ninja_writer.newline()

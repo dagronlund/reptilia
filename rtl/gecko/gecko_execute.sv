@@ -230,14 +230,14 @@ module gecko_execute
         next_execute_result.payload.reg_status = cmd_in.reg_status;
         next_execute_result.payload.jump_flag = cmd_in.jump_flag;
 
-        next_mem_command.payload = '{default: 'b0};
+        next_mem_command.payload = gecko_mem_operation_t'(0);
         next_mem_command.payload.addr = cmd_in.reg_addr;
         next_mem_command.payload.op = cmd_in.op.ls;
         next_mem_command.payload.offset = 'b0;
         next_mem_command.payload.reg_status = cmd_in.reg_status;
         next_mem_command.payload.jump_flag = cmd_in.jump_flag;
 
-        next_jump_command.payload = '{default: 'b0};
+        next_jump_command.payload = gecko_jump_operation_t'(0);
         next_jump_command.payload.current_pc = cmd_in.current_pc;
         next_jump_command.payload.prediction = cmd_in.prediction;
 
