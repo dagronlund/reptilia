@@ -66,6 +66,41 @@ def write_riscv_ninja_rules(writer: str) -> None:
     ninja_writer.newline()
 
 
+def write_riscv_test_ninja(
+    writer: str,
+    programs: Sequence[RiscvProgram],
+    simulator: str,
+) -> None:
+    """Write Ninja rules that run RISC-V programs against a simulator."""
+    ninja_writer = NinjaWriter(writer)
+    ninja_writer.comment("Run RISC-V ISA tests against Gecko")
+
+    # The simulator writes to a shared VCD path, so invocations must not overlap.
+    ninja_writer.pool(name="gecko_test_pool", depth=1)
+    ninja_writer.rule(
+        name="gecko_test",
+        command="$simulator --binary $binary",
+        description="TEST $binary",
+        pool="gecko_test_pool",
+    )
+
+    targets: list[str] = []
+    for program in programs:
+        target = "test-" + program.name.replace("/", "-")
+        binary = f"build/{program.name}.bin"
+        ninja_writer.build(
+            outputs=[target],
+            rule="gecko_test",
+            inputs=[binary],
+            implicit=[simulator],
+            variables={"simulator": simulator, "binary": binary},
+        )
+        targets.append(target)
+
+    ninja_writer.default(targets)
+    ninja_writer.newline()
+
+
 class RiscvProgram:
     "Compiles RISCV programs using the GNU toolchain"
 

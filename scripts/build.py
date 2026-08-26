@@ -12,7 +12,11 @@ import time
 from pathlib import Path
 from typing import cast
 
-from .riscv import RiscvProgram, write_riscv_ninja_rules
+from .riscv import (
+    RiscvProgram,
+    write_riscv_ninja_rules,
+    write_riscv_test_ninja,
+)
 from .util import error, info
 from .verilator import (
     VerilatorProgram,
@@ -128,7 +132,10 @@ def search_sources(path: str) -> dict[str, SourceFile]:
     return source_files
 
 
-def main() -> None:
+def main(
+    run_riscv_tests: bool = False,
+    run_dhrystone: bool = False,
+) -> None:
     """Main function"""
     rtl_folders: list[str] = [
         "rtl/std",
@@ -263,6 +270,31 @@ def main() -> None:
     )
     duration = time.time() - start
     print(f"Time: {duration:.3}s...")
+
+    if run_riscv_tests or run_dhrystone:
+        info("Running programs against the Gecko simulator...")
+        riscv_test_ninja_path = build_path / "riscv_test.ninja"
+        simulator = "build/gecko_nano_simulator"
+        # Gecko does not implement FENCE.I or misaligned data accesses.
+        skipped_isa_tests = {"fence_i", "ma_data"}
+        test_programs: list[RiscvProgram] = []
+        if run_riscv_tests:
+            test_programs.extend(
+                program
+                for name, program in riscv_programs.items()
+                if name not in {"basic", "dhrystone"} | skipped_isa_tests
+            )
+        if run_dhrystone:
+            test_programs.append(riscv_programs["dhrystone"])
+        with open(riscv_test_ninja_path, "w", encoding="utf-8") as ninja_file:
+            write_riscv_test_ninja(
+                cast(str, ninja_file), test_programs, simulator
+            )
+        subprocess.run(
+            ["ninja", "-f", str(riscv_test_ninja_path), "-k", "0"],
+            capture_output=False,
+            check=True,
+        )
 
 
 if __name__ == "__main__":

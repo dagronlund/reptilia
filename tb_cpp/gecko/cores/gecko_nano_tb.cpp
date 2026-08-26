@@ -151,6 +151,7 @@ int main(int argc, char **argv) {
     }
 
     // Tick the clock until we are done
+    int exit_status = EXIT_FAILURE;
     for (int i = 0; i < 100000; i++) {
         tb->tick();
         if (tb->dut->tty_out_valid) {
@@ -184,6 +185,9 @@ int main(int argc, char **argv) {
                     tb->tick();
                 }
                 printf("\nGecko finished: %d!\n", tb->dut->exit_code);
+                if (tb->dut->exit_code == 0) {
+                    exit_status = EXIT_SUCCESS;
+                }
             }
             break;
         }
@@ -205,5 +209,5 @@ int main(int argc, char **argv) {
     uint64_t duration = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
     printf("%lu cycles in %lld us\n", tb->cycles, duration);
 
-    exit(EXIT_SUCCESS);
+    return exit_status;
 }

@@ -20,6 +20,10 @@ generate the Verilator models, and then compile the Verilator models with the
 test programs loaded into memory. Ninja and the other Python dependencies are
 provided by the uv environment.
 
+Run the complete RV32UI test suite against the Gecko simulator with
+`uv run ./main.py --riscv-tests`. Add `--dhrystone` to also run the
+Dhrystone benchmark, or use `--dhrystone` by itself.
+
 ## Cores
 
 ### Gecko
