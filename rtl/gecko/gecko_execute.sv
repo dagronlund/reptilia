@@ -33,6 +33,9 @@ module gecko_execute
     input wire clk, 
     input wire rst,
 
+    // Pulses when a resolved control-flow operation redirects instruction fetch.
+    input wire instruction_updated,
+
     stream_intf.in execute_command, // gecko_execute_operation_t
 
     stream_intf.out mem_command, // gecko_mem_operation_t
@@ -125,7 +128,7 @@ module gecko_execute
     ) mispredicted_register (
         .clk, 
         .rst,
-        .enable,
+        .enable(enable || instruction_updated),
         .next(mispredicted_next),
         .value(mispredicted)
     );
@@ -187,7 +190,7 @@ module gecko_execute
 
         cmd_in = gecko_execute_operation_t'(execute_command.payload);
 
-        // Clear mispredicted if the instruction stream updated
+        // Clear mispredicted on the first corrected-path execute operation.
         mispredicted_next = mispredicted;
         if (execute_command.payload.pc_updated) begin
             mispredicted_next = 'b0;
@@ -388,6 +391,12 @@ module gecko_execute
                 // Do not clear the mispredicted register if an earlier jump was mispredicted
                 mispredicted_next = mispredicted;
             end
+        end
+
+        // The execute input can be idle when the redirect reaches the core,
+        // so give recovery final priority over the stale command payload.
+        if (instruction_updated) begin
+            mispredicted_next = 'b0;
         end
     end
 

@@ -184,6 +184,10 @@ module gecko_core
     ) gecko_execute_inst (
         .clk, .rst,
 
+        .instruction_updated(jump_command.valid &&
+                jump_command.payload.update_pc &&
+                !jump_command.payload.mispredicted),
+
         .execute_command,
 
         .mem_command(mem_command_in),

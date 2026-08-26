@@ -13,6 +13,7 @@ module gecko_execute_tb
     localparam std_clock_info_t CLOCK_INFO = 'b0;
 
     logic clk, rst;
+    logic instruction_updated;
     clk_rst_gen #() clk_rst_gen_inst(.clk, .rst);
 
     stream_intf #(.T(gecko_execute_operation_t)) execute_command (.clk, .rst);
@@ -29,6 +30,8 @@ module gecko_execute_tb
         .ENABLE_INTEGER_MATH(1)
     ) gecko_execute_inst (
         .clk, .rst,
+
+        .instruction_updated,
 
         .execute_command, // gecko_execute_operation_t
 
@@ -53,6 +56,7 @@ module gecko_execute_tb
         recv_count = 0;
 
         execute_command.valid = 'b0;
+        instruction_updated = 'b0;
         
         mem_request.ready = 'b0;
         mem_command.ready = 'b0;

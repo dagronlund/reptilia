@@ -126,6 +126,7 @@ module gecko_decode
     function automatic instruction_status_t get_instruction_status(
         input state_t state,
         input riscv32_fields_t instruction_fields,
+        input logic instruction_error,
         input gecko_decode_operands_status_t operands_status,
         input rs1_rs2_status_t rs1_rs2_status,
         input logic mispredicted,
@@ -144,11 +145,8 @@ module gecko_decode
                          !rs1_rs2_status.rs2_valid || 
                          !operands_status.rd_valid) begin
                 status.stall_data = 'b1;
-            // Only execute non-side-effect instructions while speculating
-            end else if (speculating && is_instruction_system(instruction_fields)) begin
-                status.stall_control = 'b1;
-            // Only execute non-control flow while speculation queue is full
-            end else if (speculation_full && is_opcode_control_flow(instruction_fields)) begin
+            // TODO: Implement misprediction history table to avoid stalling on all speculative instructions
+            end else if (speculating) begin
                 status.stall_control = 'b1;
             end
         end
@@ -382,6 +380,7 @@ module gecko_decode
         instruction_status = get_instruction_status(
             state,
             instruction_fields,
+            opcode_status.error_flag,
             operands_status,
             rs1_rs2_status,
             mispredicted,

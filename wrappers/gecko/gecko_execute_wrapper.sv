@@ -4,6 +4,8 @@ module gecko_execute_wrapper
     input wire clk, 
     input wire rst,
 
+    input wire instruction_updated,
+
     output logic instruction_executed
 );
 
@@ -17,6 +19,8 @@ module gecko_execute_wrapper
     gecko_execute inst (
         .clk, 
         .rst,
+
+        .instruction_updated,
 
         .execute_command,
 
