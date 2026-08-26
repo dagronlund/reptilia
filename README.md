@@ -3,15 +3,22 @@ SystemVerilog RISC-V implementation and libraries
 
 ## Build/Verify
 
-Before building you need to install two different tools, RISCV-GNU, and LLVM. 
-Once these are installed you need to set three environment variables to point to
-where these are installed.
-- $LLVM_ROOT
-- $RISCV_GNU_ROOT
+Before building, install [uv](https://docs.astral.sh/uv/), the RISC-V GNU
+toolchain, and Verilator. Add both tools' `bin` directories to `PATH`:
 
-The RTL can then be verified by running `./build.py`, which will compile the
-test programs, generate the verilator models, and then compile the verilator
-models with the test programs loaded into memory.
+```sh
+export PATH="<verilator-prefix>/bin:<riscv-prefix>/bin:$PATH"
+```
+
+The build discovers `riscv64-unknown-elf-gcc`,
+`riscv64-unknown-elf-objcopy`, `riscv64-unknown-elf-objdump`, and `verilator`
+from `PATH`. It queries Verilator for its runtime include directory.
+
+Install the locked Python environment with `uv sync`. The RTL can then be
+verified by running `uv run ./main.py`, which will compile the test programs,
+generate the Verilator models, and then compile the Verilator models with the
+test programs loaded into memory. Ninja and the other Python dependencies are
+provided by the uv environment.
 
 ## Cores
 

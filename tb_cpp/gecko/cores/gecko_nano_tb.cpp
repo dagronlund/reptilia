@@ -9,13 +9,17 @@
 
 #include "Vgecko_nano.h"
 #include "Vgecko_nano_gecko_nano_wrapper.h"
-#include "Vgecko_nano_gecko_nano__M10_TBz2_TCz3.h"
+#include "Vgecko_nano_gecko_nano__M10_TBz2_TCz2.h"
 #include "Vgecko_nano_gecko_core__pi2.h"
-#include "Vgecko_nano_gecko_decode__pi8.h"
+#include "Vgecko_nano_gecko_decode__pi6.h"
 #include "Vgecko_nano_mem_sequential_double__pi1.h"
-#include "Vgecko_nano_xilinx_block_ram_double__pi3.h"
+#include "Vgecko_nano_xilinx_block_ram_double__Ae.h"
 #include "verilated_vcd_c.h"
 #include "verilated.h"
+
+double sc_time_stamp() {
+    return 0;
+}
 
 template<class Module>
 class Testbench {
@@ -82,8 +86,8 @@ class Testbench {
 int main(int argc, char **argv) {
     // Initialize Verilators variables
     Verilated::commandArgs(argc, argv);
-    std::filesystem::create_directories("bin/");
-    std::filesystem::create_directories("bin/debug/");
+    std::filesystem::create_directories("build/");
+    std::filesystem::create_directories("build/debug/");
 
     std::string program_path = std::string("");
     bool debug = false;
@@ -113,15 +117,15 @@ int main(int argc, char **argv) {
     std::ofstream trace_reg;
 
     if (debug) {
-        trace_pc.open("bin/debug/trace_pc.log");
+        trace_pc.open("build/debug/trace_pc.log");
         trace_pc << "pc" << std::endl;
-        trace_reg.open("bin/debug/trace_regs.log");
+        trace_reg.open("build/debug/trace_regs.log");
         trace_reg << "reg, addr" << std::endl;
     }
 
     const auto start_time = std::chrono::system_clock::now();
     Testbench<Vgecko_nano> *tb = new Testbench<Vgecko_nano>();
-    tb->openTrace("bin/gecko_nano.vcd");
+    tb->openTrace("build/gecko_nano.vcd");
     tb->reset();
 
     tb->dut->tty_in_valid = 1;

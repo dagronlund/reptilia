@@ -1,37 +1,36 @@
-#!/usr/bin/env python3
 """
 Builds the RTL with verilator
 """
 
 from __future__ import annotations
 
+import copy
+import glob
 import os
 import subprocess
 import time
-import copy
-import glob
-from typing import Dict
 from pathlib import Path
-from filecmp import cmp as filecmp
-from shutil import copy as filecopy
+from typing import cast
 
-from util import info, error
-from riscv import RiscvProgram, write_riscv_ninja_rules
-from verilator import (
+from .riscv import RiscvProgram, write_riscv_ninja_rules
+from .util import error, info
+from .verilator import (
     VerilatorProgram,
-    write_verilator_ninja_rules,
     write_verilator_compile_ninja_rules,
+    write_verilator_ninja_rules,
 )
 
+DependencyInfo = tuple[list[str], list[str], str | None, bool]
 
-def get_includes_imports(path):
+
+def get_includes_imports(path: str) -> DependencyInfo:
     """Parses special comments in the file to find dependencies"""
-    with open(path, "r") as file:
-        include_paths = []
-        import_paths = []
-        wrapper_path = None
+    with open(path, "r", encoding="utf-8") as file:
+        include_paths: list[str] = []
+        import_paths: list[str] = []
+        wrapper_path: str | None = None
         no_lint = False
-        for line in file.readlines():
+        for line in file:
             if line.startswith("//!import "):
                 import_paths.append("rtl/" + line[len("//!import") :].strip())
             elif line.startswith("//!include "):
@@ -50,7 +49,7 @@ def get_includes_imports(path):
 class HeaderFile:
     """Describes dependencies of .svh files"""
 
-    def __init__(self, path) -> None:
+    def __init__(self, path: str) -> None:
         self.path = path
         self.includes, _, _, _ = get_includes_imports(path)
 
@@ -58,22 +57,23 @@ class HeaderFile:
 class SourceFile:
     """Describes dependencies of .sv files"""
 
-    def __init__(self, path) -> None:
+    def __init__(self, path: str) -> None:
         self.path = path
         self.includes, self.imports, self.wrapper, self.no_lint = get_includes_imports(
             path
         )
-        self.dependencies = None
+        self.dependencies: list[str] | None = None
 
     def _get_dependencies(
         self,
-        source_files: Dict[str, SourceFile],
-        source_files_used: Dict[str, SourceFile],
-    ):
-        dependencies = []
+        source_files: dict[str, SourceFile],
+        source_files_used: dict[str, SourceFile],
+    ) -> list[str]:
+        dependencies: list[str] = []
         # Add sub-dependencies to list
         for import_path in self.imports:
             if import_path in source_files:
+                # pylint: disable-next=protected-access
                 dependencies += source_files[import_path]._get_dependencies(
                     source_files, source_files_used
                 )
@@ -98,36 +98,39 @@ class SourceFile:
             )
         return dependencies
 
-    def get_dependencies(self, source_files=None):
+    def get_dependencies(
+        self, source_files: dict[str, SourceFile] | None = None
+    ) -> list[str]:
         "Returns a list of all the SV dependencies listed in included order"
         if source_files is None and self.dependencies is None:
             error(
                 f"{self.path} asked for dependencies without being given source files first!"
             )
         if self.dependencies is None:
-            self.dependencies = self._get_dependencies(copy.deepcopy(source_files), {})
+            source_files_copy = cast(dict[str, SourceFile], copy.deepcopy(source_files))
+            self.dependencies = self._get_dependencies(source_files_copy, {})
             if self.wrapper is not None:
                 self.dependencies += [self.wrapper]
         return self.dependencies
 
 
-def search_headers(path):
-    header_files = {}
+def search_headers(path: str) -> dict[str, HeaderFile]:
+    header_files: dict[str, HeaderFile] = {}
     for glob_path in glob.glob(os.path.join(path, "*.svh")):
         header_files[glob_path] = HeaderFile(glob_path)
     return header_files
 
 
-def search_sources(path):
-    source_files = {}
+def search_sources(path: str) -> dict[str, SourceFile]:
+    source_files: dict[str, SourceFile] = {}
     for glob_path in glob.glob(os.path.join(path, "*.sv")):
         source_files[glob_path] = SourceFile(glob_path)
     return source_files
 
 
-def main():
+def main() -> None:
     """Main function"""
-    rtl_folders = [
+    rtl_folders: list[str] = [
         "rtl/std",
         "rtl/xilinx",
         "rtl/asic",
@@ -137,15 +140,14 @@ def main():
         "rtl/gecko",
         "rtl/gecko/cores",
     ]
-    top_level = ["rtl/gecko/cores/gecko_nano.sv"]
+    top_level: list[str] = ["rtl/gecko/cores/gecko_nano.sv"]
 
-    # Make sure bin/ folder(s) exists
-    Path("bin/").mkdir(parents=True, exist_ok=True)
-    Path("bin/obj_dir").mkdir(parents=True, exist_ok=True)
-    Path("bin/riscv-tests/").mkdir(parents=True, exist_ok=True)
-    Path("bin/verilator/").mkdir(parents=True, exist_ok=True)
+    # Make sure the build folder exists
+    build_path = Path("build")
+    build_path.mkdir(parents=True, exist_ok=True)
+    (build_path / "obj_dir").mkdir(parents=True, exist_ok=True)
 
-    riscv_programs = {}
+    riscv_programs: dict[str, RiscvProgram] = {}
 
     info("Compiling RISCV programs...")
     riscv_programs["dhrystone"] = RiscvProgram(
@@ -182,13 +184,14 @@ def main():
             include_folders=["riscv-tests/isa/macros/scalar/", "tests/"],
         )
 
-    with open("build_riscv.ninja", "w") as ninja_file:
-        write_riscv_ninja_rules(ninja_file)
+    riscv_ninja_path = build_path / "riscv.ninja"
+    with open(riscv_ninja_path, "w", encoding="utf-8") as ninja_file:
+        write_riscv_ninja_rules(cast(str, ninja_file))
         for program in riscv_programs.values():
-            program.write_ninja_build(ninja_file)
+            program.write_ninja_build(cast(str, ninja_file))
 
     subprocess.run(
-        ["ninja", "-f", "build_riscv.ninja"], capture_output=False, check=True
+        ["ninja", "-f", str(riscv_ninja_path)], capture_output=False, check=True
     )
 
     for program in riscv_programs.values():
@@ -196,8 +199,8 @@ def main():
         # program.print_info()
 
     info("Finding RTL dependencies...")
-    header_files = {}
-    source_files = {}
+    header_files: dict[str, HeaderFile] = {}
+    source_files: dict[str, SourceFile] = {}
     for folder in rtl_folders:
         header_files = {**header_files, **search_headers(folder)}
         source_files = {**source_files, **search_sources(folder)}
@@ -205,56 +208,56 @@ def main():
     info("Verifying RTL dependencies...")
     for path, source_file in source_files.items():
         for include_path in source_file.includes:
-            if include_path not in header_files.keys():
+            if include_path not in header_files:
                 raise RuntimeError(
                     f"""File {path} includes {include_path} which does not exist!
                         {header_files.keys()}"""
                 )
         for import_path in source_file.imports:
-            if import_path not in source_files.keys():
+            if import_path not in source_files:
                 raise RuntimeError(
                     f"""File {path} imports {import_path} which does not exist!
                         {source_files.keys()}"""
                 )
-    for _, source_file in source_files.items():
+    for source_file in source_files.values():
         source_file.get_dependencies(source_files=source_files)
 
     info("Verilating RTL...")
-    verilated = []
-    with open("build_verilator.ninja", "w") as ninja_file:
-        write_verilator_ninja_rules(ninja_file)
+    verilated: list[VerilatorProgram] = []
+    verilator_ninja_path = build_path / "verilator.ninja"
+    with open(verilator_ninja_path, "w", encoding="utf-8") as ninja_file:
+        write_verilator_ninja_rules(cast(str, ninja_file))
         for path, source_file in source_files.items():
             lint_only = path not in top_level
-            verilator_args = None
+            verilator_args: list[str] | None = None
             if not lint_only and len(riscv_programs) > 0:
                 _, program = next(iter(riscv_programs.items()))
                 verilator_args = [f"-GMEMORY_ADDR_WIDTH={program.address_width}"]
             v = VerilatorProgram(source_file, lint_only=lint_only)
-            v.write_ninja_build_verilate(ninja_file, verilator_args=verilator_args)
+            v.write_ninja_build_verilate(
+                cast(str, ninja_file), verilator_args=verilator_args
+            )
             if not lint_only:
                 verilated.append(v)
 
     subprocess.run(
-        ["ninja", "-f", "build_verilator.ninja"],
+        ["ninja", "-f", str(verilator_ninja_path)],
         capture_output=False,
         check=True,
     )
 
-    info("Merging obj_dir...")
-    for path in Path("obj_dir").rglob("*.*"):
-        new_path = Path("bin") / path
-        if not new_path.is_file() or not filecmp(str(path), str(new_path)):
-            filecopy(str(path), str(new_path))
-
     info("Compiling RTL...")
-    with open("build_verilator_compile.ninja", "w") as ninja_file:
-        write_verilator_compile_ninja_rules(ninja_file)
+    verilator_compile_ninja_path = build_path / "verilator_compile.ninja"
+    with open(
+        verilator_compile_ninja_path, "w", encoding="utf-8"
+    ) as ninja_file:
+        write_verilator_compile_ninja_rules(cast(str, ninja_file))
         for v in verilated:
-            v.write_ninja_build_verilate_compile(ninja_file)
+            v.write_ninja_build_verilate_compile(cast(str, ninja_file))
 
     start = time.time()
     subprocess.run(
-        ["ninja", "-f", "build_verilator_compile.ninja", "-v"],
+        ["ninja", "-f", str(verilator_compile_ninja_path), "-v"],
         capture_output=False,
         check=True,
     )

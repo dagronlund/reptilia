@@ -22,13 +22,12 @@ ucli.key
 # Top level folders
 obj_dir/
 bin/
+build/
 misc/
 __pycache__/
+.venv/
 .vscode/
 
 # Ninja artifacts
 .ninja_log
-build.ninja
-build_riscv.ninja
-build_verilator.ninja
-build_verilator_compile.ninja
+*.ninja
