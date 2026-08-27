@@ -16,14 +16,15 @@ module mem_split
     parameter int PORTS = 2,
     parameter int META_WIDTH = 1,
     parameter bit USE_LAST = 0
-)(
-    input wire clk, rst,
+) (
+    input wire clk,
+    rst,
 
-    mem_intf.in                 mem_in,
-    input wire [META_WIDTH-1:0] mem_in_meta,
+          mem_intf.in                  mem_in,
+    input wire        [META_WIDTH-1:0] mem_in_meta,
 
-    mem_intf.out                  mem_out [PORTS],
-    output logic [META_WIDTH-1:0] mem_out_meta [PORTS]
+           mem_intf.out                  mem_out     [PORTS],
+    output logic        [META_WIDTH-1:0] mem_out_meta[PORTS]
 );
 
     typedef bit [mem_in.ADDR_WIDTH-1:0] addr_width_temp_t;
@@ -57,34 +58,44 @@ module mem_split
     } mem_t;
 
     logic [INTERNAL_ID_WIDTH-1:0] stream_in_id;
-    stream_intf #(.T(mem_t)) stream_in (.clk, .rst);
+    stream_intf #(
+        .T(mem_t)
+    ) stream_in (
+        .clk,
+        .rst
+    );
 
-    stream_intf #(.T(mem_t)) stream_out [PORTS] (.clk, .rst);
-    logic stream_out_last [PORTS];
+    stream_intf #(
+        .T(mem_t)
+    ) stream_out[PORTS] (
+        .clk,
+        .rst
+    );
+    logic stream_out_last[PORTS];
 
     generate
-    genvar k;
-    for (k = 0; k < PORTS; k++) begin
+        genvar k;
+        for (k = 0; k < PORTS; k++) begin
 
-        `PROCEDURAL_ASSERT(ADDR_WIDTH == $bits(mem_out[k].addr))
-        `PROCEDURAL_ASSERT(MASK_WIDTH == $bits(mem_out[k].write_enable))
-        `PROCEDURAL_ASSERT(DATA_WIDTH == $bits(mem_out[k].data))
-        `PROCEDURAL_ASSERT(OUTPUT_ID_WIDTH == $bits(mem_out[k].id))
+            `PROCEDURAL_ASSERT(ADDR_WIDTH == $bits(mem_out[k].addr))
+            `PROCEDURAL_ASSERT(MASK_WIDTH == $bits(mem_out[k].write_enable))
+            `PROCEDURAL_ASSERT(DATA_WIDTH == $bits(mem_out[k].data))
+            `PROCEDURAL_ASSERT(OUTPUT_ID_WIDTH == $bits(mem_out[k].id))
 
-        always_comb begin
-            automatic mem_t payload = stream_out[k].payload;
+            always_comb begin
+                automatic mem_t payload = stream_out[k].payload;
 
-            mem_out[k].valid = stream_out[k].valid;
-            mem_out[k].read_enable = payload.read_enable;
-            mem_out[k].write_enable = payload.write_enable;
-            mem_out[k].addr = payload.addr;
-            mem_out[k].data = payload.data;
-            mem_out[k].id = payload.id[OUTPUT_ID_WIDTH-1:0];
-            mem_out[k].last = stream_out_last[k];
-            mem_out_meta[k] = payload.meta;
-            stream_out[k].ready = mem_out[k].ready;
+                mem_out[k].valid = stream_out[k].valid;
+                mem_out[k].read_enable = payload.read_enable;
+                mem_out[k].write_enable = payload.write_enable;
+                mem_out[k].addr = payload.addr;
+                mem_out[k].data = payload.data;
+                mem_out[k].id = payload.id[OUTPUT_ID_WIDTH-1:0];
+                mem_out[k].last = stream_out_last[k];
+                mem_out_meta[k] = payload.meta;
+                stream_out[k].ready = mem_out[k].ready;
+            end
         end
-    end
     endgenerate
 
     always_comb begin
@@ -109,13 +120,13 @@ module mem_split
         .PORTS(PORTS),
         .ID_WIDTH(OUTPUT_ID_WIDTH)
     ) stream_split_inst (
-        .clk, 
+        .clk,
         .rst,
-        .stream_in, 
-        .stream_in_id, 
+        .stream_in,
+        .stream_in_id,
         .stream_in_last(mem_in.last),
         .stream_out,
-        .stream_out_id(), 
+        .stream_out_id (),
         .stream_out_last
     );
 

@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 
 `ifdef __LINTER__
 
@@ -31,22 +31,29 @@ module basilisk_sqrt_exponent
     import basilisk::*;
 #(
     parameter int OUTPUT_REGISTER_MODE = 1
-)(
-    input logic clk, rst,
+) (
+    input logic clk,
+    rst,
 
-    std_stream_intf.in sqrt_command, // basilisk_sqrt_command_t
-    std_stream_intf.out sqrt_exponent_command // basilisk_sqrt_operation_t
+    std_stream_intf.in sqrt_command,  // basilisk_sqrt_command_t
+    std_stream_intf.out sqrt_exponent_command  // basilisk_sqrt_operation_t
 );
 
-    std_stream_intf #(.T(basilisk_sqrt_operation_t)) next_sqrt_exponent_command (.clk, .rst);
+    std_stream_intf #(
+        .T(basilisk_sqrt_operation_t)
+    ) next_sqrt_exponent_command (
+        .clk,
+        .rst
+    );
 
     logic enable, consume, produce;
 
     std_flow_lite #(
-        .NUM_INPUTS(1),
+        .NUM_INPUTS (1),
         .NUM_OUTPUTS(1)
     ) std_flow_lite_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
 
         .valid_input({sqrt_command.valid}),
         .ready_input({sqrt_command.ready}),
@@ -54,15 +61,19 @@ module basilisk_sqrt_exponent
         .valid_output({next_sqrt_exponent_command.valid}),
         .ready_output({next_sqrt_exponent_command.ready}),
 
-        .consume, .produce, .enable
+        .consume,
+        .produce,
+        .enable
     );
 
     std_flow_stage #(
         .T(basilisk_sqrt_operation_t),
         .MODE(OUTPUT_REGISTER_MODE)
     ) output_stage_inst (
-        .clk, .rst,
-        .stream_in(next_sqrt_exponent_command), .stream_out(sqrt_exponent_command)
+        .clk,
+        .rst,
+        .stream_in (next_sqrt_exponent_command),
+        .stream_out(sqrt_exponent_command)
     );
 
     always_comb begin
@@ -70,10 +81,7 @@ module basilisk_sqrt_exponent
         produce = 'b1;
 
         next_sqrt_exponent_command.payload.result = fpu_float_sqrt_exponent(
-                sqrt_command.payload.a,
-                sqrt_command.payload.conditions_a,
-                sqrt_command.payload.mode
-        );
+            sqrt_command.payload.a, sqrt_command.payload.conditions_a, sqrt_command.payload.mode);
         next_sqrt_exponent_command.payload.dest_reg_addr = sqrt_command.payload.dest_reg_addr;
         next_sqrt_exponent_command.payload.dest_offset_addr = sqrt_command.payload.dest_offset_addr;
     end

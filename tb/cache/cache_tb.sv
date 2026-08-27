@@ -5,14 +5,14 @@
 //!import mem/mem_intf
 //!import mem/mem_sequential_single
 
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 
 module cache_tb
     import std_pkg::*;
     import stream_pkg::*;
     import cache_pkg::*;
 #(
-)();
+) ();
 
     localparam std_clock_info_t CLOCK_INFO = 'b0;
     localparam int PORTS = 1;
@@ -21,18 +21,45 @@ module cache_tb
     localparam int PARENT_DATA_WIDTH = 32;
 
     logic clk, rst;
-    clk_rst_gen clk_rst_gen_inst(.clk, .rst);
+    clk_rst_gen clk_rst_gen_inst (
+        .clk,
+        .rst
+    );
 
-    mem_intf #(.DATA_WIDTH(CHILD_DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH)) child_request [PORTS] (.clk, .rst);
-    mem_intf #(.DATA_WIDTH(CHILD_DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH)) child_response [PORTS] (.clk, .rst);
+    mem_intf #(
+        .DATA_WIDTH(CHILD_DATA_WIDTH),
+        .ADDR_WIDTH(ADDR_WIDTH)
+    ) child_request[PORTS] (
+        .clk,
+        .rst
+    );
+    mem_intf #(
+        .DATA_WIDTH(CHILD_DATA_WIDTH),
+        .ADDR_WIDTH(ADDR_WIDTH)
+    ) child_response[PORTS] (
+        .clk,
+        .rst
+    );
 
-    cache_mesi_request_t child_request_info [PORTS];
-    cache_mesi_response_t child_response_info [PORTS];
+    cache_mesi_request_t  child_request_info [PORTS];
+    cache_mesi_response_t child_response_info[PORTS];
 
-    mem_intf #(.DATA_WIDTH(PARENT_DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH)) parent_request (.clk, .rst);
-    mem_intf #(.DATA_WIDTH(PARENT_DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH)) parent_response (.clk, .rst);
+    mem_intf #(
+        .DATA_WIDTH(PARENT_DATA_WIDTH),
+        .ADDR_WIDTH(ADDR_WIDTH)
+    ) parent_request (
+        .clk,
+        .rst
+    );
+    mem_intf #(
+        .DATA_WIDTH(PARENT_DATA_WIDTH),
+        .ADDR_WIDTH(ADDR_WIDTH)
+    ) parent_response (
+        .clk,
+        .rst
+    );
 
-    cache_mesi_request_t parent_request_info;
+    cache_mesi_request_t  parent_request_info;
     cache_mesi_response_t parent_response_info;
 
     cache #(
@@ -53,12 +80,17 @@ module cache_tb
         .IS_LAST_LEVEL(0),
         .IS_FIRST_LEVEL(0)
     ) cache_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
 
-        .child_request, .child_request_info,
-        .child_response, .child_response_info,
-        .parent_response, .parent_response_info,
-        .parent_request, .parent_request_info
+        .child_request,
+        .child_request_info,
+        .child_response,
+        .child_response_info,
+        .parent_response,
+        .parent_response_info,
+        .parent_request,
+        .parent_request_info
     );
 
     mem_sequential_single #(
@@ -67,8 +99,10 @@ module cache_tb
         .ADDR_BYTE_SHIFTED(1),
         .ENABLE_OUTPUT_REG(1)
     ) parent_memory (
-        .clk, .rst,
-        .mem_in(parent_request), .mem_out(parent_response)
+        .clk,
+        .rst,
+        .mem_in (parent_request),
+        .mem_out(parent_response)
     );
 
     logic read_enable_temp;
@@ -97,39 +131,39 @@ module cache_tb
         child_request[0].addr = 'b0;
         child_request[0].data = 'b0;
         child_request[0].id = 'b0;
-        
+
         child_response[0].ready = 'b0;
 
-        while (std_is_reset_active(CLOCK_INFO, rst)) @ (posedge clk);
+        while (std_is_reset_active(CLOCK_INFO, rst)) @(posedge clk);
 
         fork
-        begin
-            // Read, Write, Addr, Data, Id
-            child_request[0].send('b1, 'b0, 'h0, 'h0, 'b0); // Read 0x0
-            child_request[0].send('b0, 'b1, 'h0, 'h42, 'b0); // Write 0x0
-            child_request[0].send('b0, 'b1, 'h4, 'h69, 'b0); // Write 0x4
-            child_request[0].send('b1, 'b0, 'h0, 'h0, 'b0); // Read 0x0
-            child_request[0].send('b1, 'b0, 'h4, 'h0, 'b0); // Read 0x4
+            begin
+                // Read, Write, Addr, Data, Id
+                child_request[0].send('b1, 'b0, 'h0, 'h0, 'b0);  // Read 0x0
+                child_request[0].send('b0, 'b1, 'h0, 'h42, 'b0);  // Write 0x0
+                child_request[0].send('b0, 'b1, 'h4, 'h69, 'b0);  // Write 0x4
+                child_request[0].send('b1, 'b0, 'h0, 'h0, 'b0);  // Read 0x0
+                child_request[0].send('b1, 'b0, 'h4, 'h0, 'b0);  // Read 0x4
 
-            // Read something that should associate
-            child_request[0].send('b1, 'b0, 'h1 << 12, 'h0, 'b0); // Read 0x1000
+                // Read something that should associate
+                child_request[0].send('b1, 'b0, 'h1 << 12, 'h0, 'b0);  // Read 0x1000
 
-            // Read something that should evict the first read
-            child_request[0].send('b1, 'b0, 'h2 << 12, 'h0, 'b0); // Read 0x2000
-        end
-        begin
-            child_response[0].recv(read_enable_temp, write_enable_temp, addr_temp, data_temp, id_temp);
-            $display("Read back: 0x%h, should be 0x0", data_temp);
-            child_response[0].recv(read_enable_temp, write_enable_temp, addr_temp, data_temp, id_temp);
-            $display("Read back: 0x%h, should be 0x42", data_temp);
-            child_response[0].recv(read_enable_temp, write_enable_temp, addr_temp, data_temp, id_temp);
-            $display("Read back: 0x%h, should be 0x69", data_temp);
+                // Read something that should evict the first read
+                child_request[0].send('b1, 'b0, 'h2 << 12, 'h0, 'b0);  // Read 0x2000
+            end
+            begin
+                child_response[0].recv(read_enable_temp, write_enable_temp, addr_temp, data_temp, id_temp);
+                $display("Read back: 0x%h, should be 0x0", data_temp);
+                child_response[0].recv(read_enable_temp, write_enable_temp, addr_temp, data_temp, id_temp);
+                $display("Read back: 0x%h, should be 0x42", data_temp);
+                child_response[0].recv(read_enable_temp, write_enable_temp, addr_temp, data_temp, id_temp);
+                $display("Read back: 0x%h, should be 0x69", data_temp);
 
-            child_response[0].recv(read_enable_temp, write_enable_temp, addr_temp, data_temp, id_temp);
-            $display("Read back: 0x%h, should be 0x0", data_temp);
-            child_response[0].recv(read_enable_temp, write_enable_temp, addr_temp, data_temp, id_temp);
-            $display("Read back: 0x%h, should be 0x0", data_temp);
-        end
+                child_response[0].recv(read_enable_temp, write_enable_temp, addr_temp, data_temp, id_temp);
+                $display("Read back: 0x%h, should be 0x0", data_temp);
+                child_response[0].recv(read_enable_temp, write_enable_temp, addr_temp, data_temp, id_temp);
+                $display("Read back: 0x%h, should be 0x0", data_temp);
+            end
         join
 
         $finish();
@@ -235,13 +269,13 @@ module cache_tb
         //     $finish();
         // end
 
-//        // Randomly set external valid and ready
-//        while ('b1) begin
-//            @ (posedge clk);
-//            mem_in.valid <= $urandom();
-//            mem_out.ready <= $urandom();
-//        end
-//        join
+        //        // Randomly set external valid and ready
+        //        while ('b1) begin
+        //            @ (posedge clk);
+        //            mem_in.valid <= $urandom();
+        //            mem_out.ready <= $urandom();
+        //        end
+        //        join
 
     end
 

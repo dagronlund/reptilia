@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 
 `ifdef __LINTER__
 
@@ -31,22 +31,29 @@ module basilisk_add_normalize
     import basilisk::*;
 #(
     parameter int OUTPUT_REGISTER_MODE = 1
-)(
-    input logic clk, rst,
+) (
+    input logic clk,
+    rst,
 
-    std_stream_intf.in add_operation_command, // basilisk_add_operation_command_t
-    std_stream_intf.out add_result_command // basilisk_result_t
+    std_stream_intf.in add_operation_command,  // basilisk_add_operation_command_t
+    std_stream_intf.out add_result_command  // basilisk_result_t
 );
 
-    std_stream_intf #(.T(basilisk_result_t)) next_add_result_command (.clk, .rst);
+    std_stream_intf #(
+        .T(basilisk_result_t)
+    ) next_add_result_command (
+        .clk,
+        .rst
+    );
 
     logic enable, consume, produce;
 
     std_flow_lite #(
-        .NUM_INPUTS(1),
+        .NUM_INPUTS (1),
         .NUM_OUTPUTS(1)
     ) std_flow_lite_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
 
         .valid_input({add_operation_command.valid}),
         .ready_input({add_operation_command.ready}),
@@ -54,15 +61,19 @@ module basilisk_add_normalize
         .valid_output({next_add_result_command.valid}),
         .ready_output({next_add_result_command.ready}),
 
-        .consume, .produce, .enable
+        .consume,
+        .produce,
+        .enable
     );
 
     std_flow_stage #(
         .T(basilisk_result_t),
         .MODE(OUTPUT_REGISTER_MODE)
     ) output_stage_inst (
-        .clk, .rst,
-        .stream_in(next_add_result_command), .stream_out(add_result_command)
+        .clk,
+        .rst,
+        .stream_in (next_add_result_command),
+        .stream_out(add_result_command)
     );
 
     always_comb begin

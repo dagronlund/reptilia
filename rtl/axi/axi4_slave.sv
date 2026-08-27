@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 
 `ifdef __LINTER__
 
@@ -6,7 +6,7 @@
 `include "../../lib/std/std_mem.svh"
 `include "../../lib/axi/axi4.svh"
 
-`else 
+`else
 
 `include "std_util.svh"
 `include "std_mem.svh"
@@ -22,30 +22,31 @@ module axi4_slave
 #(
     parameter int AXI_ADDR_WIDTH = 32,
     parameter int AXI_DATA_WIDTH = 32,
-    parameter int AXI_ID_WIDTH = 1,
+    parameter int AXI_ID_WIDTH   = 1,
     parameter int AXI_USER_WIDTH = 1,
 
     parameter int MEM_ADDR_WIDTH = 32,
     parameter int MEM_DATA_WIDTH = 32,
     parameter int MEM_MASK_WIDTH = MEM_DATA_WIDTH / 8
-)(
-    input logic clk, rst,
+) (
+    input logic clk,
+    rst,
 
     axi4_ar_intf.in axi_ar,
     axi4_aw_intf.in axi_aw,
-    axi4_w_intf.in axi_w,
-    axi4_r_intf.out axi_r, // Buffered
-    axi4_b_intf.out axi_b, // Buffered
-    
-    std_mem_intf.out mem_request, // Buffered
-    std_mem_intf.in mem_response
+    axi4_w_intf.in  axi_w,
+    axi4_r_intf.out axi_r,   // Buffered
+    axi4_b_intf.out axi_b,   // Buffered
+
+    std_mem_intf.out mem_request,  // Buffered
+    std_mem_intf.in  mem_response
 );
 
     // Check AXI interface parameters
     `STATIC_ASSERT(AXI_ADDR_WIDTH == $bits(axi_ar.araddr) && AXI_ADDR_WIDTH == $bits(axi_aw.awaddr))
     `STATIC_ASSERT(AXI_USER_WIDTH == $bits(axi_ar.aruser) && AXI_USER_WIDTH == $bits(axi_aw.awuser))
-    `STATIC_ASSERT(AXI_ID_WIDTH == $bits(axi_ar.arid) && AXI_ID_WIDTH == $bits(axi_aw.awid) &&
-            AXI_ID_WIDTH == $bits(axi_r.rid) && AXI_ID_WIDTH == $bits(axi_b.bid))
+    `STATIC_ASSERT(AXI_ID_WIDTH == $bits(axi_ar.arid) && AXI_ID_WIDTH == $bits(axi_aw.awid) && AXI_ID_WIDTH == $bits
+                   (axi_r.rid) && AXI_ID_WIDTH == $bits(axi_b.bid))
     `STATIC_ASSERT(AXI_DATA_WIDTH == $bits(axi_w.wdata) && AXI_DATA_WIDTH == $bits(axi_r.rdata))
 
     // Check memory interface parameters
@@ -63,10 +64,7 @@ module axi4_slave
 
     typedef logic [AXI_ID_WIDTH-1:0] id_t;
 
-    function automatic base_addr_t get_actual_address(
-            input base_addr_t base_addr,
-            input page_addr_t page_addr
-    );
+    function automatic base_addr_t get_actual_address(input base_addr_t base_addr, input page_addr_t page_addr);
         base_addr_t mask = ~('hFFF);
         return (base_addr & mask) | page_addr;
     endfunction
@@ -94,14 +92,44 @@ module axi4_slave
     logic consume_axi_ar, consume_axi_aw, consume_axi_w, consume_mem_response;
     logic produce_axi_r, produce_axi_b, produce_mem_request;
 
-    std_stream_intf #(.T(mem_t)) mem_request_mid (.clk, .rst);
-    std_stream_intf #(.T(mem_t)) mem_request_packed (.clk, .rst);
+    std_stream_intf #(
+        .T(mem_t)
+    ) mem_request_mid (
+        .clk,
+        .rst
+    );
+    std_stream_intf #(
+        .T(mem_t)
+    ) mem_request_packed (
+        .clk,
+        .rst
+    );
 
-    std_stream_intf #(.T(axi_r_t)) axi_r_mid (.clk, .rst);
-    std_stream_intf #(.T(axi_r_t)) axi_r_packed (.clk, .rst);
+    std_stream_intf #(
+        .T(axi_r_t)
+    ) axi_r_mid (
+        .clk,
+        .rst
+    );
+    std_stream_intf #(
+        .T(axi_r_t)
+    ) axi_r_packed (
+        .clk,
+        .rst
+    );
 
-    std_stream_intf #(.T(axi_b_t)) axi_b_mid (.clk, .rst);
-    std_stream_intf #(.T(axi_b_t)) axi_b_packed (.clk, .rst);
+    std_stream_intf #(
+        .T(axi_b_t)
+    ) axi_b_mid (
+        .clk,
+        .rst
+    );
+    std_stream_intf #(
+        .T(axi_b_t)
+    ) axi_b_packed (
+        .clk,
+        .rst
+    );
 
     always_comb begin
         mem_request.valid = mem_request_packed.valid;
@@ -126,10 +154,11 @@ module axi4_slave
     end
 
     std_flow_lite #(
-        .NUM_INPUTS(4),
+        .NUM_INPUTS (4),
         .NUM_OUTPUTS(3)
     ) std_flow_lite_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
 
         .valid_input({axi_ar.arvalid, axi_aw.awvalid, axi_w.wvalid, mem_response.valid}),
         .ready_input({axi_ar.arready, axi_aw.awready, axi_w.wready, mem_response.ready}),
@@ -146,8 +175,9 @@ module axi4_slave
         .T(mem_t),
         .MODE(2)
     ) std_flow_stage_mem_request_inst (
-        .clk, .rst,
-        .stream_in(mem_request_mid),
+        .clk,
+        .rst,
+        .stream_in (mem_request_mid),
         .stream_out(mem_request_packed)
     );
 
@@ -155,8 +185,9 @@ module axi4_slave
         .T(axi_r_t),
         .MODE(2)
     ) std_flow_stage_axi_r_inst (
-        .clk, .rst,
-        .stream_in(axi_r_mid),
+        .clk,
+        .rst,
+        .stream_in (axi_r_mid),
         .stream_out(axi_r_packed)
     );
 
@@ -164,8 +195,9 @@ module axi4_slave
         .T(axi_b_t),
         .MODE(2)
     ) std_flow_stage_axi_b_inst (
-        .clk, .rst,
-        .stream_in(axi_b_mid),
+        .clk,
+        .rst,
+        .stream_in (axi_b_mid),
         .stream_out(axi_b_packed)
     );
 
@@ -219,13 +251,13 @@ module axi4_slave
             current_id <= next_id;
 
             current_read_request_done <= next_read_request_done;
-            
+
             current_state <= next_state;
         end
     end
 
     always_comb begin
-        automatic mem_t next_mem_request = '{default: 'b0};
+        automatic mem_t   next_mem_request = '{default: 'b0};
         automatic axi_r_t next_axi_r = '{default: 'b0};
         automatic axi_b_t next_axi_b = '{default: 'b0};
 
@@ -233,7 +265,7 @@ module axi4_slave
         consume_axi_aw = 'b0;
         consume_axi_w = 'b0;
         consume_mem_response = 'b0;
-        
+
         produce_axi_r = 'b0;
         produce_axi_b = 'b0;
         produce_mem_request = 'b0;
@@ -262,76 +294,76 @@ module axi4_slave
         next_mem_request.data = axi_w.wdata;
 
         case (next_state)
-        IDLE: begin
-            next_burst = 'b0;
-            if (axi_aw.awvalid) begin
-                consume_axi_aw = 'b1;
-                next_state = (axi_aw.awburst == AXI4_BURST_FIXED) ? WRITE_FIXED : WRITE;
-                
-                next_base_addr = axi_aw.awaddr;
-                next_page_addr = axi_aw.awaddr;
-                next_page_step = axi4_len_from_size(axi_aw.awsize);
+            IDLE: begin
+                next_burst = 'b0;
+                if (axi_aw.awvalid) begin
+                    consume_axi_aw = 'b1;
+                    next_state = (axi_aw.awburst == AXI4_BURST_FIXED) ? WRITE_FIXED : WRITE;
 
-                next_burst_limit = axi_aw.awlen;
+                    next_base_addr = axi_aw.awaddr;
+                    next_page_addr = axi_aw.awaddr;
+                    next_page_step = axi4_len_from_size(axi_aw.awsize);
 
-                next_id = axi_aw.awid;
-            end else if (axi_ar.arvalid) begin
-                consume_axi_ar = 'b1;
-                next_state = (axi_ar.arburst == AXI4_BURST_FIXED) ? READ_FIXED : READ;
+                    next_burst_limit = axi_aw.awlen;
 
-                next_base_addr = axi_ar.araddr;
-                next_page_addr = axi_ar.araddr;
-                next_page_step = axi4_len_from_size(axi_ar.arsize);
-                
-                next_burst_limit = axi_ar.arlen;
+                    next_id = axi_aw.awid;
+                end else if (axi_ar.arvalid) begin
+                    consume_axi_ar = 'b1;
+                    next_state = (axi_ar.arburst == AXI4_BURST_FIXED) ? READ_FIXED : READ;
 
-                next_id = axi_ar.arid;
+                    next_base_addr = axi_ar.araddr;
+                    next_page_addr = axi_ar.araddr;
+                    next_page_step = axi4_len_from_size(axi_ar.arsize);
 
-                next_read_request_done = 'b0;
-            end
-        end
-        WRITE, WRITE_FIXED: begin
-            consume_axi_w = 'b1;
-            produce_mem_request = 'b1;
+                    next_burst_limit = axi_ar.arlen;
 
-            next_mem_request.read_enable = 'b0;
-            next_mem_request.write_enable = axi_w.wstrb;
+                    next_id = axi_ar.arid;
 
-            if (next_burst == next_burst_limit) begin
-                produce_axi_b = 'b1;
-                next_state = IDLE;
-            end else begin
-                next_burst += 1;
-            end
-
-            next_page_addr += (next_state == WRITE) ? next_page_step : 'b0;
-        end
-        READ, READ_FIXED: begin
-            produce_mem_request = (!next_read_request_done);
-
-            next_mem_request.read_enable = 'b1;
-            next_mem_request.write_enable = 'b0;
-
-            if (next_burst == next_burst_limit) begin
-                next_read_request_done = 'b1;
-            end else begin
-                next_burst += 1;
-            end
-
-            if (mem_response.valid) begin
-                produce_axi_r = 'b1;
-                consume_mem_response = 'b1;
-                
-                if (next_burst_read == next_burst_limit) begin
-                    next_axi_r.rlast = 'b1;
-                    next_state = IDLE;
-                end else begin
-                    next_burst_read += 1;
+                    next_read_request_done = 'b0;
                 end
             end
-            
-            next_page_addr += (next_state == READ) ? next_page_step : 'b0;
-        end
+            WRITE, WRITE_FIXED: begin
+                consume_axi_w = 'b1;
+                produce_mem_request = 'b1;
+
+                next_mem_request.read_enable = 'b0;
+                next_mem_request.write_enable = axi_w.wstrb;
+
+                if (next_burst == next_burst_limit) begin
+                    produce_axi_b = 'b1;
+                    next_state = IDLE;
+                end else begin
+                    next_burst += 1;
+                end
+
+                next_page_addr += (next_state == WRITE) ? next_page_step : 'b0;
+            end
+            READ, READ_FIXED: begin
+                produce_mem_request = (!next_read_request_done);
+
+                next_mem_request.read_enable = 'b1;
+                next_mem_request.write_enable = 'b0;
+
+                if (next_burst == next_burst_limit) begin
+                    next_read_request_done = 'b1;
+                end else begin
+                    next_burst += 1;
+                end
+
+                if (mem_response.valid) begin
+                    produce_axi_r = 'b1;
+                    consume_mem_response = 'b1;
+
+                    if (next_burst_read == next_burst_limit) begin
+                        next_axi_r.rlast = 'b1;
+                        next_state = IDLE;
+                    end else begin
+                        next_burst_read += 1;
+                    end
+                end
+
+                next_page_addr += (next_state == READ) ? next_page_step : 'b0;
+            end
 
         endcase
 

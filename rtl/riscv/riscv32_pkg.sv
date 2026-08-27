@@ -3,7 +3,7 @@
 package riscv32_pkg;
 
     import riscv_pkg::*;
-    
+
     typedef logic [31:0] riscv32_inst_t;
     typedef logic [31:0] riscv32_imm_t;
     typedef logic [6:0] riscv32_opcode_t;

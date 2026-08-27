@@ -2,7 +2,7 @@ package riscv_pkg;
 
     typedef logic [15:0] riscv_inst_header_t;
 
-    typedef enum logic [2:0] { 
+    typedef enum logic [2:0] {
         RISCV_INST_SIZE_16 = 3'b000,
         RISCV_INST_SIZE_32 = 3'b001,
         RISCV_INST_SIZE_48 = 3'b010,
@@ -11,9 +11,7 @@ package riscv_pkg;
         RISCV_INST_SIZE_RESERVED = 3'b101
     } riscv_inst_size_t;
 
-    function automatic riscv_inst_size_t riscv_get_inst_size(
-        input riscv_inst_header_t inst_header
-    );
+    function automatic riscv_inst_size_t riscv_get_inst_size(input riscv_inst_header_t inst_header);
         if (inst_header[1:0] != 2'b11) begin
             return RISCV_INST_SIZE_16;
         end else if (inst_header[4:2] != 3'b111) begin
@@ -29,9 +27,7 @@ package riscv_pkg;
         end
     endfunction
 
-    function automatic logic [3:0] riscv_get_inst_size_variable_parcels(
-            input riscv_inst_header_t inst_header
-    );
+    function automatic logic [3:0] riscv_get_inst_size_variable_parcels(input riscv_inst_header_t inst_header);
         return inst_header[14:12] + 4'd5;
     endfunction
 

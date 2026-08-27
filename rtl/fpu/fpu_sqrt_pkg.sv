@@ -17,13 +17,12 @@ package fpu_sqrt_pkg;
         logic [26:0] mantissa;
         logic [23:0] actual_mantissa;
         fpu_reference_float_sqrt_partial_t sqrt_partial;
-        logic inf, nan, zero, exponent_negative; //, valid;
+        logic infinity, nan, zero, exponent_negative;  //, valid;
         fpu_round_mode_t mode;
     } fpu_sqrt_result_t;
 
     function automatic fpu_reference_float_sqrt_partial_t fpu_reference_float_sqrt_partial(
-        input fpu_reference_float_sqrt_partial_t args
-    );
+        input fpu_reference_float_sqrt_partial_t args);
         logic mantissa_acc_lsb = 'b0;
         logic [47:0] sub_result;
         logic sub_carry;
@@ -33,9 +32,9 @@ package fpu_sqrt_pkg;
 
         {sub_carry, sub_result} = args.mantissa_temp - args.mantissa_acc;
 
-        if (!sub_carry) begin // mantissa_temp >= mantissa_acc
+        if (!sub_carry) begin  // mantissa_temp >= mantissa_acc
             args.mantissa_temp = sub_result;
-            args.mantissa_lsb = 'b1;
+            args.mantissa_lsb  = 'b1;
             args.mantissa_acc += 'b1;
         end else begin
             args.mantissa_lsb = 'b0;
@@ -51,8 +50,7 @@ package fpu_sqrt_pkg;
         input fpu_float_fields_t number,
         input fpu_float_conditions_t conditions,
         // input valid,
-        input fpu_round_mode_t mode
-    );
+        input fpu_round_mode_t mode);
 
         logic denormalized, mantissa_zero, exponent_negative, number_zero;
         logic [23:0] actual_mantissa;
@@ -77,17 +75,17 @@ package fpu_sqrt_pkg;
         end else begin
             actual_exponent = number.exponent - 8'd127;
         end
-        
+
         // Modify mantissa if even/odd/or negative
-        if (actual_exponent[0]) begin // Odd
+        if (actual_exponent[0]) begin  // Odd
             if (exponent_negative) begin
                 actual_mantissa = {2'b0, actual_mantissa[23:2]};
             end else begin
                 actual_mantissa = {actual_mantissa[23:0]};
             end
-        end else begin // Even
+        end else begin  // Even
             actual_mantissa = {1'b0, actual_mantissa[23:1]};
-        end 
+        end
         // Halve the exponent
         result.actual_mantissa = actual_mantissa;
         result.exponent = actual_exponent >> 1;
@@ -100,8 +98,8 @@ package fpu_sqrt_pkg;
         result.sqrt_partial.mantissa_temp = 48'd0;
 
 
-        result.nan = conditions.nan || number.sign; 
-        result.inf = conditions.inf;
+        result.nan = conditions.nan || number.sign;
+        result.infinity = conditions.infinity;
         result.zero = conditions.zero;
         result.exponent_negative = exponent_negative;
         // result.valid = valid;
@@ -111,9 +109,7 @@ package fpu_sqrt_pkg;
 
     endfunction
 
-    function automatic fpu_sqrt_result_t fpu_float_sqrt_operation(
-        fpu_sqrt_result_t result
-        );
+    function automatic fpu_sqrt_result_t fpu_float_sqrt_operation(fpu_sqrt_result_t result);
 
         result.sqrt_partial = fpu_reference_float_sqrt_partial(result.sqrt_partial);
         // Update mantissa
@@ -126,12 +122,11 @@ package fpu_sqrt_pkg;
         return result;
     endfunction
 
-    function automatic fpu_result_t fpu_float_sqrt_normalize(
-        input fpu_sqrt_result_t y);
+    function automatic fpu_result_t fpu_float_sqrt_normalize(input fpu_sqrt_result_t y);
 
         logic [4:0] zeros;
         logic [26:0] result_mantissa;
- 
+
         fpu_reference_float_sqrt_partial_t sqrt_partial;
         fpu_result_t result;
 
@@ -145,7 +140,7 @@ package fpu_sqrt_pkg;
         // Normalize
         zeros = get_leading_zeros_27(result_mantissa);
         result_mantissa = result_mantissa << zeros;
-        if(y.exponent_negative) result.exponent += zeros;
+        if (y.exponent_negative) result.exponent += zeros;
         else result.exponent -= zeros;
 
         // if (sqrt_partial.mantissa_temp != 'd0) result_mantissa[0] |= 1'b1;
@@ -162,7 +157,7 @@ package fpu_sqrt_pkg;
         result.mantissa = result_mantissa[26:3];
         result.guard = result_mantissa[2:0];
         result.nan = y.nan;
-        result.inf = y.inf;
+        result.infinity = y.infinity;
         result.zero = y.zero;
         // result.valid = y.valid;
         result.mode = y.mode;

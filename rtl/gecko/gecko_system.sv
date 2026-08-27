@@ -27,60 +27,74 @@ module gecko_system
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
     parameter bit ENABLE_TTY_IO = 0,
     parameter bit ENABLE_PERFORMANCE_COUNTERS = 0
-)(
-    input wire clk, 
+) (
+    input wire clk,
     input wire rst,
     input gecko_performance_stats_t performance_stats,
-    stream_intf.in system_command, // gecko_system_operation_t
-    stream_intf.out system_result, // gecko_operation_t
+    stream_intf.in system_command,  // gecko_system_operation_t
+    stream_intf.out system_result,  // gecko_operation_t
 
     input logic instruction_decoded,
     input logic instruction_executed,
 
-    stream_intf.in     tty_in, // logic [7:0]
-    stream_intf.out    tty_out, // logic [7:0]
-    output logic [7:0] exit_code
+           stream_intf.in        tty_in,    // logic [7:0]
+           stream_intf.out       tty_out,   // logic [7:0]
+    output logic           [7:0] exit_code
 );
 
-    typedef logic [7:0]  byte_t;
+    typedef logic [7:0] byte_t;
     typedef logic [31:0] word_t;
 
-    function automatic riscv32_reg_value_t update_csr(
-            input riscv32_reg_value_t current_value,
-            input gecko_system_operation_t op
-    );
+    function automatic riscv32_reg_value_t update_csr(input riscv32_reg_value_t current_value,
+                                                      input gecko_system_operation_t op);
         case (op.sys_op)
-        RISCV32I_FUNCT3_SYS_CSRRW:  return op.rs1_value;
-        RISCV32I_FUNCT3_SYS_CSRRS:  return current_value | op.rs1_value;
-        RISCV32I_FUNCT3_SYS_CSRRC:  return current_value & ~op.rs1_value;
-        RISCV32I_FUNCT3_SYS_CSRRWI: return op.imm_value;
-        RISCV32I_FUNCT3_SYS_CSRRSI: return current_value | op.imm_value;
-        RISCV32I_FUNCT3_SYS_CSRRCI: return current_value & ~op.imm_value;
-        default:                    return '0;
+            RISCV32I_FUNCT3_SYS_CSRRW:  return op.rs1_value;
+            RISCV32I_FUNCT3_SYS_CSRRS:  return current_value | op.rs1_value;
+            RISCV32I_FUNCT3_SYS_CSRRC:  return current_value & ~op.rs1_value;
+            RISCV32I_FUNCT3_SYS_CSRRWI: return op.imm_value;
+            RISCV32I_FUNCT3_SYS_CSRRSI: return current_value | op.imm_value;
+            RISCV32I_FUNCT3_SYS_CSRRCI: return current_value & ~op.imm_value;
+            default:                    return '0;
         endcase
     endfunction
 
     logic consume_command, produce_result, enable;
     logic consume_tty, produce_tty;
 
-    stream_intf #(.T(gecko_operation_t)) system_result_next (.clk, .rst);
-    stream_intf #(.T(logic [7:0]))       tty_in_buffered    (.clk, .rst);
-    stream_intf #(.T(logic [7:0]))       tty_out_next       (.clk, .rst);
+    stream_intf #(
+        .T(gecko_operation_t)
+    ) system_result_next (
+        .clk,
+        .rst
+    );
+    stream_intf #(
+        .T(logic [7:0])
+    ) tty_in_buffered (
+        .clk,
+        .rst
+    );
+    stream_intf #(
+        .T(logic [7:0])
+    ) tty_out_next (
+        .clk,
+        .rst
+    );
 
     stream_controller #(
-        .NUM_INPUTS(2),
+        .NUM_INPUTS (2),
         .NUM_OUTPUTS(2)
     ) stream_controller_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
 
         .valid_input({system_command.valid, tty_in_buffered.valid}),
         .ready_input({system_command.ready, tty_in_buffered.ready}),
-        
+
         .valid_output({system_result_next.valid, tty_out_next.valid}),
         .ready_output({system_result_next.ready, tty_out_next.ready}),
 
         .consume({consume_command, consume_tty}),
-        .produce({produce_result,  produce_tty}),
+        .produce({produce_result, produce_tty}),
 
         .enable
     );
@@ -90,8 +104,10 @@ module gecko_system
         .PIPELINE_MODE(PIPELINE_MODE),
         .T(gecko_operation_t)
     ) system_result_stage_inst (
-        .clk, .rst,
-        .stream_in(system_result_next), .stream_out(system_result)
+        .clk,
+        .rst,
+        .stream_in (system_result_next),
+        .stream_out(system_result)
     );
 
     stream_stage #(
@@ -99,8 +115,10 @@ module gecko_system
         .PIPELINE_MODE(STREAM_PIPELINE_MODE_BUFFERED),
         .T(logic [7:0])
     ) tty_in_stage_inst (
-        .clk, .rst,
-        .stream_in(tty_in), .stream_out(tty_in_buffered)
+        .clk,
+        .rst,
+        .stream_in (tty_in),
+        .stream_out(tty_in_buffered)
     );
 
     stream_stage #(
@@ -108,39 +126,43 @@ module gecko_system
         .PIPELINE_MODE(STREAM_PIPELINE_MODE_BUFFERED),
         .T(logic [7:0])
     ) tty_out_stage_inst (
-        .clk, .rst,
-        .stream_in(tty_out_next), .stream_out(tty_out)
+        .clk,
+        .rst,
+        .stream_in (tty_out_next),
+        .stream_out(tty_out)
     );
 
     // TODO: Use different counters for RDCYCLE and RDTIME to support processor pausing
-    logic [31:0] perf_counter_increments [7];
-    always_comb perf_counter_increments = '{
-        32'b1, // clock cycles
-        {30'b0, {1'b0, instruction_decoded} + {1'b0, instruction_executed}},
-        {31'b0, performance_stats.instruction_mispredicted},
-        {31'b0, performance_stats.instruction_data_stalled},
-        {31'b0, performance_stats.instruction_control_stalled},
-        {31'b0, performance_stats.frontend_stalled},
-        {31'b0, performance_stats.backend_stalled}
-    };
+    logic [31:0] perf_counter_increments[7];
+    always_comb
+        perf_counter_increments = '{
+            32'b1,  // clock cycles
+            {30'b0, {1'b0, instruction_decoded} + {1'b0, instruction_executed}},
+            {31'b0, performance_stats.instruction_mispredicted},
+            {31'b0, performance_stats.instruction_data_stalled},
+            {31'b0, performance_stats.instruction_control_stalled},
+            {31'b0, performance_stats.frontend_stalled},
+            {31'b0, performance_stats.backend_stalled}
+        };
 
-    logic [63:0] perf_counters [7];
+    logic [63:0] perf_counters[7];
 
     genvar k;
     generate
-    for (k = 0; k < 7; k++) begin
-        std_counter_pipelined #(
-            .CLOCK_INFO(CLOCK_INFO),
-            .PIPELINE_WIDTH(32),
-            .PIPELINE_COUNT(2),
-            .RESET_VECTOR('b0)
-        ) counter_inst (
-            .clk, .rst,
-            .increment(perf_counter_increments[k]),
-            .value(perf_counters[k]),
-            .overflowed()
-        );
-    end
+        for (k = 0; k < 7; k++) begin
+            std_counter_pipelined #(
+                .CLOCK_INFO(CLOCK_INFO),
+                .PIPELINE_WIDTH(32),
+                .PIPELINE_COUNT(2),
+                .RESET_VECTOR('b0)
+            ) counter_inst (
+                .clk,
+                .rst,
+                .increment(perf_counter_increments[k]),
+                .value(perf_counters[k]),
+                .overflowed()
+            );
+        end
     endgenerate
 
     logic [7:0] exit_code_next;
@@ -150,9 +172,10 @@ module gecko_system
         .T(logic [7:0]),
         .RESET_VECTOR('b0)
     ) exit_code_register_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .enable,
-        .next(exit_code_next),
+        .next (exit_code_next),
         .value(exit_code)
     );
 
@@ -176,20 +199,21 @@ module gecko_system
 
         if (ENABLE_PERFORMANCE_COUNTERS) begin
             case (command_in.csr)
-            RISCV32I_CSR_CYCLE: system_result_next.payload.value = perf_counters[0][31:0];
-            RISCV32I_CSR_TIME: system_result_next.payload.value = perf_counters[0][31:0];
-            RISCV32I_CSR_INSTRET: system_result_next.payload.value = perf_counters[1][31:0];
+                RISCV32I_CSR_CYCLE: system_result_next.payload.value = perf_counters[0][31:0];
+                RISCV32I_CSR_TIME: system_result_next.payload.value = perf_counters[0][31:0];
+                RISCV32I_CSR_INSTRET: system_result_next.payload.value = perf_counters[1][31:0];
 
-            12'hC03: system_result_next.payload.value = perf_counters[2][31:0];
-            12'hC04: system_result_next.payload.value = perf_counters[3][31:0];
-            12'hC05: system_result_next.payload.value = perf_counters[4][31:0];
-            12'hC06: system_result_next.payload.value = perf_counters[5][31:0];
-            12'hC07: system_result_next.payload.value = perf_counters[6][31:0];
+                12'hC03: system_result_next.payload.value = perf_counters[2][31:0];
+                12'hC04: system_result_next.payload.value = perf_counters[3][31:0];
+                12'hC05: system_result_next.payload.value = perf_counters[4][31:0];
+                12'hC06: system_result_next.payload.value = perf_counters[5][31:0];
+                12'hC07: system_result_next.payload.value = perf_counters[6][31:0];
 
-            RISCV32I_CSR_CYCLEH: system_result_next.payload.value = perf_counters[0][63:32];
-            RISCV32I_CSR_TIMEH: system_result_next.payload.value = perf_counters[0][63:32];
-            RISCV32I_CSR_INSTRETH: system_result_next.payload.value = perf_counters[1][63:32];
-            default: begin end
+                RISCV32I_CSR_CYCLEH: system_result_next.payload.value = perf_counters[0][63:32];
+                RISCV32I_CSR_TIMEH: system_result_next.payload.value = perf_counters[0][63:32];
+                RISCV32I_CSR_INSTRETH: system_result_next.payload.value = perf_counters[1][63:32];
+                default: begin
+                end
             endcase
         end
 
@@ -197,37 +221,39 @@ module gecko_system
 
         if (ENABLE_TTY_IO) begin
             case (command_in.csr)
-            12'h800: system_result_next.payload.value = word_t'(exit_code);
-            12'h801: system_result_next.payload.value = 'b0;
-            12'h802: system_result_next.payload.value = word_t'(tty_in_buffered.payload);
-            default: begin end
+                12'h800: system_result_next.payload.value = word_t'(exit_code);
+                12'h801: system_result_next.payload.value = 'b0;
+                12'h802: system_result_next.payload.value = word_t'(tty_in_buffered.payload);
+                default: begin
+                end
             endcase
         end
 
-        produce_result = (command_in.reg_addr != 'b0); // Don't produce writeback to x0
+        produce_result = (command_in.reg_addr != 'b0);  // Don't produce writeback to x0
 
         case (command_in.sys_op)
-        RISCV32I_FUNCT3_SYS_ENV: begin // System Op
-            produce_result = 'b0;
-        end
-        RISCV32I_FUNCT3_SYS_CSRRW, 
+            RISCV32I_FUNCT3_SYS_ENV: begin  // System Op
+                produce_result = 'b0;
+            end
+            RISCV32I_FUNCT3_SYS_CSRRW, 
         RISCV32I_FUNCT3_SYS_CSRRS, 
         RISCV32I_FUNCT3_SYS_CSRRC,
         RISCV32I_FUNCT3_SYS_CSRRWI, 
         RISCV32I_FUNCT3_SYS_CSRRSI, 
         RISCV32I_FUNCT3_SYS_CSRRCI: begin // CSR Op
-            if (ENABLE_TTY_IO) begin
-                case (command_in.csr)
-                12'h800: exit_code_next = byte_t'(update_csr(word_t'(exit_code), command_in));
-                12'h801: produce_tty = 'b1;
-                12'h802: consume_tty = 'b1;
-                default: begin end
-                endcase
+                if (ENABLE_TTY_IO) begin
+                    case (command_in.csr)
+                        12'h800: exit_code_next = byte_t'(update_csr(word_t'(exit_code), command_in));
+                        12'h801: produce_tty = 'b1;
+                        12'h802: consume_tty = 'b1;
+                        default: begin
+                        end
+                    endcase
+                end
             end
-        end
-        default: begin
-            produce_result = 'b0;
-        end
+            default: begin
+                produce_result = 'b0;
+            end
         endcase
     end
 

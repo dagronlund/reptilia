@@ -3,23 +3,24 @@
 //!import stream/stream_stage
 //!import axi/axi4_pkg
 
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 
 `ifdef __LINTER__
-    `include "../std/std_util.svh"
+`include "../std/std_util.svh"
 `else
-    `include "std_util.svh"
+`include "std_util.svh"
 `endif
 
-module axi4_ar_stage 
+module axi4_ar_stage
     import std_pkg::*;
     import stream_pkg::*;
     import axi4_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED
-)(
-    input logic clk, rst,
+) (
+    input logic clk,
+    rst,
     axi4_ar_intf.in axi_ar_in,
     axi4_ar_intf.out axi_ar_out
 );
@@ -45,16 +46,28 @@ module axi4_ar_stage
         logic [ID_WIDTH-1:0]   id;
     } axi_ar_t;
 
-    stream_intf #(.T(axi_ar_t)) stream_in (.clk, .rst);
-    stream_intf #(.T(axi_ar_t)) stream_out (.clk, .rst);
+    stream_intf #(
+        .T(axi_ar_t)
+    ) stream_in (
+        .clk,
+        .rst
+    );
+    stream_intf #(
+        .T(axi_ar_t)
+    ) stream_out (
+        .clk,
+        .rst
+    );
 
     stream_stage #(
         .CLOCK_INFO(CLOCK_INFO),
         .PIPELINE_MODE(PIPELINE_MODE),
         .T(axi_ar_t)
     ) stream_stage_inst (
-        .clk, .rst,
-        .stream_in, .stream_out
+        .clk,
+        .rst,
+        .stream_in,
+        .stream_out
     );
 
     always_comb begin
@@ -73,7 +86,7 @@ module axi4_ar_stage
             user: axi_ar_in.user,
             id: axi_ar_in.id
         };
-        
+
         // Connect outputs
         axi_ar_out.valid = stream_out.valid;
         stream_out.ready = axi_ar_out.ready;
@@ -91,15 +104,16 @@ module axi4_ar_stage
 
 endmodule
 
-module axi4_aw_stage 
+module axi4_aw_stage
     import std_pkg::*;
     import stream_pkg::*;
     import axi4_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED
-)(
-    input logic clk, rst,
+) (
+    input logic clk,
+    rst,
     axi4_aw_intf.in axi_aw_in,
     axi4_aw_intf.out axi_aw_out
 );
@@ -125,16 +139,28 @@ module axi4_aw_stage
         logic [ID_WIDTH-1:0]   id;
     } axi_aw_t;
 
-    stream_intf #(.T(axi_aw_t)) stream_in (.clk, .rst);
-    stream_intf #(.T(axi_aw_t)) stream_out (.clk, .rst);
+    stream_intf #(
+        .T(axi_aw_t)
+    ) stream_in (
+        .clk,
+        .rst
+    );
+    stream_intf #(
+        .T(axi_aw_t)
+    ) stream_out (
+        .clk,
+        .rst
+    );
 
     stream_stage #(
         .CLOCK_INFO(CLOCK_INFO),
         .PIPELINE_MODE(PIPELINE_MODE),
         .T(axi_aw_t)
     ) stream_stage_inst (
-        .clk, .rst,
-        .stream_in, .stream_out
+        .clk,
+        .rst,
+        .stream_in,
+        .stream_out
     );
 
     always_comb begin
@@ -153,7 +179,7 @@ module axi4_aw_stage
             user: axi_aw_in.user,
             id: axi_aw_in.id
         };
-        
+
         // Connect outputs
         axi_aw_out.valid = stream_out.valid;
         stream_out.ready = axi_aw_out.ready;
@@ -171,15 +197,16 @@ module axi4_aw_stage
 
 endmodule
 
-module axi4_w_stage 
+module axi4_w_stage
     import std_pkg::*;
     import stream_pkg::*;
     import axi4_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED
-)(
-    input logic clk, rst,
+) (
+    input logic clk,
+    rst,
     axi4_w_intf.in axi_w_in,
     axi4_w_intf.out axi_w_out
 );
@@ -196,28 +223,36 @@ module axi4_w_stage
         logic                    last;
     } axi_w_t;
 
-    stream_intf #(.T(axi_w_t)) stream_in (.clk, .rst);
-    stream_intf #(.T(axi_w_t)) stream_out (.clk, .rst);
+    stream_intf #(
+        .T(axi_w_t)
+    ) stream_in (
+        .clk,
+        .rst
+    );
+    stream_intf #(
+        .T(axi_w_t)
+    ) stream_out (
+        .clk,
+        .rst
+    );
 
     stream_stage #(
         .CLOCK_INFO(CLOCK_INFO),
         .PIPELINE_MODE(PIPELINE_MODE),
         .T(axi_w_t)
     ) stream_stage_inst (
-        .clk, .rst,
-        .stream_in, .stream_out
+        .clk,
+        .rst,
+        .stream_in,
+        .stream_out
     );
 
     always_comb begin
         // Connect inputs
         stream_in.valid = axi_w_in.valid;
         axi_w_in.ready = stream_in.ready;
-        stream_in.payload = '{
-            data: axi_w_in.data,
-            strb: axi_w_in.strb,
-            last: axi_w_in.last
-        };
-        
+        stream_in.payload = '{data: axi_w_in.data, strb: axi_w_in.strb, last: axi_w_in.last};
+
         // Connect outputs
         axi_w_out.valid = stream_out.valid;
         stream_out.ready = axi_w_out.ready;
@@ -228,15 +263,16 @@ module axi4_w_stage
 
 endmodule
 
-module axi4_r_stage 
+module axi4_r_stage
     import std_pkg::*;
     import stream_pkg::*;
     import axi4_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED
-)(
-    input logic clk, rst,
+) (
+    input logic clk,
+    rst,
     axi4_r_intf.in axi_r_in,
     axi4_r_intf.out axi_r_out
 );
@@ -248,35 +284,42 @@ module axi4_r_stage
     localparam ID_WIDTH = $bits(axi_r_in.id);
 
     typedef struct packed {
-        logic [DATA_WIDTH-1:0]   data;
-        logic                    last;
-        axi4_resp_t              resp;
-        logic [ID_WIDTH-1:0]     id;
+        logic [DATA_WIDTH-1:0] data;
+        logic                  last;
+        axi4_resp_t            resp;
+        logic [ID_WIDTH-1:0]   id;
     } axi_r_t;
 
-    stream_intf #(.T(axi_r_t)) stream_in (.clk, .rst);
-    stream_intf #(.T(axi_r_t)) stream_out (.clk, .rst);
+    stream_intf #(
+        .T(axi_r_t)
+    ) stream_in (
+        .clk,
+        .rst
+    );
+    stream_intf #(
+        .T(axi_r_t)
+    ) stream_out (
+        .clk,
+        .rst
+    );
 
     stream_stage #(
         .CLOCK_INFO(CLOCK_INFO),
         .PIPELINE_MODE(PIPELINE_MODE),
         .T(axi_r_t)
     ) stream_stage_inst (
-        .clk, .rst,
-        .stream_in, .stream_out
+        .clk,
+        .rst,
+        .stream_in,
+        .stream_out
     );
 
     always_comb begin
         // Connect inputs
         stream_in.valid = axi_r_in.valid;
         axi_r_in.ready = stream_in.ready;
-        stream_in.payload = '{
-            data: axi_r_in.data,
-            last: axi_r_in.last,
-            resp: axi_r_in.resp,
-            id: axi_r_in.id
-        };
-        
+        stream_in.payload = '{data: axi_r_in.data, last: axi_r_in.last, resp: axi_r_in.resp, id: axi_r_in.id};
+
         // Connect outputs
         axi_r_out.valid = stream_out.valid;
         stream_out.ready = axi_r_out.ready;
@@ -288,15 +331,16 @@ module axi4_r_stage
 
 endmodule
 
-module axi4_b_stage 
+module axi4_b_stage
     import std_pkg::*;
     import stream_pkg::*;
     import axi4_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED
-)(
-    input logic clk, rst,
+) (
+    input logic clk,
+    rst,
     axi4_b_intf.in axi_b_in,
     axi4_b_intf.out axi_b_out
 );
@@ -306,31 +350,40 @@ module axi4_b_stage
     localparam ID_WIDTH = $bits(axi_b_in.id);
 
     typedef struct packed {
-        axi4_resp_t              resp;
-        logic [ID_WIDTH-1:0]     id;
+        axi4_resp_t          resp;
+        logic [ID_WIDTH-1:0] id;
     } axi_b_t;
 
-    stream_intf #(.T(axi_b_t)) stream_in (.clk, .rst);
-    stream_intf #(.T(axi_b_t)) stream_out (.clk, .rst);
+    stream_intf #(
+        .T(axi_b_t)
+    ) stream_in (
+        .clk,
+        .rst
+    );
+    stream_intf #(
+        .T(axi_b_t)
+    ) stream_out (
+        .clk,
+        .rst
+    );
 
     stream_stage #(
         .CLOCK_INFO(CLOCK_INFO),
         .PIPELINE_MODE(PIPELINE_MODE),
         .T(axi_b_t)
     ) stream_stage_inst (
-        .clk, .rst,
-        .stream_in, .stream_out
+        .clk,
+        .rst,
+        .stream_in,
+        .stream_out
     );
 
     always_comb begin
         // Connect inputs
         stream_in.valid = axi_b_in.valid;
         axi_b_in.ready = stream_in.ready;
-        stream_in.payload = '{
-            resp: axi_b_in.resp,
-            id: axi_b_in.id
-        };
-        
+        stream_in.payload = '{resp: axi_b_in.resp, id: axi_b_in.id};
+
         // Connect outputs
         axi_b_out.valid = stream_out.valid;
         stream_out.ready = axi_b_out.ready;

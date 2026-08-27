@@ -1,11 +1,12 @@
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 
 module clk_rst_gen #(
     parameter ACTIVE_HIGH = 1,
     parameter CYCLES = 5,
     parameter START_DELAY = 0
-)(
-    output logic clk, rst
+) (
+    output logic clk,
+    rst
     // input logic trigger_rst = 1'b0
 );
     int i;
@@ -21,7 +22,7 @@ module clk_rst_gen #(
             #5 clk = 0;
         end
         rst = 0;
-        forever begin 
+        forever begin
             #5 clk = ~clk;
         end
     end

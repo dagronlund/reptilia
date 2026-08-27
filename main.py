@@ -6,7 +6,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from scripts.build import main
+from scripts.build import build
+from scripts.format import format_systemverilog
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
@@ -26,6 +27,11 @@ if __name__ == "__main__":
         help="run the rustdv memory and stream regressions",
     )
     parser.add_argument(
+        "--format",
+        action="store_true",
+        help="format all SystemVerilog files with Verible",
+    )
+    parser.add_argument(
         "--wave",
         choices=("vcd", "fst"),
         help="export optional rustdv waveforms in the selected format",
@@ -37,10 +43,22 @@ if __name__ == "__main__":
         help="waveform output directory (default: build/waves)",
     )
     args = parser.parse_args()
-    main(
-        run_riscv_tests=args.riscv_tests,
-        run_dhrystone=args.dhrystone,
-        run_rustdv_tests=args.rustdv_tests,
-        wave=args.wave,
-        wave_dir=args.wave_dir,
+
+    if args.format:
+        format_systemverilog()
+
+    run_build = (
+        not args.format
+        or args.riscv_tests
+        or args.dhrystone
+        or args.rustdv_tests
+        or args.wave is not None
     )
+    if run_build:
+        build(
+            run_riscv_tests=args.riscv_tests,
+            run_dhrystone=args.dhrystone,
+            run_rustdv_tests=args.rustdv_tests,
+            wave=args.wave,
+            wave_dir=args.wave_dir,
+        )

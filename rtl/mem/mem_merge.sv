@@ -6,7 +6,7 @@
 `include "std/std_util.svh"
 `include "mem/mem_util.svh"
 
-module mem_merge 
+module mem_merge
     import std_pkg::*;
     import stream_pkg::*;
 #(
@@ -16,14 +16,15 @@ module mem_merge
     parameter int PORTS = 2,
     parameter int META_WIDTH = 1,
     parameter bit USE_LAST = 0
-)(
-    input wire clk, rst,
+) (
+    input wire clk,
+    rst,
 
-    mem_intf.in                 mem_in [PORTS],
-    input wire [META_WIDTH-1:0] mem_in_meta [PORTS],
+          mem_intf.in                  mem_in     [PORTS],
+    input wire        [META_WIDTH-1:0] mem_in_meta[PORTS],
 
-    mem_intf.out                  mem_out,
-    output logic [META_WIDTH-1:0] mem_out_meta
+           mem_intf.out                  mem_out,
+    output logic        [META_WIDTH-1:0] mem_out_meta
 );
 
     typedef bit [mem_out.ADDR_WIDTH-1:0] addr_width_temp_t;
@@ -57,37 +58,49 @@ module mem_merge
         logic [META_WIDTH-1:0] meta;
     } mem_t;
 
-    stream_intf #(.T(mem_t)) stream_in [PORTS] (.clk, .rst);
-    logic stream_in_last [PORTS];
+    stream_intf #(
+        .T(mem_t)
+    ) stream_in[PORTS] (
+        .clk,
+        .rst
+    );
+    logic stream_in_last[PORTS];
 
     logic [INTERNAL_ID_WIDTH-1:0] stream_out_id;
-    stream_intf #(.T(mem_t)) stream_out (.clk, .rst);
+    stream_intf #(
+        .T(mem_t)
+    ) stream_out (
+        .clk,
+        .rst
+    );
 
     generate
-    genvar k;
-    for (k = 0; k < PORTS; k++) begin
+        genvar k;
+        for (k = 0; k < PORTS; k++) begin
 
-        `PROCEDURAL_ASSERT(ADDR_WIDTH == $bits(mem_in[k].addr))
-        `PROCEDURAL_ASSERT(MASK_WIDTH == $bits(mem_in[k].write_enable))
-        `PROCEDURAL_ASSERT(DATA_WIDTH == $bits(mem_in[k].data))
-        `PROCEDURAL_ASSERT(INPUT_ID_WIDTH == $bits(mem_in[k].id))
+            `PROCEDURAL_ASSERT(ADDR_WIDTH == $bits(mem_in[k].addr))
+            `PROCEDURAL_ASSERT(MASK_WIDTH == $bits(mem_in[k].write_enable))
+            `PROCEDURAL_ASSERT(DATA_WIDTH == $bits(mem_in[k].data))
+            `PROCEDURAL_ASSERT(INPUT_ID_WIDTH == $bits(mem_in[k].id))
 
-        always_comb begin
-            automatic mem_t payload = '{
-                read_enable: mem_in[k].read_enable,
-                write_enable: mem_in[k].write_enable,
-                addr: mem_in[k].addr,
-                data: mem_in[k].data,
-                id: mem_in[k].id,
-                meta: mem_in_meta[k]
-            };
+            always_comb begin
+                automatic
+                mem_t
+                payload = '{
+                    read_enable: mem_in[k].read_enable,
+                    write_enable: mem_in[k].write_enable,
+                    addr: mem_in[k].addr,
+                    data: mem_in[k].data,
+                    id: mem_in[k].id,
+                    meta: mem_in_meta[k]
+                };
 
-            stream_in[k].valid = mem_in[k].valid;
-            stream_in[k].payload = payload;
-            stream_in_last[k] = mem_in[k].last;
-            mem_in[k].ready = stream_in[k].ready;
+                stream_in[k].valid = mem_in[k].valid;
+                stream_in[k].payload = payload;
+                stream_in_last[k] = mem_in[k].last;
+                mem_in[k].ready = stream_in[k].ready;
+            end
         end
-    end
     endgenerate
 
     always_comb begin
@@ -100,7 +113,7 @@ module mem_merge
         mem_out.addr = payload.addr;
         mem_out.data = payload.data;
         // Insert generated ID in MSB
-        mem_out.id = {stream_out_id, payload.id}[ID_WIDTH-1:0];
+        mem_out.id = ID_WIDTH'({stream_out_id, payload.id});
         mem_out_meta = payload.meta;
     end
 
@@ -112,13 +125,13 @@ module mem_merge
         .ID_WIDTH(INPUT_ID_WIDTH),
         .USE_LAST(USE_LAST)
     ) stream_merge_inst (
-        .clk, 
+        .clk,
         .rst,
-        .stream_in, 
+        .stream_in,
         .stream_in_last,
         .stream_in_id('{default: 'b0}),
-        .stream_out, 
-        .stream_out_id, 
+        .stream_out,
+        .stream_out_id,
         .stream_out_last(mem_out.last)
     );
 

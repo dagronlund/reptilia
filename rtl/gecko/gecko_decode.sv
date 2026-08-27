@@ -48,20 +48,20 @@ module gecko_decode
     parameter bit ENABLE_INTEGER_MATH = 0,
     parameter bit ENABLE_EXECUTE_SAVED = 1,
     parameter int NUM_FORWARDED_SAFE = NUM_FORWARDED == 0 ? 1 : NUM_FORWARDED
-)(
-    input wire clk, 
+) (
+    input wire clk,
     input wire rst,
 
     mem_intf.in instruction_result,
-    stream_intf.in instruction_command, // gecko_instruction_operation_t
+    stream_intf.in instruction_command,  // gecko_instruction_operation_t
 
-    stream_intf.out system_command, // gecko_system_operation_t
-    stream_intf.out execute_command, // gecko_execute_operation_t
-    stream_intf.out float_command, // gecko_float_operation_t
+    stream_intf.out system_command,   // gecko_system_operation_t
+    stream_intf.out execute_command,  // gecko_execute_operation_t
+    stream_intf.out float_command,    // gecko_float_operation_t
 
     // Non-flow Controlled
-    stream_intf.view jump_command, // gecko_jump_operation_t
-    stream_intf.in writeback_result, // gecko_operation_t
+    stream_intf.view jump_command,  // gecko_jump_operation_t
+    stream_intf.in writeback_result,  // gecko_operation_t
 
     input gecko_forwarded_t [NUM_FORWARDED_SAFE-1:0] forwarded_results,
 
@@ -87,11 +87,8 @@ module gecko_decode
     } rs1_rs2_status_t;
 
     function automatic rs1_rs2_status_t get_forwarded_values(
-        input rs1_rs2_status_t status,
-        input gecko_forwarded_t [NUM_FORWARDED_SAFE-1:0] forwarded_results,
-        input gecko_reg_status_t rs1_status_front_last, 
-        input gecko_reg_status_t rs2_status_front_last
-    );
+        input rs1_rs2_status_t status, input gecko_forwarded_t [NUM_FORWARDED_SAFE-1:0] forwarded_results,
+        input gecko_reg_status_t rs1_status_front_last, input gecko_reg_status_t rs2_status_front_last);
         rs1_rs2_status_t status_next = status;
 
         // Find forwarded results
@@ -124,58 +121,67 @@ module gecko_decode
     } instruction_status_t;
 
     function automatic instruction_status_t get_instruction_status(
-        input state_t state,
-        input riscv32_fields_t instruction_fields,
-        input logic instruction_error,
-        input gecko_decode_operands_status_t operands_status,
-        input rs1_rs2_status_t rs1_rs2_status,
-        input logic mispredicted,
-        input logic pc_updated,
-        input logic speculating,
-        input logic speculation_full
-    );
+        input state_t state, input riscv32_fields_t instruction_fields, input logic instruction_error,
+        input gecko_decode_operands_status_t operands_status, input rs1_rs2_status_t rs1_rs2_status,
+        input logic mispredicted, input logic pc_updated, input logic speculating, input logic speculation_full);
         instruction_status_t status = '{default: 'b0};
         case (state)
-        GECKO_DECODE_NORMAL: begin
-            // Throw away instructions that were misfetched
-            if (mispredicted && !pc_updated) begin
-                status.flush_instruction = 'b1;
-            // Wait if instruction registers are not ready yet
-            end else if (!rs1_rs2_status.rs1_valid || 
-                         !rs1_rs2_status.rs2_valid || 
-                         !operands_status.rd_valid) begin
-                status.stall_data = 'b1;
-            // TODO: Implement misprediction history table to avoid stalling on all speculative instructions
-            end else if (speculating) begin
-                status.stall_control = 'b1;
+            GECKO_DECODE_NORMAL: begin
+                // Throw away instructions that were misfetched
+                if (mispredicted && !pc_updated) begin
+                    status.flush_instruction = 'b1;
+                    // Wait if instruction registers are not ready yet
+                end else if (!rs1_rs2_status.rs1_valid || !rs1_rs2_status.rs2_valid || !operands_status.rd_valid) begin
+                    status.stall_data = 'b1;
+                    // TODO: Implement misprediction history table to avoid stalling on all speculative instructions
+                end else if (speculating) begin
+                    status.stall_control = 'b1;
+                end
             end
-        end
-        GECKO_DECODE_EXIT: begin
-            status.flush_instruction = 'b1;
-        end
-        default: begin end
+            GECKO_DECODE_EXIT: begin
+                status.flush_instruction = 'b1;
+            end
+            default: begin
+            end
         endcase
         return status;
     endfunction
 
     stream_controller8_output_t stream_controller_result;
-    logic consume_instruction /* verilator isolate_assignments*/;
-    logic produce_system /* verilator isolate_assignments*/;
-    logic produce_execute /* verilator isolate_assignments*/;
-    logic produce_float /* verilator isolate_assignments*/;
-    logic enable /* verilator isolate_assignments*/;
+    logic consume_instruction  /* verilator isolate_assignments*/;
+    logic produce_system  /* verilator isolate_assignments*/;
+    logic produce_execute  /* verilator isolate_assignments*/;
+    logic produce_float  /* verilator isolate_assignments*/;
+    logic enable  /* verilator isolate_assignments*/;
 
-    stream_intf #(.T(gecko_system_operation_t)) next_system_command (.clk, .rst);
-    stream_intf #(.T(gecko_execute_operation_t)) next_execute_command (.clk, .rst);
-    stream_intf #(.T(gecko_float_operation_t)) next_float_command (.clk, .rst);
+    stream_intf #(
+        .T(gecko_system_operation_t)
+    ) next_system_command (
+        .clk,
+        .rst
+    );
+    stream_intf #(
+        .T(gecko_execute_operation_t)
+    ) next_execute_command (
+        .clk,
+        .rst
+    );
+    stream_intf #(
+        .T(gecko_float_operation_t)
+    ) next_float_command (
+        .clk,
+        .rst
+    );
 
     stream_stage #(
         .CLOCK_INFO(CLOCK_INFO),
         .PIPELINE_MODE(PIPELINE_MODE),
         .T(gecko_system_operation_t)
     ) system_operation_stream_stage_inst (
-        .clk, .rst,
-        .stream_in(next_system_command), .stream_out(system_command)
+        .clk,
+        .rst,
+        .stream_in (next_system_command),
+        .stream_out(system_command)
     );
 
     stream_stage #(
@@ -183,8 +189,10 @@ module gecko_decode
         .PIPELINE_MODE(PIPELINE_MODE),
         .T(gecko_execute_operation_t)
     ) execute_operation_stream_stage_inst (
-        .clk, .rst,
-        .stream_in(next_execute_command), .stream_out(execute_command)
+        .clk,
+        .rst,
+        .stream_in (next_execute_command),
+        .stream_out(execute_command)
     );
 
     stream_stage #(
@@ -192,12 +200,14 @@ module gecko_decode
         .PIPELINE_MODE(PIPELINE_MODE),
         .T(gecko_float_operation_t)
     ) float_operation_stream_stage_inst (
-        .clk, .rst,
-        .stream_in(next_float_command), .stream_out(float_command)
+        .clk,
+        .rst,
+        .stream_in (next_float_command),
+        .stream_out(float_command)
     );
 
     state_t state, next_state;
-    logic next_error_flag /* verilator isolate_assignments*/;
+    logic next_error_flag  /* verilator isolate_assignments*/;
     riscv32_reg_addr_t execute_saved, next_execute_saved;
 
     gecko_performance_stats_t performance_stats_next;
@@ -211,9 +221,10 @@ module gecko_decode
         .T(logic [1:0]),
         .RESET_VECTOR(GECKO_DECODE_RESET)
     ) decode_state_register_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .enable,
-        .next(next_state),
+        .next (next_state),
         .value(state_temp)
     );
 
@@ -222,10 +233,11 @@ module gecko_decode
         .T(gecko_performance_stats_t),
         .RESET_VECTOR('b0)
     ) performance_stats_register_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .enable('b1),
-        .next(performance_stats_next),
-        .value(performance_stats)
+        .next  (performance_stats_next),
+        .value (performance_stats)
     );
 
     std_register #(
@@ -233,9 +245,10 @@ module gecko_decode
         .T(logic),
         .RESET_VECTOR('b0)
     ) error_flag_register_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .enable,
-        .next(next_error_flag),
+        .next (next_error_flag),
         .value(error_flag)
     );
 
@@ -244,9 +257,10 @@ module gecko_decode
         .T(riscv32_reg_addr_t),
         .RESET_VECTOR('b0)
     ) execute_saved_register_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .enable,
-        .next(next_execute_saved),
+        .next (next_execute_saved),
         .value(execute_saved)
     );
 
@@ -255,11 +269,11 @@ module gecko_decode
         .T(logic),
         .RESET_VECTOR('b0)
     ) instruction_decoded_register (
-        .clk, 
+        .clk,
         .rst,
         .enable('b1),
-        .next(instruction_decoded_next),
-        .value(instruction_decoded)
+        .next  (instruction_decoded_next),
+        .value (instruction_decoded)
     );
 
     gecko_instruction_operation_t instruction_op;
@@ -275,16 +289,16 @@ module gecko_decode
     gecko_decode_opcode_status_t opcode_status;
     always_comb opcode_status = decode_opcode(instruction_fields, ENABLE_INTEGER_MATH, ENABLE_FLOAT);
 
-    riscv32_reg_value_t rs1_value,      rs2_value;
-    gecko_reg_status_t  rs1_status;
-    gecko_reg_status_t                  rs2_status;
+    riscv32_reg_value_t rs1_value, rs2_value;
+    gecko_reg_status_t rs1_status;
+    gecko_reg_status_t rs2_status;
 
-    logic               rd_read_enable, rd_write_enable, rd_write_value_enable;
-    riscv32_reg_addr_t  rd_read_addr,   rd_write_addr;
-    riscv32_reg_value_t                 rd_write_value;
-    gecko_reg_status_t  rd_read_status /* verilator isolate_assignments*/;
+    logic rd_read_enable, rd_write_enable, rd_write_value_enable;
+    riscv32_reg_addr_t rd_read_addr, rd_write_addr;
+    riscv32_reg_value_t rd_write_value;
+    gecko_reg_status_t  rd_read_status  /* verilator isolate_assignments*/;
 
-    gecko_reg_status_t  rs1_status_front_last, rs2_status_front_last, rd_read_status_front;
+    gecko_reg_status_t rs1_status_front_last, rs2_status_front_last, rd_read_status_front;
 
     logic reset_done;
 
@@ -292,7 +306,7 @@ module gecko_decode
         .CLOCK_INFO(CLOCK_INFO),
         .TECHNOLOGY(TECHNOLOGY)
     ) regfile (
-        .clk, 
+        .clk,
         .rst,
 
         .rs1_addr(instruction_fields.rs1),
@@ -315,23 +329,23 @@ module gecko_decode
         .reset_done
     );
 
-    logic instruction_enable /* verilator isolate_assignments*/;
+    logic instruction_enable  /* verilator isolate_assignments*/;
     logic instruction_branch_jump;
 
     gecko_jump_flag_t execute_flag;
 
-    logic mispredicted /* verilator isolate_assignments*/;
-    logic speculating /* verilator isolate_assignments*/;
-    logic speculation_full /* verilator isolate_assignments*/;
+    logic mispredicted  /* verilator isolate_assignments*/;
+    logic speculating  /* verilator isolate_assignments*/;
+    logic speculation_full  /* verilator isolate_assignments*/;
 
     gecko_decode_speculative #(
         .CLOCK_INFO(CLOCK_INFO),
         .TECHNOLOGY(TECHNOLOGY)
     ) speculator (
-        .clk, 
+        .clk,
         .rst,
 
-        .instruction_enable(enable && instruction_enable),
+        .instruction_enable (enable && instruction_enable),
         .instruction_branch_jump,
         .instruction_updated(instruction_op.pc_updated),
 
@@ -366,12 +380,15 @@ module gecko_decode
         // Find any forwarded values if they exist
         rs1_rs2_status = get_forwarded_values(
             '{
-                rs1_valid: operands_status.rs1_valid, rs2_valid: operands_status.rs2_valid,
-                rs1_addr:  instruction_fields.rs1,    rs2_addr:  instruction_fields.rs2,
-                rs1_value: rs1_value,                 rs2_value: rs2_value 
+                rs1_valid: operands_status.rs1_valid,
+                rs2_valid: operands_status.rs2_valid,
+                rs1_addr: instruction_fields.rs1,
+                rs2_addr: instruction_fields.rs2,
+                rs1_value: rs1_value,
+                rs2_value: rs2_value
             },
             forwarded_results,
-            rs1_status_front_last, 
+            rs1_status_front_last,
             rs2_status_front_last
         );
     end
@@ -394,8 +411,7 @@ module gecko_decode
         // Assign next values to defaults
         next_error_flag = opcode_status.error_flag;
         if (opcode_status.execute_flag) begin
-            next_execute_saved = get_execute_writeback(
-                    riscv32_get_fields(instruction_result.data));
+            next_execute_saved = get_execute_writeback(riscv32_get_fields(instruction_result.data));
         end else begin
             next_execute_saved = 'b0;
         end
@@ -405,13 +421,15 @@ module gecko_decode
 
         // Build commands
         next_execute_command.payload = create_execute_op(
-                riscv32_get_fields(instruction_result.data), 
-                instruction_op,
-                ENABLE_EXECUTE_SAVED ? execute_saved : 'b0,
-                rs1_rs2_status.rs1_value, 
-                rs1_rs2_status.rs2_value,
-                rd_read_status_front,
-                execute_flag
+            riscv32_get_fields(
+                instruction_result.data
+            ),
+            instruction_op,
+            ENABLE_EXECUTE_SAVED ? execute_saved : 'b0,
+            rs1_rs2_status.rs1_value,
+            rs1_rs2_status.rs2_value,
+            rd_read_status_front,
+            execute_flag
         );
         if (opcode_status.exit_flag) begin
             // Exit by jumping and halting the fetch stage
@@ -420,29 +438,31 @@ module gecko_decode
         end
 
         next_system_command.payload = create_system_op(
-                riscv32_get_fields(instruction_result.data), 
-                rs1_rs2_status.rs1_value, 
-                rs1_rs2_status.rs2_value,
-                rd_read_status_front,
-                execute_flag
+            riscv32_get_fields(
+                instruction_result.data
+            ),
+            rs1_rs2_status.rs1_value,
+            rs1_rs2_status.rs2_value,
+            rd_read_status_front,
+            execute_flag
         );
 
         next_float_command.payload = create_float_op(
-                riscv32_get_fields(instruction_result.data),  
-                rs1_rs2_status.rs1_value, 
-                rs1_rs2_status.rs2_value,
-                rd_read_status_front,
-                execute_flag
+            riscv32_get_fields(
+                instruction_result.data
+            ),
+            rs1_rs2_status.rs1_value,
+            rs1_rs2_status.rs2_value,
+            rd_read_status_front,
+            execute_flag
         );
 
         instruction_enable = !instruction_status.stall_data && 
                              !instruction_status.stall_control && 
                              !instruction_status.flush_instruction;
-        instruction_branch_jump = is_opcode_control_flow(
-                riscv32_get_fields(instruction_result.data));
+        instruction_branch_jump = is_opcode_control_flow(riscv32_get_fields(instruction_result.data));
 
-        consume_instruction = !instruction_status.stall_data && 
-                              !instruction_status.stall_control;
+        consume_instruction = !instruction_status.stall_data && !instruction_status.stall_control;
         produce_execute = 'b0;
         produce_system = 'b0;
         produce_float = 'b0;
@@ -451,42 +471,40 @@ module gecko_decode
                 produce_execute = 'b1;
             end else begin
                 produce_execute = opcode_status.execute_flag;
-                produce_system = opcode_status.system_flag;
-                produce_float = opcode_status.float_flag;
+                produce_system  = opcode_status.system_flag;
+                produce_float   = opcode_status.float_flag;
             end
         end
 
         // Update state (RESET -> NORMAL -> EXIT)
         case (state)
-        GECKO_DECODE_RESET:  next_state = (reset_done) ? 
-                                          GECKO_DECODE_NORMAL : state;
-        GECKO_DECODE_NORMAL: next_state = (opcode_status.exit_flag) ? 
-                                          GECKO_DECODE_EXIT : state;
-        GECKO_DECODE_EXIT:   next_state = state;
-        default:             next_state = GECKO_DECODE_RESET;
+            GECKO_DECODE_RESET:  next_state = (reset_done) ? GECKO_DECODE_NORMAL : state;
+            GECKO_DECODE_NORMAL: next_state = (opcode_status.exit_flag) ? GECKO_DECODE_EXIT : state;
+            GECKO_DECODE_EXIT:   next_state = state;
+            default:             next_state = GECKO_DECODE_RESET;
         endcase
 
-        stream_controller_result = stream_controller8(stream_controller8_input_t'{
-            valid_input:  {6'b0, instruction_result.valid, instruction_command.valid},
-            ready_output: {5'b0, next_system_command.ready, next_execute_command.ready, next_float_command.ready},
-            consume: {6'b0, consume_instruction, consume_instruction},
-            produce: {5'b0, produce_system, produce_execute, produce_float}
-        });
+        stream_controller_result = stream_controller8(
+            stream_controller8_input_t
+'{
+                valid_input: {6'b0, instruction_result.valid, instruction_command.valid},
+                ready_output: {5'b0, next_system_command.ready, next_execute_command.ready, next_float_command.ready},
+                consume: {6'b0, consume_instruction, consume_instruction},
+                produce: {5'b0, produce_system, produce_execute, produce_float}
+            }
+        );
         {instruction_result.ready, instruction_command.ready} = stream_controller_result.ready_input[1:0];
         {next_system_command.valid, next_execute_command.valid, next_float_command.valid} = stream_controller_result.valid_output[2:0];
         enable = stream_controller_result.enable && instruction_enable;
 
         // Update front register status
-        rd_read_enable = get_instruction_writeback(
-                riscv32_get_fields(instruction_result.data)) != 'b0;
+        rd_read_enable = get_instruction_writeback(riscv32_get_fields(instruction_result.data)) != 'b0;
         // Update register status regardless of throwing away speculation
         rd_write_enable = writeback_result.valid && writeback_result.ready;
         // Throw away writes to x0 and mispredicted results
-        rd_write_value_enable = rd_write_enable && 
-                                writeback_in.addr != 'b0 &&
-                                !writeback_in.mispredicted;
-        rd_write_addr         = writeback_in.addr;
-        rd_write_value        = writeback_in.value;
+        rd_write_value_enable = rd_write_enable && writeback_in.addr != 'b0 && !writeback_in.mispredicted;
+        rd_write_addr = writeback_in.addr;
+        rd_write_value = writeback_in.value;
         writeback_result.ready = 'b1;
 
         // Construct performance stats
@@ -496,27 +514,24 @@ module gecko_decode
                 instruction_data_stalled: instruction_status.stall_data,
                 instruction_control_stalled: instruction_status.stall_control,
                 default: 'b0
-            }; 
-        end else if (!instruction_result.valid || 
-                     !instruction_command.valid) begin
+            };
+        end else if (!instruction_result.valid || !instruction_command.valid) begin
             performance_stats_next = '{frontend_stalled: 'b1, default: 'b0};
         end else begin
             performance_stats_next = '{backend_stalled: 'b1, default: 'b0};
         end
 
-        instruction_decoded_next = instruction_enable && 
-                (produce_system || produce_float);
+        instruction_decoded_next = instruction_enable && (produce_system || produce_float);
     end
 
-    logic        debug_jump_valid /*verilator public*/;
-    logic        debug_register_write /*verilator public*/;
-    logic [4:0]  debug_register_addr /*verilator public*/;
-    logic [31:0] debug_jump_address /*verilator public*/;
-    logic [31:0] debug_register_data /*verilator public*/;
+    logic        debug_jump_valid  /*verilator public*/;
+    logic        debug_register_write  /*verilator public*/;
+    logic [ 4:0] debug_register_addr  /*verilator public*/;
+    logic [31:0] debug_jump_address  /*verilator public*/;
+    logic [31:0] debug_register_data  /*verilator public*/;
 
-    always_comb debug_jump_valid = jump_command.valid && 
-                                  !jump_cmd_in.mispredicted && 
-                                  (jump_cmd_in.branched || jump_cmd_in.jumped);
+    always_comb
+        debug_jump_valid = jump_command.valid && !jump_cmd_in.mispredicted && (jump_cmd_in.branched || jump_cmd_in.jumped);
     always_comb debug_jump_address = jump_cmd_in.actual_next_pc;
     always_comb debug_register_write = rd_write_value_enable;
     always_comb debug_register_addr = writeback_in.addr;

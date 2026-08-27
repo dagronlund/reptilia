@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 
 `ifdef __LINTER__
 
@@ -32,27 +32,33 @@ module basilisk_writeback
 #(
     parameter int OUTPUT_REGISTER_MODE = 1,
     parameter int PORTS = 1
-)(
-    input logic clk, rst,
+) (
+    input logic clk,
+    rst,
 
-    std_stream_intf.in writeback_results_in [PORTS], // basilisk_result_t
-    std_stream_intf.out writeback_result // basilisk_writeback_result_t
+    std_stream_intf.in writeback_results_in[PORTS],  // basilisk_result_t
+    std_stream_intf.out writeback_result  // basilisk_writeback_result_t
 );
 
-    std_stream_intf #(.T(basilisk_writeback_result_t)) next_writeback_result (.clk, .rst);
+    std_stream_intf #(
+        .T(basilisk_writeback_result_t)
+    ) next_writeback_result (
+        .clk,
+        .rst
+    );
 
     logic [PORTS-1:0] results_in_valid, results_in_ready;
-    basilisk_result_t results_in [PORTS];
+    basilisk_result_t results_in[PORTS];
 
     generate
-    genvar k;
-    for (k = 0; k < PORTS; k++) begin
-        always_comb begin
-            results_in_valid[k] = writeback_results_in[k].valid;
-            results_in[k] = writeback_results_in[k].payload;
-            writeback_results_in[k].ready = results_in_ready[k];
+        genvar k;
+        for (k = 0; k < PORTS; k++) begin
+            always_comb begin
+                results_in_valid[k] = writeback_results_in[k].valid;
+                results_in[k] = writeback_results_in[k].payload;
+                writeback_results_in[k].ready = results_in_ready[k];
+            end
         end
-    end
     endgenerate
 
     logic enable;
@@ -60,10 +66,11 @@ module basilisk_writeback
     logic produce;
 
     std_flow_lite #(
-        .NUM_INPUTS(PORTS),
+        .NUM_INPUTS (PORTS),
         .NUM_OUTPUTS(1)
     ) std_flow_lite_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
 
         .valid_input(results_in_valid),
         .ready_input(results_in_ready),
@@ -71,34 +78,36 @@ module basilisk_writeback
         .valid_output({next_writeback_result.valid}),
         .ready_output({next_writeback_result.ready}),
 
-        .consume, .produce, .enable
+        .consume,
+        .produce,
+        .enable
     );
 
     std_flow_stage #(
         .T(basilisk_writeback_result_t),
         .MODE(OUTPUT_REGISTER_MODE)
     ) output_stage_inst (
-        .clk, .rst,
-        .stream_in(next_writeback_result), .stream_out(writeback_result)
+        .clk,
+        .rst,
+        .stream_in (next_writeback_result),
+        .stream_out(writeback_result)
     );
 
     parameter int COUNTER_WIDTH = ($clog2(PORTS) > 0) ? $clog2(PORTS) : 1;
     typedef logic [COUNTER_WIDTH-1:0] counter_t;
 
-    function automatic counter_t increment_counter(
-        input counter_t counter
-    );
+    function automatic counter_t increment_counter(input counter_t counter);
         if (counter + 'b1 >= PORTS) begin
             return 'b0;
         end else begin
             return counter + 'b1;
         end
-    endfunction 
+    endfunction
 
     counter_t current_counter, next_counter;
 
     always_ff @(posedge clk) begin
-        if(rst) begin
+        if (rst) begin
             current_counter <= 'b0;
         end else if (enable) begin
             current_counter <= next_counter;
@@ -131,9 +140,8 @@ module basilisk_writeback
 
         next_writeback_result.payload.dest_reg_addr = results_in[iterated_counter].dest_reg_addr;
         next_writeback_result.payload.dest_offset_addr = results_in[iterated_counter].dest_offset_addr;
-        next_writeback_result.payload.result = fpu_decode_float(fpu_operations_round(
-                results_in[iterated_counter].result
-        ));
+        next_writeback_result.payload.result =
+            fpu_decode_float(fpu_operations_round(results_in[iterated_counter].result));
 
     end
 

@@ -39,9 +39,7 @@ package stream_pkg;
         logic       enable;
     } stream_controller8_output_t;
 
-    function automatic stream_controller8_output_t stream_controller8(
-        input stream_controller8_input_t in
-    );
+    function automatic stream_controller8_output_t stream_controller8(input stream_controller8_input_t in);
         logic output_enable = '1;
         logic input_enable = '1;
         logic [7:0] output_enables = '1;
@@ -52,11 +50,11 @@ package stream_pkg;
             // Enable if all outputs are either not being produced or ready
             output_enable &= (!in.produce[i]) || (in.ready_output[i]);
             // Enable if all inputs are either not being consumed or valid
-            input_enable  &= (!in.consume[i]) || (in.valid_input[i]);
+            input_enable &= (!in.consume[i]) || (in.valid_input[i]);
             for (int j = 0; j < 8; j++) begin
                 if (i != j) begin
                     output_enables[j] &= (!in.produce[i]) || (in.ready_output[i]);
-                    input_enables[j]  &= (!in.consume[i]) || (in.valid_input[i]);
+                    input_enables[j] &= (!in.consume[i]) || (in.valid_input[i]);
                 end
             end
         end
@@ -65,7 +63,7 @@ package stream_pkg;
             // Set output valid signals if enabled and being produced
             out.valid_output[i] = in.produce[i] && output_enables[i] && input_enable;
             // Set input ready signals if enabled and being consumed
-            out.ready_input[i]  = in.consume[i] && input_enables[i]  && output_enable;
+            out.ready_input[i]  = in.consume[i] && input_enables[i] && output_enable;
         end
 
         // Collapse individual enable signals for primary enable

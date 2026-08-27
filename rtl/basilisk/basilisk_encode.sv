@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 
 `ifdef __LINTER__
 
@@ -32,22 +32,30 @@ module basilisk_encode
     import gecko::*;
     import basilisk::*;
     import fpu::*;
-#()(
-    input logic clk, rst,
+#(
+) (
+    input logic clk,
+    rst,
 
-    std_stream_intf.in encode_command, // basilisk_encode_command_t
-    std_stream_intf.out float_result // gecko_operation_t
+    std_stream_intf.in encode_command,  // basilisk_encode_command_t
+    std_stream_intf.out float_result  // gecko_operation_t
 );
 
     logic consume, produce, enable;
 
-    std_stream_intf #(.T(gecko_operation_t)) next_float_result (.clk, .rst);
+    std_stream_intf #(
+        .T(gecko_operation_t)
+    ) next_float_result (
+        .clk,
+        .rst
+    );
 
     std_flow_lite #(
-        .NUM_INPUTS(1),
+        .NUM_INPUTS (1),
         .NUM_OUTPUTS(1)
     ) std_flow_lite_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
 
         .valid_input({encode_command.valid}),
         .ready_input({encode_command.ready}),
@@ -55,15 +63,19 @@ module basilisk_encode
         .valid_output({next_float_result.valid}),
         .ready_output({next_float_result.ready}),
 
-        .consume, .produce, .enable
+        .consume,
+        .produce,
+        .enable
     );
 
     std_flow_stage #(
         .T(gecko_operation_t),
         .MODE(1)
     ) system_operation_output_stage (
-        .clk, .rst,
-        .stream_in(next_float_result), .stream_out(float_result)
+        .clk,
+        .rst,
+        .stream_in (next_float_result),
+        .stream_out(float_result)
     );
 
     always_comb begin
@@ -88,32 +100,34 @@ module basilisk_encode
         next_float_result.payload.value = a;
 
         case (encode_command.payload.op)
-        BASILISK_ENCODE_OP_CONVERT: begin
-            next_float_result.payload.value = fpu_float2int(encode_command.payload.a, encode_command.payload.signed_integer);
-        end
-        BASILISK_ENCODE_OP_EQUAL: begin
-            next_float_result.payload.value = {31'b0, a_eq_b};
-        end
-        BASILISK_ENCODE_OP_LT: begin
-            next_float_result.payload.value = {31'b0, a_lt_b};
-        end
-        BASILISK_ENCODE_OP_LE: begin
-            next_float_result.payload.value = {31'b0, a_lt_b | a_eq_b};
-        end
-        BASILISK_ENCODE_OP_CLASS: begin
-            next_float_result.payload.value = {22'b0, 
+            BASILISK_ENCODE_OP_CONVERT: begin
+                next_float_result.payload.value =
+                    fpu_float2int(encode_command.payload.a, encode_command.payload.signed_integer);
+            end
+            BASILISK_ENCODE_OP_EQUAL: begin
+                next_float_result.payload.value = {31'b0, a_eq_b};
+            end
+            BASILISK_ENCODE_OP_LT: begin
+                next_float_result.payload.value = {31'b0, a_lt_b};
+            end
+            BASILISK_ENCODE_OP_LE: begin
+                next_float_result.payload.value = {31'b0, a_lt_b | a_eq_b};
+            end
+            BASILISK_ENCODE_OP_CLASS: begin
+                next_float_result.payload.value = {
+                    22'b0,
                     encode_command.payload.conditions_a.nan,
                     encode_command.payload.conditions_a.nan,
-                    ~encode_command.payload.a.sign & encode_command.payload.conditions_a.inf,
+                    ~encode_command.payload.a.sign & encode_command.payload.conditions_a.infinity,
                     ~encode_command.payload.a.sign & encode_command.payload.conditions_a.norm,
                     ~encode_command.payload.a.sign & ~encode_command.payload.conditions_a.norm,
                     ~encode_command.payload.a.sign & ~encode_command.payload.conditions_a.zero,
                     encode_command.payload.a.sign & ~encode_command.payload.conditions_a.zero,
                     encode_command.payload.a.sign & ~encode_command.payload.conditions_a.norm,
                     encode_command.payload.a.sign & encode_command.payload.conditions_a.norm,
-                    encode_command.payload.a.sign & encode_command.payload.conditions_a.inf
-            }; 
-        end
+                    encode_command.payload.a.sign & encode_command.payload.conditions_a.infinity
+                };
+            end
         endcase
     end
 

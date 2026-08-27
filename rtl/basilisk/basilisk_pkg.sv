@@ -24,9 +24,8 @@ package basilisk_pkg;
     parameter int BASILISK_VECTOR_BITWIDTH = BASILISK_VECTOR_WIDTH * $bits(rv32_reg_value_t);
     parameter int BASILISK_COMPUTE_WIDTH = 8;
 
-    parameter int BASILISK_OFFSET_ADDR_WIDTH_RAW = $clog2(BASILISK_VECTOR_WIDTH/BASILISK_COMPUTE_WIDTH);
-    parameter int BASILISK_OFFSET_ADDR_WIDTH = (BASILISK_OFFSET_ADDR_WIDTH_RAW > 0) ?
-            BASILISK_OFFSET_ADDR_WIDTH_RAW : 1;
+    parameter int BASILISK_OFFSET_ADDR_WIDTH_RAW = $clog2(BASILISK_VECTOR_WIDTH / BASILISK_COMPUTE_WIDTH);
+    parameter int BASILISK_OFFSET_ADDR_WIDTH = (BASILISK_OFFSET_ADDR_WIDTH_RAW > 0) ? BASILISK_OFFSET_ADDR_WIDTH_RAW : 1;
     typedef logic [BASILISK_OFFSET_ADDR_WIDTH-1:0] basilisk_offset_addr_t;
 
     // typedef logic [BASILISK_VECTOR_BITWIDTH-1:0] basilisk_vector_t;
@@ -47,7 +46,7 @@ package basilisk_pkg;
     typedef struct packed {
         rv32_reg_addr_t dest_reg_addr;
         basilisk_offset_addr_t dest_offset_addr;
-        fpu_float_fields_t a, b; // a + b
+        fpu_float_fields_t a, b;  // a + b
         fpu_float_conditions_t conditions_a, conditions_b;
         fpu_round_mode_t mode;
     } basilisk_add_command_t;
@@ -68,7 +67,7 @@ package basilisk_pkg;
         rv32_reg_addr_t dest_reg_addr;
         basilisk_offset_addr_t dest_offset_addr;
         logic enable_macc;
-        fpu_float_fields_t a, b, c; // a * b or (a * b) + c
+        fpu_float_fields_t a, b, c;  // a * b or (a * b) + c
         fpu_float_conditions_t conditions_a, conditions_b, conditions_c;
         fpu_round_mode_t mode;
     } basilisk_mult_command_t;
@@ -102,7 +101,7 @@ package basilisk_pkg;
     typedef struct packed {
         rv32_reg_addr_t dest_reg_addr;
         basilisk_offset_addr_t dest_offset_addr;
-        fpu_float_fields_t a, b; // a / b
+        fpu_float_fields_t a, b;  // a / b
         fpu_float_conditions_t conditions_a, conditions_b;
         fpu_round_mode_t mode;
     } basilisk_divide_command_t;
@@ -116,7 +115,7 @@ package basilisk_pkg;
     typedef struct packed {
         rv32_reg_addr_t dest_reg_addr;
         basilisk_offset_addr_t dest_offset_addr;
-        fpu_float_fields_t a; // sqrt(a)
+        fpu_float_fields_t a;  // sqrt(a)
         fpu_float_conditions_t conditions_a;
         fpu_round_mode_t mode;
     } basilisk_sqrt_command_t;
@@ -144,7 +143,7 @@ package basilisk_pkg;
     } basilisk_convert_command_t;
 
     typedef enum logic {
-        BASILISK_MEMORY_OP_LOAD = 'b0,
+        BASILISK_MEMORY_OP_LOAD  = 'b0,
         BASILISK_MEMORY_OP_STORE = 'b1
     } basilisk_memory_op_t;
 

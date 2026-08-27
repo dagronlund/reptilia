@@ -31,17 +31,17 @@ module gecko_writeback
     import riscv32_pkg::*;
     import riscv32i_pkg::*;
     import gecko_pkg::*;
-    // import gecko_decode_util_pkg::*;
+// import gecko_decode_util_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
     parameter int PORTS = 1
-)(
-    input wire clk, 
+) (
+    input wire clk,
     input wire rst,
-    stream_intf.in writeback_results_in [PORTS], // gecko_operation_t
-    stream_intf.out writeback_result // gecko_operation_t
+    stream_intf.in writeback_results_in[PORTS],  // gecko_operation_t
+    stream_intf.out writeback_result  // gecko_operation_t
 );
 
     // Check that status counter can count up to the number
@@ -49,34 +49,40 @@ module gecko_writeback
     `STATIC_ASSERT($pow(2, $size(gecko_reg_status_t)) >= 3)
 
     logic [PORTS-1:0] results_in_valid, results_in_ready;
-    gecko_operation_t results_in_operation [PORTS];
+    gecko_operation_t results_in_operation[PORTS];
 
     riscv32_reg_addr_t [PORTS-1:0] status_read_addr;
 
     generate
-    genvar k;
-    for (k = 0; k < PORTS; k++) begin
-        always_comb begin
-            results_in_valid[k] = writeback_results_in[k].valid;
-            results_in_operation[k] = writeback_results_in[k].payload;
-            writeback_results_in[k].ready = results_in_ready[k];
-            // Read local register file status flags
-            status_read_addr[k] = results_in_operation[k].addr;
+        genvar k;
+        for (k = 0; k < PORTS; k++) begin
+            always_comb begin
+                results_in_valid[k] = writeback_results_in[k].valid;
+                results_in_operation[k] = writeback_results_in[k].payload;
+                writeback_results_in[k].ready = results_in_ready[k];
+                // Read local register file status flags
+                status_read_addr[k] = results_in_operation[k].addr;
+            end
         end
-    end
     endgenerate
 
     logic enable;
     logic [PORTS-1:0] consume;
     logic produce;
 
-    stream_intf #(.T(gecko_operation_t)) next_writeback_result (.clk, .rst);
+    stream_intf #(
+        .T(gecko_operation_t)
+    ) next_writeback_result (
+        .clk,
+        .rst
+    );
 
     stream_controller #(
-        .NUM_INPUTS(PORTS),
+        .NUM_INPUTS (PORTS),
         .NUM_OUTPUTS(1)
     ) stream_controller_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
 
         .valid_input(results_in_valid),
         .ready_input(results_in_ready),
@@ -84,8 +90,8 @@ module gecko_writeback
         .valid_output({next_writeback_result.valid}),
         .ready_output({next_writeback_result.ready}),
 
-        .produce, 
-        .consume, 
+        .produce,
+        .consume,
         .enable
     );
 
@@ -94,8 +100,9 @@ module gecko_writeback
         .PIPELINE_MODE(PIPELINE_MODE),
         .T(gecko_operation_t)
     ) writeback_result_stage_inst (
-        .clk, .rst,
-        .stream_in(next_writeback_result), 
+        .clk,
+        .rst,
+        .stream_in (next_writeback_result),
         .stream_out(writeback_result)
     );
 
@@ -103,7 +110,7 @@ module gecko_writeback
     riscv32_reg_addr_t status_write_addr;
     gecko_reg_status_t status_write_value;
 
-    gecko_reg_status_t [PORTS-1:0] reg_status /* verilator isolate_assignments*/;
+    gecko_reg_status_t [PORTS-1:0] reg_status  /* verilator isolate_assignments*/;
 
     // Local Register File Status
     localparam GECKO_REG_STATUS_WIDTH = $bits(gecko_reg_status_t);
@@ -119,7 +126,8 @@ module gecko_writeback
         .READ_PORTS(PORTS),
         .AUTO_RESET(1)
     ) register_status_counters_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
 
         // Always write to all bits in register, gate with state clock enable
         .write_enable(status_write_enable && enable),
@@ -140,9 +148,10 @@ module gecko_writeback
         .T(riscv32_reg_addr_t),
         .RESET_VECTOR('b0)
     ) counter_register_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .enable,
-        .next(next_counter),
+        .next (next_counter),
         .value(current_counter)
     );
 
@@ -199,8 +208,8 @@ module gecko_writeback
         // Update local register file status
         if (produce) begin
             status_write_enable = 'b1;
-            status_write_addr = next_writeback_result.payload.addr;
-            status_write_value = next_writeback_result.payload.reg_status + 'b1;
+            status_write_addr   = next_writeback_result.payload.addr;
+            status_write_value  = next_writeback_result.payload.reg_status + 'b1;
         end
     end
 

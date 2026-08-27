@@ -8,37 +8,35 @@ package riscv32v_pkg;
 
     parameter riscv32_funct12_t RISCV32V_CSR_VL = 12'hC20;
 
-    typedef enum riscv32_opcode_t {
-        RISCV32V_OPCODE_OP = 'b1010111
-    } riscv32v_opcode_t;
+    typedef enum riscv32_opcode_t {RISCV32V_OPCODE_OP = 'b1010111} riscv32v_opcode_t;
 
     typedef enum riscv32_funct3_t {
         RISCV32V_FUNCT3_OP_IVV = 'b000,
 
         // DANGER: Swapping these to compensate for assembler bug
-        RISCV32V_FUNCT3_OP_FVV = 'b010, // Floating Point Vector-Vector
+        RISCV32V_FUNCT3_OP_FVV = 'b010,  // Floating Point Vector-Vector
         RISCV32V_FUNCT3_OP_MVV = 'b001,
-        
-        RISCV32V_FUNCT3_OP_IVI = 'b011, // Integer Vector-Immediate (Slideup/Slidedown)
-        RISCV32V_FUNCT3_OP_IVX = 'b100, 
-        RISCV32V_FUNCT3_OP_FVF = 'b101, // Floating Point Vector-Scalar
-        RISCV32V_FUNCT3_OP_MVX = 'b110,
+
+        RISCV32V_FUNCT3_OP_IVI   = 'b011,  // Integer Vector-Immediate (Slideup/Slidedown)
+        RISCV32V_FUNCT3_OP_IVX   = 'b100,
+        RISCV32V_FUNCT3_OP_FVF   = 'b101,  // Floating Point Vector-Scalar
+        RISCV32V_FUNCT3_OP_MVX   = 'b110,
         RISCV32V_FUNCT3_OP_SETVL = 'b111
     } riscv32v_funct3_t;
 
     typedef enum riscv32_funct6_t {
-        RISCV32V_FUNCT6_VFADD = 'b000000, // OP_FVV or OP_FVF
-        RISCV32V_FUNCT6_VFSUB = 'b000010, // OP_FVV or OP_FVF
-        RISCV32V_FUNCT6_VSLIDEUP = 'b001110, // OP_IVI only
-        RISCV32V_FUNCT6_VSLIDEDOWN = 'b001111, // OP_IVI only
-        RISCV32V_FUNCT6_VFDIV = 'b100000, // OP_FVV or OP_FVF
-        RISCV32V_FUNCT6_VFSQRT = 'b100011, // OP_FVV or OP_FVF
-        RISCV32V_FUNCT6_VFRDIV = 'b100001, // OP_FVF only
-        RISCV32V_FUNCT6_VFMUL = 'b100100, // OP_FVV or OP_FVF
-        RISCV32V_FUNCT6_VFMACC = 'b101100, // OP_FVV or OP_FVF
-        RISCV32V_FUNCT6_VFNMACC = 'b101101, // OP_FVV or OP_FVF
-        RISCV32V_FUNCT6_VFMSAC = 'b101110, // OP_FVV or OP_FVF
-        RISCV32V_FUNCT6_VFNMSAC = 'b101111 // OP_FVV or OP_FVF
+        RISCV32V_FUNCT6_VFADD = 'b000000,  // OP_FVV or OP_FVF
+        RISCV32V_FUNCT6_VFSUB = 'b000010,  // OP_FVV or OP_FVF
+        RISCV32V_FUNCT6_VSLIDEUP = 'b001110,  // OP_IVI only
+        RISCV32V_FUNCT6_VSLIDEDOWN = 'b001111,  // OP_IVI only
+        RISCV32V_FUNCT6_VFDIV = 'b100000,  // OP_FVV or OP_FVF
+        RISCV32V_FUNCT6_VFSQRT = 'b100011,  // OP_FVV or OP_FVF
+        RISCV32V_FUNCT6_VFRDIV = 'b100001,  // OP_FVF only
+        RISCV32V_FUNCT6_VFMUL = 'b100100,  // OP_FVV or OP_FVF
+        RISCV32V_FUNCT6_VFMACC = 'b101100,  // OP_FVV or OP_FVF
+        RISCV32V_FUNCT6_VFNMACC = 'b101101,  // OP_FVV or OP_FVF
+        RISCV32V_FUNCT6_VFMSAC = 'b101110,  // OP_FVV or OP_FVF
+        RISCV32V_FUNCT6_VFNMSAC = 'b101111  // OP_FVV or OP_FVF
     } riscv32v_funct6_t;
 
     // RISCV32V_FUNCT6_VFMIN = 'b000100, // OP_FVV or OP_FVF

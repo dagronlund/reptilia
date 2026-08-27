@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 
 `include "../../lib/std/std_util.svh"
 `include "../../lib/std/std_mem.svh"
@@ -17,10 +17,11 @@ module basilisk_input
     import rv32i::*;
     import gecko::*;
 (
-    input logic clk, rst,
+    input logic clk,
+    rst,
 
-    std_stream_intf.in input_command, // ...
-    std_stream_intf.in output_command // ...
+    std_stream_intf.in input_command,  // ...
+    std_stream_intf.in output_command  // ...
 );
 
 endmodule

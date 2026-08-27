@@ -17,17 +17,17 @@ package riscv32i_pkg;
     parameter riscv32_funct12_t RISCV32I_CSR_EBREAK = 12'h001;
 
     typedef enum riscv32_opcode_t {
-        RISCV32I_OPCODE_OP = 'h33, // Register (R-Type)
-        RISCV32I_OPCODE_IMM = 'h13, // Immediate (I-Type)
-        RISCV32I_OPCODE_LOAD = 'h03, // Load (I-Type)
-        RISCV32I_OPCODE_STORE = 'h23, // Store (S-Type)
-        RISCV32I_OPCODE_LUI = 'h37, // Upper Immediate (U-Type)
-        RISCV32I_OPCODE_AUIPC = 'h17, // PC Immediate (U-Type)
-        RISCV32I_OPCODE_JAL = 'h6F, // Jump/Link (J-Type)
-        RISCV32I_OPCODE_JALR = 'h67, // Jump/Link/Register (I-Type)
-        RISCV32I_OPCODE_BRANCH = 'h63, // Branch (B-Type)
-        RISCV32I_OPCODE_SYSTEM = 'h73, // System (I-Type)
-        RISCV32I_OPCODE_FENCE = 'h0F, // Fence (I-Type)
+        RISCV32I_OPCODE_OP = 'h33,  // Register (R-Type)
+        RISCV32I_OPCODE_IMM = 'h13,  // Immediate (I-Type)
+        RISCV32I_OPCODE_LOAD = 'h03,  // Load (I-Type)
+        RISCV32I_OPCODE_STORE = 'h23,  // Store (S-Type)
+        RISCV32I_OPCODE_LUI = 'h37,  // Upper Immediate (U-Type)
+        RISCV32I_OPCODE_AUIPC = 'h17,  // PC Immediate (U-Type)
+        RISCV32I_OPCODE_JAL = 'h6F,  // Jump/Link (J-Type)
+        RISCV32I_OPCODE_JALR = 'h67,  // Jump/Link/Register (I-Type)
+        RISCV32I_OPCODE_BRANCH = 'h63,  // Branch (B-Type)
+        RISCV32I_OPCODE_SYSTEM = 'h73,  // System (I-Type)
+        RISCV32I_OPCODE_FENCE = 'h0F,  // Fence (I-Type)
         RISCV32I_OPCODE_UNDEF
     } riscv32i_opcode_t;
 
@@ -52,12 +52,12 @@ package riscv32i_pkg;
     } riscv32i_funct3_ls_t;
 
     typedef enum riscv32_funct3_t {
-        RISCV32I_FUNCT3_B_BEQ = 'h0,
-        RISCV32I_FUNCT3_B_BNE = 'h1,
-        RISCV32I_FUNCT3_B_BLT = 'h4,
-        RISCV32I_FUNCT3_B_BGE = 'h5,
-        RISCV32I_FUNCT3_B_BLTU = 'h6,
-        RISCV32I_FUNCT3_B_BGEU = 'h7,
+        RISCV32I_FUNCT3_B_BEQ   = 'h0,
+        RISCV32I_FUNCT3_B_BNE   = 'h1,
+        RISCV32I_FUNCT3_B_BLT   = 'h4,
+        RISCV32I_FUNCT3_B_BGE   = 'h5,
+        RISCV32I_FUNCT3_B_BLTU  = 'h6,
+        RISCV32I_FUNCT3_B_BGEU  = 'h7,
         RISCV32I_FUNCT3_B_UNDEF = 'h2
     } riscv32i_funct3_b_t;
 
@@ -73,9 +73,9 @@ package riscv32i_pkg;
     } riscv32i_funct3_sys_t;
 
     typedef union packed {
-        riscv32i_funct3_ir_t ir;
-        riscv32i_funct3_ls_t ls;
-        riscv32i_funct3_b_t b;
+        riscv32i_funct3_ir_t  ir;
+        riscv32i_funct3_ls_t  ls;
+        riscv32i_funct3_b_t   b;
         riscv32i_funct3_sys_t sys;
     } riscv32i_funct3_t;
 
@@ -86,14 +86,12 @@ package riscv32i_pkg;
     } riscv32i_funct7_t;
 
     typedef enum riscv32_funct12_t {
-        RISCV32I_FUNCT12_ECALL = 'h0,
+        RISCV32I_FUNCT12_ECALL  = 'h0,
         RISCV32I_FUNCT12_EBREAK = 'h1,
         RISCV32I_FUNCT12_UNDEF
     } riscv32i_funct12_t;
 
-    function automatic riscv32_fields_t riscv32_get_fields(
-        input riscv32_inst_t inst
-    );
+    function automatic riscv32_fields_t riscv32_get_fields(input riscv32_inst_t inst);
         riscv32_fields_t fields = '{
             inst: inst[31:0],
             opcode: inst[6:0],
@@ -107,20 +105,15 @@ package riscv32i_pkg;
             funct6: inst[31:26],
             funct12: inst[31:20],
             decode_error: 1'b0,
-            default:'0
+            default: '0
         };
 
         case (riscv32i_opcode_t'(fields.opcode))
-        RISCV32I_OPCODE_STORE: 
-            fields.imm = {{20{inst[31]}}, inst[31:25], inst[11:7]}; // S-Type
-        RISCV32I_OPCODE_LUI, RISCV32I_OPCODE_AUIPC: 
-            fields.imm = {inst[31:12], 12'b0}; // U-Type
-        RISCV32I_OPCODE_JAL: 
-            fields.imm = {{12{inst[19]}}, inst[19:12], inst[20], inst[30:21], 1'b0}; // J-Type
-        RISCV32I_OPCODE_BRANCH: 
-            fields.imm = {{20{inst[7]}}, inst[7], inst[30:25], inst[11:8], 1'b0}; // B-Type
-        default: 
-            fields.imm = {{20{inst[31]}}, inst[31:20]}; // IR-Type
+            RISCV32I_OPCODE_STORE: fields.imm = {{20{inst[31]}}, inst[31:25], inst[11:7]};  // S-Type
+            RISCV32I_OPCODE_LUI, RISCV32I_OPCODE_AUIPC: fields.imm = {inst[31:12], 12'b0};  // U-Type
+            RISCV32I_OPCODE_JAL: fields.imm = {{12{inst[19]}}, inst[19:12], inst[20], inst[30:21], 1'b0};  // J-Type
+            RISCV32I_OPCODE_BRANCH: fields.imm = {{20{inst[7]}}, inst[7], inst[30:25], inst[11:8], 1'b0};  // B-Type
+            default: fields.imm = {{20{inst[31]}}, inst[31:20]};  // IR-Type
         endcase
 
         return fields;

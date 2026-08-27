@@ -4,7 +4,7 @@
 `include "mem/mem_util.svh"
 
 `ifdef __RUSTDV__
-    /* verilator public_flat_rw_on */
+/* verilator public_flat_rw_on */
 `endif
 interface mem_intf #(
     parameter int DATA_WIDTH = 32,
@@ -15,50 +15,37 @@ interface mem_intf #(
     parameter bit ADDR_BYTE_SHIFTED = 0,
     // Indicates that the bus only carries data (i.e. a read response)
     parameter bit DATA_ONLY = 0
-)(
+) (
 `ifndef __SYNTH_ONLY__
-    input wire clk = 'b0, rst = 'b0
+    input wire clk = 'b0,
+    rst = 'b0
 `else
-    input wire clk, rst
+    input wire clk,
+    rst
 `endif
 );
 
-    logic valid /* verilator isolate_assignments*/;
-    logic ready /* verilator isolate_assignments*/;
+    logic                  valid  /* verilator isolate_assignments*/;
+    logic                  ready  /* verilator isolate_assignments*/;
 
     logic                  read_enable;
     logic [MASK_WIDTH-1:0] write_enable;
     logic [ADDR_WIDTH-1:0] addr;
     logic [DATA_WIDTH-1:0] data;
-    logic [ID_WIDTH-1:0]   id;
+    logic [  ID_WIDTH-1:0] id;
     logic                  last;
 
-    modport out(
-        output valid,
-        input ready,
-        output read_enable, write_enable, addr, data, id, last
-    );
+    modport out(output valid, input ready, output read_enable, write_enable, addr, data, id, last);
 
-    modport in(
-        input valid,
-        output ready,
-        input read_enable, write_enable, addr, data, id, last
-    );
-    
-    modport view(
-        input valid, ready,
-        input read_enable, write_enable, addr, data, id, last
-    );
+    modport in(input valid, output ready, input read_enable, write_enable, addr, data, id, last);
+
+    modport view(input valid, ready, input read_enable, write_enable, addr, data, id, last);
 
 `ifndef __SYNTH_ONLY__
 
-    task send(
-        input logic                  read_enable_in,
-        input logic [MASK_WIDTH-1:0] write_enable_in,
-        input logic [ADDR_WIDTH-1:0] addr_in, 
-        input logic [DATA_WIDTH-1:0] data_in,
-        input logic [ID_WIDTH-1:0] id_in
-    );
+    task send(input logic read_enable_in, input logic [MASK_WIDTH-1:0] write_enable_in,
+              input logic [ADDR_WIDTH-1:0] addr_in, input logic [DATA_WIDTH-1:0] data_in,
+              input logic [ID_WIDTH-1:0] id_in);
         read_enable <= read_enable_in;
         write_enable <= write_enable_in;
         addr <= addr_in;
@@ -67,21 +54,17 @@ interface mem_intf #(
         last <= 'b0;
 
         valid <= 1'b1;
-        @ (posedge clk);
-        while (!ready) @ (posedge clk);
+        @(posedge clk);
+        while (!ready) @(posedge clk);
         valid <= 1'b0;
     endtask
 
-    task recv(
-        output logic                  read_enable_out,
-        output logic [MASK_WIDTH-1:0] write_enable_out,
-        output logic [ADDR_WIDTH-1:0] addr_out,
-        output logic [DATA_WIDTH-1:0] data_out,
-        output logic [ID_WIDTH-1:0] id_out
-    );
+    task recv(output logic read_enable_out, output logic [MASK_WIDTH-1:0] write_enable_out,
+              output logic [ADDR_WIDTH-1:0] addr_out, output logic [DATA_WIDTH-1:0] data_out,
+              output logic [ID_WIDTH-1:0] id_out);
         ready <= 1'b1;
-        @ (posedge clk);
-        while (!valid) @ (posedge clk);
+        @(posedge clk);
+        while (!valid) @(posedge clk);
         ready <= 1'b0;
 
         read_enable_out = read_enable;
@@ -95,5 +78,5 @@ interface mem_intf #(
 
 endinterface
 `ifdef __RUSTDV__
-    /* verilator public_off */
+/* verilator public_off */
 `endif

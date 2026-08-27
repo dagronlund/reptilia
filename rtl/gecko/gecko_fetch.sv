@@ -30,17 +30,17 @@ module gecko_fetch
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
-    
-    parameter stream_pipeline_mode_t   PIPELINE_MODE = STREAM_PIPELINE_MODE_TRANSPARENT,
-    parameter gecko_pc_t               START_ADDR = 'b0,
+
+    parameter stream_pipeline_mode_t   PIPELINE_MODE    = STREAM_PIPELINE_MODE_TRANSPARENT,
+    parameter gecko_pc_t               START_ADDR       = 'b0,
     parameter gecko_predictor_config_t PREDICTOR_CONFIG = gecko_get_basic_predictor_config()
-)(
-    input wire clk, 
+) (
+    input wire clk,
     input wire rst,
 
-    stream_intf.view jump_command, // gecko_jump_operation_t
+    stream_intf.view jump_command,  // gecko_jump_operation_t
 
-    stream_intf.out instruction_command, // gecko_instruction_operation_t
+    stream_intf.out instruction_command,  // gecko_instruction_operation_t
     mem_intf.out instruction_request
 );
 
@@ -50,16 +50,28 @@ module gecko_fetch
     logic enable;
     logic produce;
 
-    stream_intf #(.T(gecko_instruction_operation_t)) next_instruction_command (.clk, .rst);
-    mem_intf #(.DATA_WIDTH(32), .ADDR_WIDTH(32)) next_instruction_request (.clk, .rst);
+    stream_intf #(
+        .T(gecko_instruction_operation_t)
+    ) next_instruction_command (
+        .clk,
+        .rst
+    );
+    mem_intf #(
+        .DATA_WIDTH(32),
+        .ADDR_WIDTH(32)
+    ) next_instruction_request (
+        .clk,
+        .rst
+    );
 
     stream_stage #(
         .CLOCK_INFO(CLOCK_INFO),
         .PIPELINE_MODE(PIPELINE_MODE),
         .T(gecko_instruction_operation_t)
     ) instruction_command_stage_inst (
-        .clk, .rst,
-        .stream_in(next_instruction_command), 
+        .clk,
+        .rst,
+        .stream_in (next_instruction_command),
         .stream_out(instruction_command)
     );
 
@@ -67,8 +79,9 @@ module gecko_fetch
         .CLOCK_INFO(CLOCK_INFO),
         .PIPELINE_MODE(PIPELINE_MODE)
     ) instruction_request_stage_inst (
-        .clk, .rst,
-        .mem_in(next_instruction_request), 
+        .clk,
+        .rst,
+        .mem_in(next_instruction_request),
         .mem_in_meta('b0),
         .mem_out(instruction_request),
         .mem_out_meta()
@@ -87,10 +100,11 @@ module gecko_fetch
         .T(gecko_pc_t),
         .RESET_VECTOR(START_ADDR)
     ) pc_register_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .enable('b1),
-        .next(pc_next),
-        .value(pc)
+        .next  (pc_next),
+        .value (pc)
     );
 
     std_register #(
@@ -98,10 +112,11 @@ module gecko_fetch
         .T(logic),
         .RESET_VECTOR('b0)
     ) pc_updated_register_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .enable('b1),
-        .next(pc_updated_next),
-        .value(pc_updated)
+        .next  (pc_updated_next),
+        .value (pc_updated)
     );
 
     std_register #(
@@ -109,10 +124,11 @@ module gecko_fetch
         .T(logic),
         .RESET_VECTOR('b0)
     ) halt_flag_register_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .enable(jump_command.valid && !jump_command.payload.mispredicted),
-        .next(jump_command.payload.halt || halt_flag),
-        .value(halt_flag)
+        .next  (jump_command.payload.halt || halt_flag),
+        .value (halt_flag)
     );
 
     logic predictor_valid;
@@ -125,11 +141,11 @@ module gecko_fetch
         .TECHNOLOGY(TECHNOLOGY),
         .PREDICTOR_CONFIG(PREDICTOR_CONFIG)
     ) predictor (
-        .clk, 
+        .clk,
         .rst,
         .pc,
         .jump_command,
-        .predictor_valid, 
+        .predictor_valid,
         .predictor_taken,
         .predictor_prediction,
         .predictor_history,
@@ -139,12 +155,15 @@ module gecko_fetch
     always_comb begin
         produce = !halt_flag && branch_table_reset_done;
 
-        stream_controller_result = stream_controller8(stream_controller8_input_t'{
-            valid_input:  {7'b0, 1'b1},
-            ready_output: {6'b0, next_instruction_command.ready, next_instruction_request.ready},
-            consume: {7'b0, 1'b1},
-            produce: {6'b0, produce, produce}
-        });
+        stream_controller_result = stream_controller8(
+            stream_controller8_input_t
+'{
+                valid_input: {7'b0, 1'b1},
+                ready_output: {6'b0, next_instruction_command.ready, next_instruction_request.ready},
+                consume: {7'b0, 1'b1},
+                produce: {6'b0, produce, produce}
+            }
+        );
         {next_instruction_command.valid, next_instruction_request.valid} = stream_controller_result.valid_output[1:0];
         enable = stream_controller_result.enable;
 
@@ -154,8 +173,7 @@ module gecko_fetch
         // Update pc and pc_updated if the fetch state is enabled
         if (produce && enable) begin
             // Take branch if a prediction target exists and we are predicted to take it
-            if (PREDICTOR_CONFIG.mode != GECKO_PREDICTOR_MODE_NONE && 
-                    predictor_valid && predictor_taken) begin
+            if (PREDICTOR_CONFIG.mode != GECKO_PREDICTOR_MODE_NONE && predictor_valid && predictor_taken) begin
                 pc_next = predictor_prediction;
             end else begin
                 pc_next = pc + 'd4;
@@ -164,8 +182,7 @@ module gecko_fetch
         end
 
         // Override pc_next decision if a jump command comes in
-        if (jump_command.valid && jump_command.payload.update_pc && 
-                                 !jump_command.payload.mispredicted) begin
+        if (jump_command.valid && jump_command.payload.update_pc && !jump_command.payload.mispredicted) begin
             pc_next = jump_command.payload.actual_next_pc;
             pc_updated_next = 'b1;
         end
@@ -176,7 +193,7 @@ module gecko_fetch
             next_pc: pc_next,
             pc_updated: pc_updated,
             prediction: '{
-                miss: !predictor_valid, // TODO: Consider removing this flag, it is not used
+                miss: !predictor_valid,  // TODO: Consider removing this flag, it is not used
                 history: predictor_history
             }
         };

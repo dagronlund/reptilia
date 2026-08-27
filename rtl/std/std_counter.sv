@@ -1,14 +1,14 @@
 //!import std/std_pkg.sv
 //!import std/std_register.sv
 
-module std_counter 
+module std_counter
     import std_pkg::*;
 #(
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter int WIDTH = 8,
     parameter logic [WIDTH-1:0] RESET_VECTOR = 'b0
-)(
-    input wire clk, 
+) (
+    input wire clk,
     input wire rst,
 
     input wire enable,
@@ -26,13 +26,14 @@ module std_counter
 
     std_register #(
         .CLOCK_INFO(CLOCK_INFO),
-        .T(logic[WIDTH-1:0]),
+        .T(logic [WIDTH-1:0]),
         .RESET_VECTOR(RESET_VECTOR)
     ) std_register_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .enable(enable),
-        .next(next),
-        .value(value)
+        .next  (next),
+        .value (value)
     );
 
     always_comb begin
@@ -40,7 +41,7 @@ module std_counter
             next = load_value;
         end else begin
             next = value + 'b1;
-        end 
+        end
 
         complete = (value == max);
 

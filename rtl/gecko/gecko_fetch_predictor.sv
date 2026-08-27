@@ -25,15 +25,15 @@ module gecko_fetch_predictor
     parameter std_clock_info_t CLOCK_INFO = 'b0,
     parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
     parameter gecko_predictor_config_t PREDICTOR_CONFIG = gecko_get_basic_predictor_config()
-)(
-    input wire clk, 
+) (
+    input wire clk,
     input wire rst,
 
     input gecko_pc_t pc,
 
-    stream_intf.view jump_command, // gecko_jump_operation_t
+    stream_intf.view jump_command,  // gecko_jump_operation_t
 
-    output logic predictor_valid, 
+    output logic predictor_valid,
     output logic predictor_taken,
     output gecko_pc_t predictor_prediction,
     output gecko_predictor_history_t predictor_history,
@@ -43,14 +43,12 @@ module gecko_fetch_predictor
 
     // Type Definitions --------------------------------------------------------
 
-    function automatic int get_history_table_addr_width(
-            input gecko_predictor_mode_t prediction_type
-    );
+    function automatic int get_history_table_addr_width(input gecko_predictor_mode_t prediction_type);
         unique case (prediction_type)
-        GECKO_PREDICTOR_MODE_NONE: return PREDICTOR_CONFIG.target_addr_width;
-        GECKO_PREDICTOR_MODE_SIMPLE: return PREDICTOR_CONFIG.target_addr_width;
-        GECKO_PREDICTOR_MODE_GLOBAL: return PREDICTOR_CONFIG.history_width;
-        GECKO_PREDICTOR_MODE_LOCAL: return PREDICTOR_CONFIG.history_width;
+            GECKO_PREDICTOR_MODE_NONE:   return PREDICTOR_CONFIG.target_addr_width;
+            GECKO_PREDICTOR_MODE_SIMPLE: return PREDICTOR_CONFIG.target_addr_width;
+            GECKO_PREDICTOR_MODE_GLOBAL: return PREDICTOR_CONFIG.history_width;
+            GECKO_PREDICTOR_MODE_LOCAL:  return PREDICTOR_CONFIG.history_width;
         endcase
     endfunction
 
@@ -83,11 +81,11 @@ module gecko_fetch_predictor
     endfunction
 
     logic branch_table_write_enable;
-    target_addr_t branch_table_write_addr /* verilator isolate_assignments*/;
+    target_addr_t branch_table_write_addr  /* verilator isolate_assignments*/;
     gecko_fetch_table_entry_t branch_table_write_data;
 
     // target_addr_t branch_table_read_addr /* verilator isolate_assignments*/;
-    gecko_fetch_table_entry_t branch_table_read_data /* verilator isolate_assignments*/;
+    gecko_fetch_table_entry_t branch_table_read_data  /* verilator isolate_assignments*/;
 
     mem_combinational #(
         .CLOCK_INFO(CLOCK_INFO),
@@ -97,7 +95,8 @@ module gecko_fetch_predictor
         .READ_PORTS(1),
         .AUTO_RESET(1)
     ) branch_target_table_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
 
         .write_enable(branch_table_write_enable),
         .write_addr(branch_table_write_addr),
@@ -116,8 +115,8 @@ module gecko_fetch_predictor
     history_t local_history_update_read_data, local_history_update_write_data;
     history_t local_history_result;
 
-    history_addr_t history_table_update_addr /* verilator isolate_assignments*/;
-    history_addr_t history_table_addr /* verilator isolate_assignments*/;
+    history_addr_t history_table_update_addr  /* verilator isolate_assignments*/;
+    history_addr_t history_table_addr  /* verilator isolate_assignments*/;
     gecko_predictor_history_t history_table_update_data, history_table_data;
 
     std_register #(
@@ -125,10 +124,11 @@ module gecko_fetch_predictor
         .T(history_t),
         .RESET_VECTOR('b0)
     ) global_history_register_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .enable(branch_table_write_enable),
-        .next(next_global_history),
-        .value(current_global_history)
+        .next  (next_global_history),
+        .value (current_global_history)
     );
 
     mem_combinational #(
@@ -138,7 +138,8 @@ module gecko_fetch_predictor
         .ADDR_WIDTH(PREDICTOR_CONFIG.local_addr_width),
         .READ_PORTS(1)
     ) local_history_table_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
 
         .write_enable(branch_table_write_enable),
         .write_addr(get_pc_local_addr(jump_command.payload.current_pc)),
@@ -158,7 +159,8 @@ module gecko_fetch_predictor
         .ADDR_WIDTH($bits(history_addr_t)),
         .READ_PORTS(1)
     ) branch_history_table_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
 
         .write_enable(branch_table_write_enable),
         .write_addr(history_table_update_addr),
@@ -173,10 +175,10 @@ module gecko_fetch_predictor
 
     always_comb begin
         unique case (PREDICTOR_CONFIG.mode)
-        GECKO_PREDICTOR_MODE_NONE:   history_table_addr = 'b0;
-        GECKO_PREDICTOR_MODE_SIMPLE: history_table_addr = get_pc_target(pc);
-        GECKO_PREDICTOR_MODE_GLOBAL: history_table_addr = current_global_history;
-        GECKO_PREDICTOR_MODE_LOCAL:  history_table_addr = local_history_result;
+            GECKO_PREDICTOR_MODE_NONE:   history_table_addr = 'b0;
+            GECKO_PREDICTOR_MODE_SIMPLE: history_table_addr = get_pc_target(pc);
+            GECKO_PREDICTOR_MODE_GLOBAL: history_table_addr = current_global_history;
+            GECKO_PREDICTOR_MODE_LOCAL:  history_table_addr = local_history_result;
         endcase
     end
 
@@ -184,10 +186,8 @@ module gecko_fetch_predictor
         // Get branch predictions ----------------------------------------------
 
         // Determine if entry exists in branch table and has matching address
-        predictor_valid = branch_table_read_data.valid && 
-                                (branch_table_read_data.tag == get_pc_tag(pc));
-        predictor_taken = gecko_predictor_is_taken(history_table_data) || 
-                                 branch_table_read_data.jump_instruction;
+        predictor_valid = branch_table_read_data.valid && (branch_table_read_data.tag == get_pc_tag(pc));
+        predictor_taken = gecko_predictor_is_taken(history_table_data) || branch_table_read_data.jump_instruction;
         predictor_prediction = branch_table_read_data.predicted_next;
         predictor_history = history_table_data;
 
@@ -204,27 +204,23 @@ module gecko_fetch_predictor
         };
 
         // Update global history
-        next_global_history = {
-                current_global_history[$bits(history_t)-2:0], 
-                jump_command.payload.branched};
+        next_global_history = {current_global_history[$bits(history_t)-2:0], jump_command.payload.branched};
 
         // Update local history table
         local_history_update_write_data = {
-                local_history_update_read_data[$bits(history_t)-2:0],
-                jump_command.payload.branched};
+            local_history_update_read_data[$bits(history_t)-2:0], jump_command.payload.branched
+        };
 
         // Update history table
         unique case (PREDICTOR_CONFIG.mode)
-        GECKO_PREDICTOR_MODE_NONE, 
-        GECKO_PREDICTOR_MODE_SIMPLE: history_table_update_addr = branch_table_write_addr;
-        GECKO_PREDICTOR_MODE_GLOBAL: history_table_update_addr = current_global_history;
-        GECKO_PREDICTOR_MODE_LOCAL:  history_table_update_addr = local_history_update_read_data;
+            GECKO_PREDICTOR_MODE_NONE, GECKO_PREDICTOR_MODE_SIMPLE: history_table_update_addr = branch_table_write_addr;
+            GECKO_PREDICTOR_MODE_GLOBAL: history_table_update_addr = current_global_history;
+            GECKO_PREDICTOR_MODE_LOCAL: history_table_update_addr = local_history_update_read_data;
         endcase
         // I have some questions about two adjacent jumps stepping on each other
         // but this is the simplest version to implement
-        history_table_update_data = gecko_predictor_update_history(
-                jump_command.payload.prediction.history, 
-                jump_command.payload.branched);
+        history_table_update_data =
+            gecko_predictor_update_history(jump_command.payload.prediction.history, jump_command.payload.branched);
     end
 
 endmodule

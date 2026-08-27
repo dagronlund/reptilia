@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 
 `include "../../lib/std/std_util.svh"
 `include "../../lib/std/std_mem.svh"
@@ -14,7 +14,8 @@ module gecko_tb
     import rv32::*;
     import rv32i::*;
     import gecko::*;
-#()();
+#(
+) ();
 
     initial begin
         automatic gecko_math_result_t result;

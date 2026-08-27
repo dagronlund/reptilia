@@ -134,7 +134,7 @@ def search_sources(path: str) -> dict[str, SourceFile]:
     return source_files
 
 
-def main(
+def build(
     run_riscv_tests: bool = False,
     run_dhrystone: bool = False,
     run_rustdv_tests: bool = False,
@@ -304,7 +304,3 @@ def main(
             wave=wave,
             wave_dir=wave_dir,
         )
-
-
-if __name__ == "__main__":
-    main()

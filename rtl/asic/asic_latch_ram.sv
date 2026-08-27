@@ -9,8 +9,8 @@ module asic_latch_ram
     parameter int DATA_WIDTH = 1,
     parameter int ADDR_WIDTH = 5,
     parameter int READ_PORTS = 1
-)(
-    input wire clk, 
+) (
+    input wire clk,
     input wire rst,
 
     input  wire                   write_enable,
@@ -18,27 +18,24 @@ module asic_latch_ram
     input  wire  [DATA_WIDTH-1:0] write_data_in,
     output logic [DATA_WIDTH-1:0] write_data_out,
 
-    input  wire  [READ_PORTS-1:0] [ADDR_WIDTH-1:0] read_addr,
-    output logic [READ_PORTS-1:0] [DATA_WIDTH-1:0] read_data_out
+    input  wire  [READ_PORTS-1:0][ADDR_WIDTH-1:0] read_addr,
+    output logic [READ_PORTS-1:0][DATA_WIDTH-1:0] read_data_out
 );
 
     // TODO: Support falling clock edges with clock gating primitives
 
-    localparam DATA_LENGTH = 2**ADDR_WIDTH;
+    localparam DATA_LENGTH = 2 ** ADDR_WIDTH;
 
-    logic [DATA_WIDTH-1:0] data [DATA_LENGTH];
+    logic [DATA_WIDTH-1:0] data               [DATA_LENGTH];
     logic [DATA_WIDTH-1:0] sampled_write_data;
-    logic                  write_clocks [DATA_LENGTH];
+    logic                  write_clocks       [DATA_LENGTH];
 
     // Generate gated write clocks
     genvar k;
     generate
-    for (k = 0; k < DATA_LENGTH; k++) begin
-        always_comb write_clocks[k] = 
-                clk && 
-                write_enable && 
-                (k[ADDR_WIDTH-1:0] == write_addr);
-    end
+        for (k = 0; k < DATA_LENGTH; k++) begin
+            always_comb write_clocks[k] = clk && write_enable && (k[ADDR_WIDTH-1:0] == write_addr);
+        end
     endgenerate
 
     // Register write data
@@ -47,10 +44,11 @@ module asic_latch_ram
         .T(logic [DATA_WIDTH-1:0]),
         .RESET_VECTOR('b0)
     ) sampled_write_data_register_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .enable(write_enable),
-        .next(write_data_in),
-        .value(sampled_write_data)
+        .next  (write_data_in),
+        .value (sampled_write_data)
     );
 
     // Perform write operation with latches

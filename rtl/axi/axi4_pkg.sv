@@ -5,16 +5,16 @@ package axi4_pkg;
     typedef logic [2:0] axi4_size_t;
 
     typedef enum logic [1:0] {
-        AXI4_RESP_OKAY = 2'b00, 
-        AXI4_RESP_EXOKAY = 2'b01, 
-        AXI4_RESP_SLVERR = 2'b10, 
+        AXI4_RESP_OKAY   = 2'b00,
+        AXI4_RESP_EXOKAY = 2'b01,
+        AXI4_RESP_SLVERR = 2'b10,
         AXI4_RESP_DECERR = 2'b11
     } axi4_resp_t;
 
     typedef enum logic [1:0] {
         AXI4_BURST_FIXED = 2'b00,
-        AXI4_BURST_INCR = 2'b01,
-        AXI4_BURST_WRAP = 2'b10,
+        AXI4_BURST_INCR  = 2'b01,
+        AXI4_BURST_WRAP  = 2'b10,
         AXI4_BURST_UNDEF = 2'b11
     } axi4_burst_t;
 
@@ -30,7 +30,7 @@ package axi4_pkg;
 
     typedef enum logic {
         AXI4_UNALLOCATED = 1'b0,
-        AXI4_ALLOCATED = 1'b1
+        AXI4_ALLOCATED   = 1'b1
     } axi4_allocation_t;
 
     typedef struct packed {
@@ -47,7 +47,7 @@ package axi4_pkg;
 
     typedef enum logic {
         AXI4_UNPRIVILEDGED_ACCESS = 1'b0,
-        AXI4_PRIVILEDGED_ACCESS = 1'b1
+        AXI4_PRIVILEDGED_ACCESS   = 1'b1
     } axi4_privilege_t;
 
     typedef enum logic {
@@ -66,18 +66,16 @@ package axi4_pkg;
         axi4_privilege_t privilege;
     } axi4_prot_t;
 
-    function automatic axi4_len_t axi4_convert_size_to_len(
-            input axi4_size_t size
-    );
+    function automatic axi4_len_t axi4_convert_size_to_len(input axi4_size_t size);
         case (size)
-        'b000: return 'd1;
-        'b001: return 'd2;
-        'b010: return 'd4;
-        'b011: return 'd8;
-        'b100: return 'd16;
-        'b101: return 'd32;
-        'b110: return 'd64;
-        'b111: return 'd128;
+            'b000: return 'd1;
+            'b001: return 'd2;
+            'b010: return 'd4;
+            'b011: return 'd8;
+            'b100: return 'd16;
+            'b101: return 'd32;
+            'b110: return 'd64;
+            'b111: return 'd128;
         endcase
     endfunction
 

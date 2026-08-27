@@ -14,11 +14,11 @@ module stream_stage_multiple
     parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
     parameter int STAGES = 1,
     parameter type T = logic
-)(
-    input wire clk, 
+) (
+    input wire clk,
     input wire rst,
 
-    stream_intf.in stream_in,
+    stream_intf.in  stream_in,
     stream_intf.out stream_out
 );
 
@@ -27,71 +27,86 @@ module stream_stage_multiple
 
     genvar k;
     generate
-    if (STAGES == 0) begin
+        if (STAGES == 0) begin
 
-        stream_stage #(
-            .CLOCK_INFO(CLOCK_INFO),
-            .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT),
-            .T(T)
-        ) stream_stage_inst (
-            .clk, .rst,
-            .stream_in, .stream_out
-        );
+            stream_stage #(
+                .CLOCK_INFO(CLOCK_INFO),
+                .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT),
+                .T(T)
+            ) stream_stage_inst (
+                .clk,
+                .rst,
+                .stream_in,
+                .stream_out
+            );
 
-    end else if (STAGES == 1) begin
+        end else if (STAGES == 1) begin
 
-        stream_stage #(
-            .CLOCK_INFO(CLOCK_INFO),
-            .PIPELINE_MODE(PIPELINE_MODE),
-            .T(T)
-        ) stream_stage_inst (
-            .clk, .rst,
-            .stream_in, .stream_out
-        );
+            stream_stage #(
+                .CLOCK_INFO(CLOCK_INFO),
+                .PIPELINE_MODE(PIPELINE_MODE),
+                .T(T)
+            ) stream_stage_inst (
+                .clk,
+                .rst,
+                .stream_in,
+                .stream_out
+            );
 
-    end else begin
-        localparam int INTERNAL_STAGES = STAGES - 1;
-        stream_intf #(.T(T)) internal_streams [INTERNAL_STAGES] (.clk, .rst);
+        end else begin
+            localparam int INTERNAL_STAGES = STAGES - 1;
+            stream_intf #(
+                .T(T)
+            ) internal_streams[INTERNAL_STAGES] (
+                .clk,
+                .rst
+            );
 
-        for (k = 0; k < STAGES; k++) begin
-            if (k == 0) begin
+            for (k = 0; k < STAGES; k++) begin
+                if (k == 0) begin
 
-                stream_stage #(
-                    .CLOCK_INFO(CLOCK_INFO),
-                    .PIPELINE_MODE(PIPELINE_MODE),
-                    .T(T)
-                ) stream_stage_inst (
-                    .clk, .rst,
-                    .stream_in(stream_in), .stream_out(internal_streams[k])
-                );
+                    stream_stage #(
+                        .CLOCK_INFO(CLOCK_INFO),
+                        .PIPELINE_MODE(PIPELINE_MODE),
+                        .T(T)
+                    ) stream_stage_inst (
+                        .clk,
+                        .rst,
+                        .stream_in (stream_in),
+                        .stream_out(internal_streams[k])
+                    );
 
-            end else if (k == STAGES - 1) begin
+                end else if (k == STAGES - 1) begin
 
-                stream_stage #(
-                    .CLOCK_INFO(CLOCK_INFO),
-                    .PIPELINE_MODE(PIPELINE_MODE),
-                    .T(T)
-                ) stream_stage_inst (
-                    .clk, .rst,
-                    .stream_in(internal_streams[k - 1]), .stream_out(stream_out)
-                );
+                    stream_stage #(
+                        .CLOCK_INFO(CLOCK_INFO),
+                        .PIPELINE_MODE(PIPELINE_MODE),
+                        .T(T)
+                    ) stream_stage_inst (
+                        .clk,
+                        .rst,
+                        .stream_in (internal_streams[k-1]),
+                        .stream_out(stream_out)
+                    );
 
-            end else begin
+                end else begin
 
-                stream_stage #(
-                    .CLOCK_INFO(CLOCK_INFO),
-                    .PIPELINE_MODE(PIPELINE_MODE),
-                    .T(T)
-                ) stream_stage_inst (
-                    .clk, .rst,
-                    .stream_in(internal_streams[k - 1]), .stream_out(internal_streams[k])
-                );
+                    stream_stage #(
+                        .CLOCK_INFO(CLOCK_INFO),
+                        .PIPELINE_MODE(PIPELINE_MODE),
+                        .T(T)
+                    ) stream_stage_inst (
+                        .clk,
+                        .rst,
+                        .stream_in (internal_streams[k-1]),
+                        .stream_out(internal_streams[k])
+                    );
 
+                end
             end
         end
-    end
 
-    
+
     endgenerate
 
 endmodule

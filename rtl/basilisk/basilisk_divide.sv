@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 
 `ifdef __LINTER__
 
@@ -31,35 +31,52 @@ module basilisk_divide
     import basilisk::*;
 #(
     parameter int OUTPUT_REGISTER_MODE = 1
-)(
-    input logic clk, rst,
+) (
+    input logic clk,
+    rst,
 
-    std_stream_intf.in divide_command, // basilisk_divide_command_t
-    std_stream_intf.out divide_result_command // basilisk_result_t
+    std_stream_intf.in divide_command,  // basilisk_divide_command_t
+    std_stream_intf.out divide_result_command  // basilisk_result_t
 );
 
-    std_stream_intf #(.T(basilisk_divide_result_t)) divide_exponent_command (.clk, .rst);
-    std_stream_intf #(.T(basilisk_divide_result_t)) divide_operation_command (.clk, .rst);
+    std_stream_intf #(
+        .T(basilisk_divide_result_t)
+    ) divide_exponent_command (
+        .clk,
+        .rst
+    );
+    std_stream_intf #(
+        .T(basilisk_divide_result_t)
+    ) divide_operation_command (
+        .clk,
+        .rst
+    );
 
     basilisk_divide_exponent #(
         .OUTPUT_REGISTER_MODE(OUTPUT_REGISTER_MODE)
     ) basilisk_divide_exponent_inst (
-        .clk, .rst,
-        .divide_command, .divide_exponent_command
+        .clk,
+        .rst,
+        .divide_command,
+        .divide_exponent_command
     );
 
     basilisk_divide_operation #(
         .OUTPUT_REGISTER_MODE(OUTPUT_REGISTER_MODE)
     ) basilisk_divide_operation_inst (
-        .clk, .rst,
-        .divide_exponent_command, .divide_operation_command
+        .clk,
+        .rst,
+        .divide_exponent_command,
+        .divide_operation_command
     );
 
     basilisk_divide_normalize #(
         .OUTPUT_REGISTER_MODE(OUTPUT_REGISTER_MODE)
     ) basilisk_divide_normalize_inst (
-        .clk, .rst,
-        .divide_operation_command, .divide_result_command
+        .clk,
+        .rst,
+        .divide_operation_command,
+        .divide_result_command
     );
 
 endmodule

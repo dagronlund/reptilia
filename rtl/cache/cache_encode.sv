@@ -1,11 +1,11 @@
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 
 `ifdef __LINTER__
-    `include "../std/std_util.svh"
-    `include "../mem/mem_util.svh"
+`include "../std/std_util.svh"
+`include "../mem/mem_util.svh"
 `else
-    `include "std_util.svh"
-    `include "mem_util.svh"
+`include "std_util.svh"
+`include "mem_util.svh"
 `endif
 
 module cache_encode
@@ -30,17 +30,18 @@ module cache_encode
 
     parameter int DATA_WIDTH_RATIO = DATA_WIDTH / CHILD_DATA_WIDTH,
     parameter int SUB_BLOCK_ADDR_WIDTH = BLOCK_ADDR_WIDTH - $clog2(DATA_WIDTH_RATIO)
-)(
-    input logic clk, rst,
-    
-    mem_intf.in local_response,
-    stream_intf.in local_response_meta, // local_meta_t
-    stream_intf.in bypass_response, // bypass_t
+) (
+    input logic clk,
+    rst,
 
-    mem_intf.out                 child_response,
+    mem_intf.in local_response,
+    stream_intf.in local_response_meta,  // local_meta_t
+    stream_intf.in bypass_response,  // bypass_t
+
+           mem_intf.out          child_response,
     output cache_mesi_response_t child_response_info,
 
-    mem_intf.out                parent_request,
+           mem_intf.out         parent_request,
     output cache_mesi_request_t parent_request_info
 );
 
@@ -54,8 +55,8 @@ module cache_encode
     localparam int ID_WIDTH = $bits(local_response.id);
     `STATIC_ASSERT(ID_WIDTH == $bits(child_response.id))
 
-    localparam int WORD_BITS = $clog2(DATA_WIDTH/8);
-    localparam int CHILD_WORD_BITS = $clog2(CHILD_DATA_WIDTH/8);
+    localparam int WORD_BITS = $clog2(DATA_WIDTH / 8);
+    localparam int CHILD_WORD_BITS = $clog2(CHILD_DATA_WIDTH / 8);
 
     typedef logic [ADDR_WIDTH-1:0] addr_t;
     typedef logic [$clog2(DATA_WIDTH_RATIO)-1:0] sub_word_addr_t;
@@ -80,11 +81,10 @@ module cache_encode
         logic last;
     } bypass_t;
 
-    function automatic sub_word_t get_sub_word(
-        input word_t word,
-        input addr_t addr
-    );
-        sub_word_addr_t sub_addr = (DATA_WIDTH_RATIO > 1) ? addr[$clog2(DATA_WIDTH_RATIO)+CHILD_WORD_BITS-1:CHILD_WORD_BITS] : 'b0;
+    function automatic sub_word_t get_sub_word(input word_t word, input addr_t addr);
+        sub_word_addr_t sub_addr = (DATA_WIDTH_RATIO > 1) ? addr[$clog2(
+            DATA_WIDTH_RATIO
+        )+CHILD_WORD_BITS-1:CHILD_WORD_BITS] : 'b0;
         sub_word_t sub_word = 'b0;
         for (int i = 0; i < CHILD_DATA_WIDTH; i++) begin
             sub_word[i] = word[(addr*CHILD_DATA_WIDTH)+i];
@@ -92,9 +92,22 @@ module cache_encode
         return (DATA_WIDTH_RATIO > 1) ? sub_word : word;
     endfunction
 
-    mem_intf #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH), .ID_WIDTH(ID_WIDTH)) next_child_response (.clk, .rst);
-    mem_intf #(.DATA_WIDTH(DATA_WIDTH), .ADDR_WIDTH(ADDR_WIDTH)) next_parent_request (.clk, .rst);
-    
+    mem_intf #(
+        .DATA_WIDTH(DATA_WIDTH),
+        .ADDR_WIDTH(ADDR_WIDTH),
+        .ID_WIDTH  (ID_WIDTH)
+    ) next_child_response (
+        .clk,
+        .rst
+    );
+    mem_intf #(
+        .DATA_WIDTH(DATA_WIDTH),
+        .ADDR_WIDTH(ADDR_WIDTH)
+    ) next_parent_request (
+        .clk,
+        .rst
+    );
+
     cache_mesi_response_t next_child_response_info;
     cache_mesi_request_t next_parent_request_info;
 
@@ -103,10 +116,11 @@ module cache_encode
     logic produce_child_response, produce_parent_request;
 
     stream_controller #(
-        .NUM_INPUTS(3),
+        .NUM_INPUTS (3),
         .NUM_OUTPUTS(2)
     ) stream_controller_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
 
         .valid_input({local_response.valid, local_response_meta.valid, bypass_response.valid}),
         .ready_input({local_response.ready, local_response_meta.ready, bypass_response.ready}),
@@ -114,8 +128,8 @@ module cache_encode
         .valid_output({next_child_response.valid, next_parent_request.valid}),
         .ready_output({next_child_response.ready, next_parent_request.ready}),
 
-        .consume({consume_local_response, consume_local_response, consume_bypass_response}), 
-        .produce({produce_child_response, produce_parent_request}), 
+        .consume({consume_local_response, consume_local_response, consume_bypass_response}),
+        .produce({produce_child_response, produce_parent_request}),
         .enable
     );
 
@@ -124,7 +138,8 @@ module cache_encode
         .PIPELINE_MODE(PIPELINE_MODE),
         .META_WIDTH($bits(cache_mesi_response_t))
     ) child_response_stream_stage_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .mem_in(next_child_response),
         .mem_in_meta(next_child_response_info),
         .mem_out(child_response),
@@ -136,7 +151,8 @@ module cache_encode
         .PIPELINE_MODE(STREAM_PIPELINE_MODE_BUFFERED),
         .META_WIDTH($bits(cache_mesi_request_t))
     ) parent_request_stream_stage_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .mem_in(next_parent_request),
         .mem_in_meta(next_parent_request_info),
         .mem_out(parent_request),
@@ -150,9 +166,10 @@ module cache_encode
         .T(logic),
         .RESET_VECTOR('b0)
     ) id_register_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .enable,
-        .next(next_bypass_id),
+        .next (next_bypass_id),
         .value(current_bypass_id)
     );
 
@@ -204,7 +221,7 @@ module cache_encode
             next_child_response.last = bypass_response.payload.last;
             next_child_response_info.op = bypass_response.payload.op;
 
-        // We do not need to check valid here, assigning consume will do that for us
+            // We do not need to check valid here, assigning consume will do that for us
         end else if (local_response_meta.payload.bypass_id == current_bypass_id) begin
             consume_local_response = 'b1;
             next_bypass_id = current_bypass_id + 'b1;

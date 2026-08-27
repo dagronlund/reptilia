@@ -1,15 +1,15 @@
 package axi4_lite_pkg;
 
     typedef enum logic [1:0] {
-        AXI4_LITE_RESP_OKAY = 2'b00, 
-        AXI4_LITE_RESP_EXOKAY = 2'b01, 
-        AXI4_LITE_RESP_SLVERR = 2'b10, 
+        AXI4_LITE_RESP_OKAY   = 2'b00,
+        AXI4_LITE_RESP_EXOKAY = 2'b01,
+        AXI4_LITE_RESP_SLVERR = 2'b10,
         AXI4_LITE_RESP_DECERR = 2'b11
     } axi4_lite_resp_t;
 
     typedef enum logic {
         AXI4_LITE_UNPRIVILEDGED_ACCESS = 1'b0,
-        AXI4_LITE_PRIVILEDGED_ACCESS = 1'b1
+        AXI4_LITE_PRIVILEDGED_ACCESS   = 1'b1
     } axi4_lite_privilege_t;
 
     typedef enum logic {

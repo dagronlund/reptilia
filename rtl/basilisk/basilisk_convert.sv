@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 
 `ifdef __LINTER__
 
@@ -28,22 +28,29 @@ module basilisk_convert
     import basilisk::*;
 #(
     parameter int OUTPUT_REGISTER_MODE = 1
-)(
-    input logic clk, rst,
+) (
+    input logic clk,
+    rst,
 
-    std_stream_intf.in convert_command, // basilisk_convert_command_t
-    std_stream_intf.out convert_result // basilisk_result_t
+    std_stream_intf.in  convert_command,  // basilisk_convert_command_t
+    std_stream_intf.out convert_result    // basilisk_result_t
 );
 
-    std_stream_intf #(.T(basilisk_result_t)) next_convert_result (.clk, .rst);
+    std_stream_intf #(
+        .T(basilisk_result_t)
+    ) next_convert_result (
+        .clk,
+        .rst
+    );
 
     logic enable, consume, produce;
 
     std_flow_lite #(
-        .NUM_INPUTS(1),
+        .NUM_INPUTS (1),
         .NUM_OUTPUTS(1)
     ) std_flow_lite_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
 
         .valid_input({convert_command.valid}),
         .ready_input({convert_command.ready}),
@@ -51,24 +58,30 @@ module basilisk_convert
         .valid_output({next_convert_result.valid}),
         .ready_output({next_convert_result.ready}),
 
-        .consume, .produce, .enable
+        .consume,
+        .produce,
+        .enable
     );
 
     std_flow_stage #(
         .T(basilisk_result_t),
         .MODE(OUTPUT_REGISTER_MODE)
     ) output_stage_inst (
-        .clk, .rst,
-        .stream_in(next_convert_result), .stream_out(convert_result)
+        .clk,
+        .rst,
+        .stream_in (next_convert_result),
+        .stream_out(convert_result)
     );
 
     always_comb begin
         automatic basilisk_convert_command_t cmd = basilisk_convert_command_t'(convert_command.payload);
         automatic logic a_lt_b;
-        automatic fpu_result_t result = '{
+        automatic
+        fpu_result_t
+        result = '{
             sign: 'b0,
             nan: 'b0,
-            inf: 'b0,
+            infinity: 'b0,
             zero: 'b0,
             guard: 'b0,
             exponent: 'b0,
@@ -86,29 +99,29 @@ module basilisk_convert
         result.mantissa = cmd.a.mantissa;
 
         case (cmd.op)
-        BASILISK_CONVERT_OP_MIN: begin
-            if (cmd.conditions_a.nan || cmd.conditions_b.nan) begin
-                result.nan = 'b1;
-            end else if (!a_lt_b) begin
-                result.sign = cmd.b.sign;
-                result.exponent = cmd.b.exponent;
-                result.mantissa = cmd.b.mantissa;
+            BASILISK_CONVERT_OP_MIN: begin
+                if (cmd.conditions_a.nan || cmd.conditions_b.nan) begin
+                    result.nan = 'b1;
+                end else if (!a_lt_b) begin
+                    result.sign = cmd.b.sign;
+                    result.exponent = cmd.b.exponent;
+                    result.mantissa = cmd.b.mantissa;
+                end
             end
-        end
-        BASILISK_CONVERT_OP_MAX: begin 
-            if (cmd.conditions_a.nan || cmd.conditions_b.nan) begin
-                result.nan = 'b1;
-            end else if (a_lt_b) begin
-                result.sign = cmd.b.sign;
-                result.exponent = cmd.b.exponent;
-                result.mantissa = cmd.b.mantissa;
+            BASILISK_CONVERT_OP_MAX: begin
+                if (cmd.conditions_a.nan || cmd.conditions_b.nan) begin
+                    result.nan = 'b1;
+                end else if (a_lt_b) begin
+                    result.sign = cmd.b.sign;
+                    result.exponent = cmd.b.exponent;
+                    result.mantissa = cmd.b.mantissa;
+                end
             end
-        end
-        BASILISK_CONVERT_OP_RAW: begin 
-        end
-        BASILISK_CONVERT_OP_CNV: begin
-            result = fpu_int2float({cmd.a.sign, cmd.a.exponent, cmd.a.mantissa}, cmd.signed_integer);
-        end
+            BASILISK_CONVERT_OP_RAW: begin
+            end
+            BASILISK_CONVERT_OP_CNV: begin
+                result = fpu_int2float({cmd.a.sign, cmd.a.exponent, cmd.a.mantissa}, cmd.signed_integer);
+            end
         endcase
 
         next_convert_result.payload.dest_reg_addr = cmd.dest_reg_addr;

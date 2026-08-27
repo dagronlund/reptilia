@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 
 `ifdef __LINTER__
 
@@ -31,35 +31,52 @@ module basilisk_sqrt
     import basilisk::*;
 #(
     parameter int OUTPUT_REGISTER_MODE = 1
-)(
-    input logic clk, rst,
+) (
+    input logic clk,
+    rst,
 
-    std_stream_intf.in sqrt_command, // basilisk_sqrt_command_t
-    std_stream_intf.out sqrt_result_command // fpu_result_t
+    std_stream_intf.in sqrt_command,  // basilisk_sqrt_command_t
+    std_stream_intf.out sqrt_result_command  // fpu_result_t
 );
 
-    std_stream_intf #(.T(basilisk_sqrt_operation_t)) sqrt_exponent_command (.clk, .rst);
-    std_stream_intf #(.T(basilisk_sqrt_operation_t)) sqrt_operation_command (.clk, .rst);
+    std_stream_intf #(
+        .T(basilisk_sqrt_operation_t)
+    ) sqrt_exponent_command (
+        .clk,
+        .rst
+    );
+    std_stream_intf #(
+        .T(basilisk_sqrt_operation_t)
+    ) sqrt_operation_command (
+        .clk,
+        .rst
+    );
 
     basilisk_sqrt_exponent #(
         .OUTPUT_REGISTER_MODE(OUTPUT_REGISTER_MODE)
     ) basilisk_sqrt_exponent_inst (
-        .clk, .rst,
-        .sqrt_command, .sqrt_exponent_command
+        .clk,
+        .rst,
+        .sqrt_command,
+        .sqrt_exponent_command
     );
 
     basilisk_sqrt_operation #(
         .OUTPUT_REGISTER_MODE(OUTPUT_REGISTER_MODE)
     ) basilisk_sqrt_operation_inst (
-        .clk, .rst,
-        .sqrt_exponent_command, .sqrt_operation_command
+        .clk,
+        .rst,
+        .sqrt_exponent_command,
+        .sqrt_operation_command
     );
 
     basilisk_sqrt_normalize #(
         .OUTPUT_REGISTER_MODE(OUTPUT_REGISTER_MODE)
     ) basilisk_sqrt_normalize_inst (
-        .clk, .rst,
-        .sqrt_operation_command, .sqrt_result_command
+        .clk,
+        .rst,
+        .sqrt_operation_command,
+        .sqrt_result_command
     );
 
 endmodule

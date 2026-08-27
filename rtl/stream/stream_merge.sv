@@ -24,7 +24,7 @@ STREAM_SELECT_MODE_ORDERED:
     usually the complementary stream_split stage. The output id will just be the 
     input id of the accepted stream, or a modulo PORTS incrementing value.
 */
-module stream_merge 
+module stream_merge
     import std_pkg::*;
     import stream_pkg::*;
 #(
@@ -34,17 +34,17 @@ module stream_merge
     parameter int PORTS = 2,
     parameter int ID_WIDTH = (PORTS > 1) ? $clog2(PORTS) : 1,
     parameter bit USE_LAST = 0
-)(
-    input wire clk, 
+) (
+    input wire clk,
     input wire rst,
 
-    stream_intf.in            stream_in [PORTS],
-    input wire [ID_WIDTH-1:0] stream_in_id [PORTS],
-    input wire                stream_in_last [PORTS],
+          stream_intf.in                stream_in     [PORTS],
+    input wire           [ID_WIDTH-1:0] stream_in_id  [PORTS],
+    input wire                          stream_in_last[PORTS],
 
-    stream_intf.out             stream_out,
-    output logic [ID_WIDTH-1:0] stream_out_id,
-    output logic                stream_out_last
+           stream_intf.out                stream_out,
+    output logic           [ID_WIDTH-1:0] stream_out_id,
+    output logic                          stream_out_last
 );
 
     typedef bit [$bits(stream_out.T_LOGIC)-1:0] payload_width_temp_t;
@@ -60,10 +60,7 @@ module stream_merge
         logic last;
     } payload_id_last_t;
 
-    function automatic index_t get_next_priority(
-            input index_t current_priority,
-            input index_t incr
-    );
+    function automatic index_t get_next_priority(input index_t current_priority, input index_t incr);
         index_t incr_priority = current_priority;
         for (index_t i = 0; i < incr; i++) begin
             incr_priority += 'b1;
@@ -75,35 +72,46 @@ module stream_merge
     endfunction
 
     logic [PORTS-1:0] stream_in_valid, stream_in_ready;
-    payload_t         stream_in_payload [PORTS];
+    payload_t stream_in_payload[PORTS];
 
     // Copy interfaces into arrays
     generate
-    genvar k;
-    for (k = 0; k < PORTS; k++) begin
+        genvar k;
+        for (k = 0; k < PORTS; k++) begin
 
-        `PROCEDURAL_ASSERT(PAYLOAD_WIDTH == $bits(stream_in[k].payload))
+            `PROCEDURAL_ASSERT(PAYLOAD_WIDTH == $bits(stream_in[k].payload))
 
-        always_comb begin
-            stream_in_valid[k] = stream_in[k].valid;
-            stream_in_payload[k] = stream_in[k].payload;
-            stream_in[k].ready = stream_in_ready[k];
+            always_comb begin
+                stream_in_valid[k]   = stream_in[k].valid;
+                stream_in_payload[k] = stream_in[k].payload;
+                stream_in[k].ready   = stream_in_ready[k];
+            end
         end
-    end
     endgenerate
 
     logic enable;
     logic [PORTS-1:0] consume;
     logic produce;
 
-    stream_intf #(.T(payload_id_last_t)) stream_out_next (.clk, .rst);
-    stream_intf #(.T(payload_id_last_t)) stream_out_complete (.clk, .rst);
+    stream_intf #(
+        .T(payload_id_last_t)
+    ) stream_out_next (
+        .clk,
+        .rst
+    );
+    stream_intf #(
+        .T(payload_id_last_t)
+    ) stream_out_complete (
+        .clk,
+        .rst
+    );
 
     stream_controller #(
-        .NUM_INPUTS(PORTS),
+        .NUM_INPUTS (PORTS),
         .NUM_OUTPUTS(1)
     ) stream_controller_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
 
         .valid_input(stream_in_valid),
         .ready_input(stream_in_ready),
@@ -111,11 +119,13 @@ module stream_merge
         .valid_output({stream_out_next.valid}),
         .ready_output({stream_out_next.ready}),
 
-        .consume, .produce, .enable
+        .consume,
+        .produce,
+        .enable
     );
 
     payload_t stream_out_payload_next;
-    index_t stream_out_id_next;
+    index_t   stream_out_id_next;
     index_t current_priority, next_priority;
 
     stream_stage #(
@@ -123,9 +133,10 @@ module stream_merge
         .PIPELINE_MODE(PIPELINE_MODE),
         .T(payload_id_last_t)
     ) stream_stage_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
 
-        .stream_in(stream_out_next),
+        .stream_in (stream_out_next),
         .stream_out(stream_out_complete)
     );
 
@@ -136,10 +147,11 @@ module stream_merge
         .T(index_t),
         .RESET_VECTOR('b0)
     ) valid_register_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .enable(enable_priority),
-        .next(next_priority),
-        .value(current_priority)
+        .next  (next_priority),
+        .value (current_priority)
     );
 
     logic next_last_flag, last_flag;
@@ -149,10 +161,11 @@ module stream_merge
         .T(logic),
         .RESET_VECTOR('b1)
     ) last_flag_register_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .enable(enable_priority),
-        .next(next_last_flag),
-        .value(last_flag)
+        .next  (next_last_flag),
+        .value (last_flag)
     );
 
     always_comb begin
@@ -166,11 +179,7 @@ module stream_merge
         next_priority = current_priority;
 
         // Set default master payloads, better than just zeros
-        stream_out_next_payload = '{
-            payload: stream_in_payload[0],
-            last: stream_in_last[0],
-            id: 'b0            
-        };
+        stream_out_next_payload = '{payload: stream_in_payload[0], last: stream_in_last[0], id: 'b0};
         next_last_flag = stream_in_last[0];
 
         if (STREAM_SELECT_MODE == STREAM_SELECT_MODE_ROUND_ROBIN) begin
@@ -180,8 +189,8 @@ module stream_merge
                 produce = 'b1;
                 enable_priority = enable;
                 // Only use next stream if that was the last beat
-                next_priority = stream_in_last[current_priority] ? 
-                    get_next_priority(current_priority, 'b1) : current_priority;
+                next_priority = stream_in_last[current_priority] ? get_next_priority(current_priority, 'b1) :
+                    current_priority;
 
                 stream_out_next_payload = '{
                     payload: stream_in_payload[current_priority],
@@ -194,15 +203,15 @@ module stream_merge
                 // Go through input streams starting at current priority
                 for (i = 'b0; i < PORTS; i++) begin
                     stream_in_index = get_next_priority(current_priority, index_t'(i));
-                    
+
                     // Stream is valid and we haven't produced anything yet
                     if (stream_in_valid[stream_in_index] && !produce) begin
                         consume[stream_in_index] = 'b1;
                         produce = 'b1;
                         enable_priority = enable;
                         // Only use next stream if that was the last beat
-                        next_priority = (USE_LAST && !stream_in_last[stream_in_index]) ? 
-                                stream_in_index : get_next_priority(stream_in_index, 'b1);
+                        next_priority = (USE_LAST && !stream_in_last[stream_in_index]) ? stream_in_index :
+                get_next_priority(stream_in_index, 'b1);
 
                         stream_out_next_payload = '{
                             payload: stream_in_payload[stream_in_index],
@@ -214,11 +223,11 @@ module stream_merge
                     end
                 end
             end
-        end else begin // STREAM_SELECT_MODE_ORDERED
+        end else begin  // STREAM_SELECT_MODE_ORDERED
 
             // Go through input streams looking for matching id
             for (i = 'b0; i < PORTS; i++) begin
-                
+
                 // ID matches and we haven't produced anything yet
                 if ((stream_in_id[i] == current_priority) && !produce) begin
                     consume[i] = 'b1;

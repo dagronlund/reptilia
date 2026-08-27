@@ -22,21 +22,21 @@ module gecko_decode_speculative
     import riscv32_pkg::*;
     import gecko_pkg::*;
 #(
-    parameter std_clock_info_t CLOCK_INFO = 'b0,
-    parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
+    parameter std_clock_info_t CLOCK_INFO    = 'b0,
+    parameter std_technology_t TECHNOLOGY    = STD_TECHNOLOGY_FPGA_XILINX,
     parameter int              COUNTER_WIDTH = 2
-)(
-    input wire clk, 
+) (
+    input wire clk,
     input wire rst,
 
     // From decode
-    input  wire  instruction_enable,
-    input  wire  instruction_branch_jump,
-    input  wire  instruction_updated,
+    input wire instruction_enable,
+    input wire instruction_branch_jump,
+    input wire instruction_updated,
 
     // From execute
-    input  wire  speculation_resolved,
-    input  wire  speculation_mispredicted,
+    input wire speculation_resolved,
+    input wire speculation_mispredicted,
 
     output logic mispredicted,
     output logic speculating,
@@ -61,10 +61,11 @@ module gecko_decode_speculative
         .T(gecko_jump_flag_t),
         .RESET_VECTOR('b0)
     ) front_flag_register_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .enable(instruction_enable),
-        .next(front_flag_next),
-        .value(front_flag)
+        .next  (front_flag_next),
+        .value (front_flag)
     );
 
     std_register #(
@@ -72,10 +73,11 @@ module gecko_decode_speculative
         .T(gecko_jump_flag_t),
         .RESET_VECTOR('b0)
     ) rear_flag_register_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .enable('b1),
-        .next(rear_flag_next),
-        .value(rear_flag)
+        .next  (rear_flag_next),
+        .value (rear_flag)
     );
 
     std_register #(
@@ -83,10 +85,11 @@ module gecko_decode_speculative
         .T(logic),
         .RESET_VECTOR('b0)
     ) mispredicted_register_inst (
-        .clk, .rst,
+        .clk,
+        .rst,
         .enable('b1),
-        .next(mispredicted_next),
-        .value(mispredicted)
+        .next  (mispredicted_next),
+        .value (mispredicted)
     );
 
     always_comb begin
