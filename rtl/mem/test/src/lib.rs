@@ -13,12 +13,8 @@ use rustdv_vpi_stubs as _;
 
 rustdv::vpi_bootstrap!();
 
-fn fail(message: impl Into<String>) -> TestError {
-    TestError::new(message.into())
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct MemTxn {
+struct MemTransaction {
     read: bool,
     write: u8,
     addr: u16,
@@ -28,7 +24,7 @@ struct MemTxn {
 }
 
 #[derive(Clone, Copy)]
-struct MemPort {
+struct MemInputPort {
     valid: LogicHandle,
     ready: LogicHandle,
     read: LogicHandle,
@@ -37,36 +33,27 @@ struct MemPort {
     data: LogicHandle,
     id: LogicHandle,
     last: LogicHandle,
-    out_valid: LogicHandle,
-    out_ready: LogicHandle,
-    out_data: LogicHandle,
-    out_id: LogicHandle,
-    out_last: LogicHandle,
 }
 
-impl MemPort {
-    fn new(dut: &HierarchyHandle, input: &str, output: &str) -> Result<Self, HandleError> {
+impl MemInputPort {
+    fn new(dut: &HierarchyHandle, name: &str) -> Result<Self, HandleError> {
         Ok(Self {
-            valid: dut.signal(&format!("{input}_valid"))?,
-            ready: dut.signal(&format!("{input}_ready"))?,
-            read: dut.signal(&format!("{input}_read"))?,
-            write: dut.signal(&format!("{input}_write"))?,
-            addr: dut.signal(&format!("{input}_addr"))?,
-            data: dut.signal(&format!("{input}_data"))?,
-            id: dut.signal(&format!("{input}_id"))?,
-            last: dut.signal(&format!("{input}_last"))?,
-            out_valid: dut.signal(&format!("{output}_valid"))?,
-            out_ready: dut.signal(&format!("{output}_ready"))?,
-            out_data: dut.signal(&format!("{output}_data"))?,
-            out_id: dut.signal(&format!("{output}_id"))?,
-            out_last: dut.signal(&format!("{output}_last"))?,
+            valid: dut.signal(&format!("{name}.valid"))?,
+            ready: dut.signal(&format!("{name}.ready"))?,
+            read: dut.signal(&format!("{name}.read_enable"))?,
+            write: dut.signal(&format!("{name}.write_enable"))?,
+            addr: dut.signal(&format!("{name}.addr"))?,
+            data: dut.signal(&format!("{name}.data"))?,
+            id: dut.signal(&format!("{name}.id"))?,
+            last: dut.signal(&format!("{name}.last"))?,
         })
     }
+
     fn idle(&self) {
         self.valid.set_u64(0);
-        self.out_ready.set_u64(0);
     }
-    fn drive(&self, t: MemTxn) {
+
+    fn drive(&self, t: MemTransaction) {
         self.read.set_u64(t.read as u64);
         self.write.set_u64(t.write as u64);
         self.addr.set_u64(t.addr as u64);
@@ -76,11 +63,44 @@ impl MemPort {
     }
 }
 
-async fn start(dut: &HierarchyHandle, ports: &[MemPort]) -> Result<LogicHandle, TestError> {
-    let clk = dut.signal("clk").map_err(|e| fail(e.to_string()))?;
-    let rst = dut.signal("rst").map_err(|e| fail(e.to_string()))?;
-    for p in ports {
-        p.idle();
+#[derive(Clone, Copy)]
+struct MemOutputPort {
+    valid: LogicHandle,
+    ready: LogicHandle,
+    data: LogicHandle,
+    id: LogicHandle,
+    last: LogicHandle,
+}
+
+impl MemOutputPort {
+    fn new(dut: &HierarchyHandle, name: &str) -> Result<Self, HandleError> {
+        Ok(Self {
+            valid: dut.signal(&format!("{name}.valid"))?,
+            ready: dut.signal(&format!("{name}.ready"))?,
+            data: dut.signal(&format!("{name}.data"))?,
+            id: dut.signal(&format!("{name}.id"))?,
+            last: dut.signal(&format!("{name}.last"))?,
+        })
+    }
+
+    fn idle(&self) {
+        self.ready.set_u64(0);
+    }
+}
+
+async fn start(
+    dut: &HierarchyHandle,
+    ports: &[(MemInputPort, MemOutputPort)],
+) -> Result<LogicHandle, TestError> {
+    let clk = dut
+        .signal("clk")
+        .map_err(|e| TestError::new(e.to_string()))?;
+    let rst = dut
+        .signal("rst")
+        .map_err(|e| TestError::new(e.to_string()))?;
+    for (input, output) in ports {
+        input.idle();
+        output.idle();
     }
     rst.set_u64(1);
     let _clock = Clock::new(&clk, SimDuration::ns(10)).start();
@@ -94,30 +114,34 @@ async fn start(dut: &HierarchyHandle, ports: &[MemPort]) -> Result<LogicHandle, 
 
 async fn transact(
     clk: &LogicHandle,
-    p: &MemPort,
-    t: MemTxn,
+    input: &MemInputPort,
+    output: &MemOutputPort,
+    t: MemTransaction,
     expected: Option<(u32, u8, bool)>,
     rng: &mut Rng,
 ) -> Result<(), TestError> {
     let mut accepted = false;
     for _ in 0..1000 {
         clk.falling_edge().await;
-        p.drive(t);
-        p.valid.set_u64((!accepted) as u64);
-        p.out_ready.set_u64(rng.bool() as u64);
+        input.drive(t);
+        input.valid.set_u64((!accepted) as u64);
+        output.ready.set_u64(rng.bool() as u64);
         Timer::ns(4).await;
-        if !accepted && p.ready.is_high() {
+        if !accepted && input.ready.is_high() {
             accepted = true;
         }
-        if p.out_valid.is_high() && p.out_ready.is_high() {
+        if output.valid.is_high() && output.ready.is_high() {
             let Some((data, id, last)) = expected else {
-                return Err(fail("unexpected memory response"));
+                return Err(TestError::new("unexpected memory response"));
             };
-            if p.out_data.get_u64() != Ok(data as u64)
-                || p.out_id.get_u64() != Ok(id as u64)
-                || p.out_last.is_high() != last
+            if output.data.get_u64() != Ok(data as u64)
+                || output.id.get_u64() != Ok(id as u64)
+                || output.last.is_high() != last
             {
-                return Err(fail(format!("memory response mismatch at {}", t.addr)));
+                return Err(TestError::new(format!(
+                    "memory response mismatch at {}",
+                    t.addr
+                )));
             }
             clk.rising_edge().await;
             return Ok(());
@@ -127,5 +151,8 @@ async fn transact(
             return Ok(());
         }
     }
-    Err(fail(format!("memory transaction timed out at {}", t.addr)))
+    Err(TestError::new(format!(
+        "memory transaction timed out at {}",
+        t.addr
+    )))
 }

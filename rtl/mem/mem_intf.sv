@@ -3,6 +3,9 @@
 `include "std/std_util.svh"
 `include "mem/mem_util.svh"
 
+`ifdef __RUSTDV__
+    /* verilator public_flat_rw_on */
+`endif
 interface mem_intf #(
     parameter int DATA_WIDTH = 32,
     parameter int ADDR_WIDTH = 10,
@@ -91,3 +94,6 @@ interface mem_intf #(
 `endif
 
 endinterface
+`ifdef __RUSTDV__
+    /* verilator public_off */
+`endif

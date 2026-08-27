@@ -2,6 +2,9 @@
 
 `timescale 1ns/1ps
 
+`ifdef __RUSTDV__
+    /* verilator public_flat_rw_on */
+`endif
 interface axi4_ar_intf
     import axi4_pkg::*;
 #(
@@ -100,7 +103,13 @@ interface axi4_ar_intf
     endtask
 
 endinterface
+`ifdef __RUSTDV__
+    /* verilator public_off */
+`endif
 
+`ifdef __RUSTDV__
+    /* verilator public_flat_rw_on */
+`endif
 interface axi4_aw_intf 
     import axi4_pkg::*;
 #(
@@ -199,7 +208,13 @@ interface axi4_aw_intf
     endtask
 
 endinterface
+`ifdef __RUSTDV__
+    /* verilator public_off */
+`endif
 
+`ifdef __RUSTDV__
+    /* verilator public_flat_rw_on */
+`endif
 interface axi4_b_intf 
     import axi4_pkg::*;
 #(
@@ -256,7 +271,13 @@ interface axi4_b_intf
     endtask
 
 endinterface
+`ifdef __RUSTDV__
+    /* verilator public_off */
+`endif
 
+`ifdef __RUSTDV__
+    /* verilator public_flat_rw_on */
+`endif
 interface axi4_r_intf 
     import axi4_pkg::*;
 #(
@@ -324,7 +345,13 @@ interface axi4_r_intf
     endtask
 
 endinterface
+`ifdef __RUSTDV__
+    /* verilator public_off */
+`endif
 
+`ifdef __RUSTDV__
+    /* verilator public_flat_rw_on */
+`endif
 interface axi4_w_intf 
     import axi4_pkg::*;
 #(
@@ -387,3 +414,6 @@ interface axi4_w_intf
     endtask
 
 endinterface
+`ifdef __RUSTDV__
+    /* verilator public_off */
+`endif

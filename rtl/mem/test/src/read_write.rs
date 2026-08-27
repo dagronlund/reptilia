@@ -1,16 +1,27 @@
 use rustdv::prelude::*;
 
-use crate::{MemPort, MemTxn, fail, start, transact};
+use crate::{MemInputPort, MemOutputPort, MemTransaction, start, transact};
 
 #[rustdv::test(timeout_time = 5, timeout_unit = "ms")]
 async fn mem_sequential_read_write(ctx: RustdvCtx) -> Result<(), TestError> {
     let dut = ctx.dut();
     // Separate write/read channels: fill, then update one bank while reading another.
-    let wv = dut.signal("rw_w_valid").map_err(|e| fail(e.to_string()))?;
-    let wr = dut.signal("rw_w_ready").map_err(|e| fail(e.to_string()))?;
-    let wa = dut.signal("rw_w_addr").map_err(|e| fail(e.to_string()))?;
-    let wd = dut.signal("rw_w_data").map_err(|e| fail(e.to_string()))?;
-    let rp = MemPort::new(&dut, "rw_r", "rw_o").map_err(|e| fail(e.to_string()))?;
+    let wv = dut
+        .signal("mem_write_in.valid")
+        .map_err(|e| TestError::new(e.to_string()))?;
+    let wr = dut
+        .signal("mem_write_in.ready")
+        .map_err(|e| TestError::new(e.to_string()))?;
+    let wa = dut
+        .signal("mem_write_in.addr")
+        .map_err(|e| TestError::new(e.to_string()))?;
+    let wd = dut
+        .signal("mem_write_in.data")
+        .map_err(|e| TestError::new(e.to_string()))?;
+    let rp = (
+        MemInputPort::new(&dut, "mem_read_in").map_err(|e| TestError::new(e.to_string()))?,
+        MemOutputPort::new(&dut, "mem_read_out").map_err(|e| TestError::new(e.to_string()))?,
+    );
     wv.set_u64(0);
     let clk = start(&dut, &[rp]).await?;
     let mut rng = ctx.rng();
@@ -22,7 +33,7 @@ async fn mem_sequential_read_write(ctx: RustdvCtx) -> Result<(), TestError> {
         clk.rising_edge().await;
         read_only().await;
         if !wr.is_high() {
-            return Err(fail("write port not ready"));
+            return Err(TestError::new("write port not ready"));
         }
     }
     clk.falling_edge().await;
@@ -37,8 +48,9 @@ async fn mem_sequential_read_write(ctx: RustdvCtx) -> Result<(), TestError> {
         read_only().await;
         transact(
             &clk,
-            &rp,
-            MemTxn {
+            &rp.0,
+            &rp.1,
+            MemTransaction {
                 read: true,
                 write: 0,
                 addr: i,

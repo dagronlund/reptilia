@@ -1,18 +1,22 @@
 use rustdv::prelude::*;
 
-use crate::{MemPort, MemTxn, fail, start, transact};
+use crate::{MemInputPort, MemOutputPort, MemTransaction, start, transact};
 
 #[rustdv::test(timeout_time = 30, timeout_unit = "ms")]
 async fn mem_sequential_single(ctx: RustdvCtx) -> Result<(), TestError> {
     let dut = ctx.dut();
-    let p = MemPort::new(&dut, "s", "so").map_err(|e| fail(e.to_string()))?;
+    let p = (
+        MemInputPort::new(&dut, "mem_in").map_err(|e| TestError::new(e.to_string()))?,
+        MemOutputPort::new(&dut, "mem_out").map_err(|e| TestError::new(e.to_string()))?,
+    );
     let clk = start(&dut, &[p]).await?;
     let mut rng = ctx.rng();
     for i in 0..1024u16 {
         transact(
             &clk,
-            &p,
-            MemTxn {
+            &p.0,
+            &p.1,
+            MemTransaction {
                 read: false,
                 write: 15,
                 addr: i,
@@ -28,8 +32,9 @@ async fn mem_sequential_single(ctx: RustdvCtx) -> Result<(), TestError> {
     for i in 0..1024u16 {
         transact(
             &clk,
-            &p,
-            MemTxn {
+            &p.0,
+            &p.1,
+            MemTransaction {
                 read: true,
                 write: 0,
                 addr: i,
@@ -45,8 +50,9 @@ async fn mem_sequential_single(ctx: RustdvCtx) -> Result<(), TestError> {
     for i in 0..1024u16 {
         transact(
             &clk,
-            &p,
-            MemTxn {
+            &p.0,
+            &p.1,
+            MemTransaction {
                 read: true,
                 write: 15,
                 addr: i,
@@ -62,8 +68,9 @@ async fn mem_sequential_single(ctx: RustdvCtx) -> Result<(), TestError> {
     for i in 0..1024u16 {
         transact(
             &clk,
-            &p,
-            MemTxn {
+            &p.0,
+            &p.1,
+            MemTransaction {
                 read: true,
                 write: 0,
                 addr: i,

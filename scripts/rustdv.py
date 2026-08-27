@@ -125,11 +125,6 @@ def _build_model(
     obj = build / "obj_dir"
     build.mkdir(parents=True, exist_ok=True)
 
-    control = build / "top-ports.vlt"
-    control.write_text(
-        "`verilator_config\n" f'public_flat_rw -module "{target.top}" -port "*"\n',
-        encoding="utf-8",
-    )
     verilator_args = [
         "-sv",
         "--timing",
@@ -142,6 +137,7 @@ def _build_model(
         target.top,
         "-Irtl/",
         "+define+__SYNTH_ONLY__=1",
+        "+define+__RUSTDV__=1",
     ]
     verilator_args.extend(f"-G{name}={value}" for name, value in target.parameters)
     compile_flags: tuple[str, ...] = ()
@@ -174,7 +170,7 @@ def _build_model(
         link_flags=link_flags,
     )
     model.verilate(
-        [str(control), *_ordered_sources(target, source_files)],
+        _ordered_sources(target, source_files),
         verilator_args,
     )
     model.build()

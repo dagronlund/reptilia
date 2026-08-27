@@ -1,8 +1,11 @@
 use std::collections::VecDeque;
 
-use crate::MemTxn;
+use crate::MemTransaction;
 
-fn check_next(expected: &mut VecDeque<MemTxn>, actual: MemTxn) -> Result<(), &'static str> {
+fn check_next(
+    expected: &mut VecDeque<MemTransaction>,
+    actual: MemTransaction,
+) -> Result<(), &'static str> {
     match expected.pop_front() {
         Some(next) if next == actual => Ok(()),
         Some(_) => Err("memory scoreboard mismatch"),
@@ -24,7 +27,7 @@ fn stimulus(seed: u64, count: usize) -> Vec<u64> {
 
 #[test]
 fn scoreboard_rejects_payload_id_last_and_order_mutations() {
-    let a = MemTxn {
+    let a = MemTransaction {
         read: true,
         write: 0,
         addr: 1,
@@ -32,11 +35,11 @@ fn scoreboard_rejects_payload_id_last_and_order_mutations() {
         id: 3,
         last: false,
     };
-    let b = MemTxn { addr: 2, ..a };
+    let b = MemTransaction { addr: 2, ..a };
     for mutated in [
-        MemTxn { data: 9, ..a },
-        MemTxn { id: 4, ..a },
-        MemTxn { last: true, ..a },
+        MemTransaction { data: 9, ..a },
+        MemTransaction { id: 4, ..a },
+        MemTransaction { last: true, ..a },
         b,
     ] {
         let mut expected = VecDeque::from([a, b]);

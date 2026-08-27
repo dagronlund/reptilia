@@ -1,5 +1,8 @@
 //!no_lint
 
+`ifdef __RUSTDV__
+    /* verilator public_flat_rw_on */
+`endif
 interface stream_intf #(
     parameter type T = logic,
     parameter logic [$bits(T)-1:0] T_LOGIC = 'b0
@@ -60,3 +63,6 @@ interface stream_intf #(
 `endif
 
 endinterface
+`ifdef __RUSTDV__
+    /* verilator public_off */
+`endif

@@ -8,6 +8,17 @@ cargo check
 cargo clippy
 ```
 
+Run after rust changes:
+```sh
+cargo fmt
+cargo test
+```
+
+Run after systemverilog changes:
+```sh
+uv run ./main.py --rustdv-tests --dhrystone
+```
+
 # Rust Code Style
 
 - Avoid using .iter(), always use .into_iter() (with borrowing if necessary) instead

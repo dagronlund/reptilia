@@ -22,9 +22,9 @@ for name, value in STAGE_MODES:
         family="stream",
         crate="stream_tb",
         testcase="stream_stage",
-        top="stream_stage_tb_wrapper",
+        top="stream_stage_tb",
         files=("rtl/stream/stream_stage.sv",),
-        wrapper="rtl/stream/test/rtl/stream_stage_tb_wrapper.sv",
+        wrapper="rtl/stream/test/rtl/stream_stage_tb.sv",
         parameters=(("PIPELINE_MODE", value),),
     )
 
@@ -34,9 +34,9 @@ for name, value in FIFO_MODES:
         family="stream",
         crate="stream_tb",
         testcase="stream_fifo",
-        top="stream_fifo_tb_wrapper",
+        top="stream_fifo_tb",
         files=("rtl/stream/stream_fifo.sv",),
-        wrapper="rtl/stream/test/rtl/stream_fifo_tb_wrapper.sv",
+        wrapper="rtl/stream/test/rtl/stream_fifo_tb.sv",
         parameters=(("FIFO_MODE", value),),
     )
 
@@ -45,9 +45,9 @@ RustdvTest(
     family="stream",
     crate="stream_tb",
     testcase="stream_split_merge",
-    top="stream_split_merge_tb_wrapper",
+    top="stream_split_merge_tb",
     files=("rtl/stream/stream_merge.sv", "rtl/stream/stream_split.sv"),
-    wrapper="rtl/stream/test/rtl/stream_split_merge_tb_wrapper.sv",
+    wrapper="rtl/stream/test/rtl/stream_split_merge_tb.sv",
 )
 
 RustdvTest(
@@ -55,7 +55,7 @@ RustdvTest(
     family="stream",
     crate="stream_tb",
     testcase="stream_ordered_merge",
-    top="stream_merge_tb_wrapper",
+    top="stream_merge_tb",
     files=("rtl/stream/stream_merge.sv",),
-    wrapper="rtl/stream/test/rtl/stream_merge_tb_wrapper.sv",
+    wrapper="rtl/stream/test/rtl/stream_merge_tb.sv",
 )

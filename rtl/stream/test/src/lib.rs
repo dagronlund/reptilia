@@ -1,5 +1,3 @@
-#![allow(clippy::into_iter_on_ref)]
-
 mod fifo;
 mod merge;
 mod split_merge;
@@ -15,44 +13,62 @@ use rustdv_vpi_stubs as _;
 
 rustdv::vpi_bootstrap!();
 
-fn fail(message: impl Into<String>) -> TestError {
-    TestError::new(message.into())
-}
-
 #[derive(Clone, Copy)]
-struct StreamPort {
-    input_valid: LogicHandle,
-    input_ready: LogicHandle,
-    input_payload: LogicHandle,
-    output_valid: LogicHandle,
-    output_ready: LogicHandle,
-    output_payload: LogicHandle,
+struct StreamInputPort {
+    valid: LogicHandle,
+    ready: LogicHandle,
+    payload: LogicHandle,
 }
 
-impl StreamPort {
-    fn new(dut: &HierarchyHandle, input: &str, output: &str) -> Result<Self, HandleError> {
+impl StreamInputPort {
+    fn new(dut: &HierarchyHandle, name: &str) -> Result<Self, HandleError> {
         Ok(Self {
-            input_valid: dut.signal(&format!("{input}_valid"))?,
-            input_ready: dut.signal(&format!("{input}_ready"))?,
-            input_payload: dut.signal(&format!("{input}_payload"))?,
-            output_valid: dut.signal(&format!("{output}_valid"))?,
-            output_ready: dut.signal(&format!("{output}_ready"))?,
-            output_payload: dut.signal(&format!("{output}_payload"))?,
+            valid: dut.signal(&format!("{name}.valid"))?,
+            ready: dut.signal(&format!("{name}.ready"))?,
+            payload: dut.signal(&format!("{name}.payload"))?,
         })
     }
 
     fn idle(&self) {
-        self.input_valid.set_u64(0);
-        self.input_payload.set_u64(0);
-        self.output_ready.set_u64(0);
+        self.valid.set_u64(0);
+        self.payload.set_u64(0);
     }
 }
 
-async fn reset(dut: &HierarchyHandle, ports: &[StreamPort]) -> Result<LogicHandle, TestError> {
-    let clk = dut.signal("clk").map_err(|e| fail(e.to_string()))?;
-    let rst = dut.signal("rst").map_err(|e| fail(e.to_string()))?;
-    for port in ports {
-        port.idle();
+#[derive(Clone, Copy)]
+struct StreamOutputPort {
+    valid: LogicHandle,
+    ready: LogicHandle,
+    payload: LogicHandle,
+}
+
+impl StreamOutputPort {
+    fn new(dut: &HierarchyHandle, name: &str) -> Result<Self, HandleError> {
+        Ok(Self {
+            valid: dut.signal(&format!("{name}.valid"))?,
+            ready: dut.signal(&format!("{name}.ready"))?,
+            payload: dut.signal(&format!("{name}.payload"))?,
+        })
+    }
+
+    fn idle(&self) {
+        self.ready.set_u64(0);
+    }
+}
+
+async fn reset(
+    dut: &HierarchyHandle,
+    ports: &[(StreamInputPort, StreamOutputPort)],
+) -> Result<LogicHandle, TestError> {
+    let clk = dut
+        .signal("clk")
+        .map_err(|e| TestError::new(e.to_string()))?;
+    let rst = dut
+        .signal("rst")
+        .map_err(|e| TestError::new(e.to_string()))?;
+    for (input, output) in ports {
+        input.idle();
+        output.idle();
     }
     rst.set_u64(1);
     let _clock = Clock::new(&clk, SimDuration::ns(10)).start();
@@ -66,7 +82,7 @@ async fn reset(dut: &HierarchyHandle, ports: &[StreamPort]) -> Result<LogicHandl
 
 async fn ordered_flow(
     ctx: &RustdvCtx,
-    ports: &[StreamPort],
+    ports: &[(StreamInputPort, StreamOutputPort)],
     count: usize,
 ) -> Result<(), TestError> {
     let clk = reset(&ctx.dut(), ports).await?;
@@ -75,7 +91,7 @@ async fn ordered_flow(
 
 async fn ordered_flow_on_clock(
     ctx: &RustdvCtx,
-    ports: &[StreamPort],
+    ports: &[(StreamInputPort, StreamOutputPort)],
     count: usize,
     clk: &LogicHandle,
     random_ready: bool,
@@ -88,44 +104,46 @@ async fn ordered_flow_on_clock(
 
     for _cycle in 0..100_000 {
         clk.falling_edge().await;
-        for (i, port) in ports.into_iter().enumerate() {
+        for (i, (input, output)) in ports.into_iter().enumerate() {
             if !driving[i] && sent[i] < count && rng.bool() {
                 driving[i] = true;
             }
-            port.input_valid.set_u64(driving[i] as u64);
+            input.valid.set_u64(driving[i] as u64);
             if driving[i] {
-                port.input_payload.set_u64(sent[i] as u64);
+                input.payload.set_u64(sent[i] as u64);
             }
-            port.output_ready
-                .set_u64((!random_ready || rng.bool()) as u64);
+            output.ready.set_u64((!random_ready || rng.bool()) as u64);
         }
         Timer::ns(4).await;
-        for (i, port) in ports.into_iter().enumerate() {
-            if driving[i] && port.input_ready.is_high() {
+        for (i, (input, output)) in ports.into_iter().enumerate() {
+            if driving[i] && input.ready.is_high() {
                 sent[i] += 1;
                 driving[i] = false;
             }
             if stalled[i].is_some_and(|value| {
-                !port.output_valid.is_high() || port.output_payload.get_u64() != Ok(value)
+                !output.valid.is_high() || output.payload.get_u64() != Ok(value)
             }) {
-                return Err(fail(format!("port {i}: output changed while stalled")));
+                return Err(TestError::new(format!(
+                    "port {i}: output changed while stalled"
+                )));
             }
-            stalled[i] = if port.output_valid.is_high() && !port.output_ready.is_high() {
+            stalled[i] = if output.valid.is_high() && !output.ready.is_high() {
                 Some(
-                    port.output_payload
+                    output
+                        .payload
                         .get_u64()
-                        .map_err(|e| fail(e.to_string()))?,
+                        .map_err(|e| TestError::new(e.to_string()))?,
                 )
             } else {
                 None
             };
-            if port.output_valid.is_high() && port.output_ready.is_high() {
-                let got = port
-                    .output_payload
+            if output.valid.is_high() && output.ready.is_high() {
+                let got = output
+                    .payload
                     .get_u64()
-                    .map_err(|e| fail(e.to_string()))? as usize;
+                    .map_err(|e| TestError::new(e.to_string()))? as usize;
                 if got != received[i] {
-                    return Err(fail(format!(
+                    return Err(TestError::new(format!(
                         "port {i}: expected {}, got {got}",
                         received[i]
                     )));
@@ -138,7 +156,7 @@ async fn ordered_flow_on_clock(
             return Ok(());
         }
     }
-    Err(fail(format!(
+    Err(TestError::new(format!(
         "flow timed out: sent={sent:?} received={received:?}"
     )))
 }
