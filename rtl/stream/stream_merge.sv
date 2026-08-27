@@ -205,8 +205,8 @@ module stream_merge
                                 stream_in_index : get_next_priority(stream_in_index, 'b1);
 
                         stream_out_next_payload = '{
-                            payload: stream_in_payload[current_priority],
-                            last: stream_in_last[current_priority],
+                            payload: stream_in_payload[stream_in_index],
+                            last: stream_in_last[stream_in_index],
                             id: stream_in_index
                         };
 

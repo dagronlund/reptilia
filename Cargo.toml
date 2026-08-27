@@ -1,0 +1,9 @@
+[workspace]
+resolver = "3"
+members = ["rtl/mem/test", "rtl/stream/test"]
+
+[profile.release]
+panic = "unwind"
+
+[profile.dev]
+panic = "unwind"

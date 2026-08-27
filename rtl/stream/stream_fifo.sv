@@ -120,8 +120,8 @@ module stream_fifo
     if (FIFO_ADDRESS_MODE == STREAM_FIFO_ADDRESS_MODE_POINTERS) begin
 
         always_comb begin
-            full = (read_pointer == (write_pointer + 'b1));
-            empty = (read_pointer == write_pointer);
+            full  = read_pointer == (write_pointer + pointer_t'(1));
+            empty = read_pointer == write_pointer;
         end
 
     end else begin

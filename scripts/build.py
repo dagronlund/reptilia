@@ -17,6 +17,8 @@ from .riscv import (
     write_riscv_ninja_rules,
     write_riscv_test_ninja,
 )
+from .rustdv import WaveFormat
+from .rustdv import run_rustdv_tests as run_rustdv_regression
 from .util import error, info
 from .verilator import (
     VerilatorProgram,
@@ -135,6 +137,9 @@ def search_sources(path: str) -> dict[str, SourceFile]:
 def main(
     run_riscv_tests: bool = False,
     run_dhrystone: bool = False,
+    run_rustdv_tests: bool = False,
+    wave: WaveFormat | None = None,
+    wave_dir: Path = Path("build/waves"),
 ) -> None:
     """Main function"""
     rtl_folders: list[str] = [
@@ -255,9 +260,7 @@ def main(
 
     info("Compiling RTL...")
     verilator_compile_ninja_path = build_path / "verilator_compile.ninja"
-    with open(
-        verilator_compile_ninja_path, "w", encoding="utf-8"
-    ) as ninja_file:
+    with open(verilator_compile_ninja_path, "w", encoding="utf-8") as ninja_file:
         write_verilator_compile_ninja_rules(cast(str, ninja_file))
         for v in verilated:
             v.write_ninja_build_verilate_compile(cast(str, ninja_file))
@@ -287,13 +290,19 @@ def main(
         if run_dhrystone:
             test_programs.append(riscv_programs["dhrystone"])
         with open(riscv_test_ninja_path, "w", encoding="utf-8") as ninja_file:
-            write_riscv_test_ninja(
-                cast(str, ninja_file), test_programs, simulator
-            )
+            write_riscv_test_ninja(cast(str, ninja_file), test_programs, simulator)
         subprocess.run(
             ["ninja", "-f", str(riscv_test_ninja_path), "-k", "0"],
             capture_output=False,
             check=True,
+        )
+
+    if run_rustdv_tests:
+        info("Running rustdv memory/stream regressions...")
+        run_rustdv_regression(
+            source_files,
+            wave=wave,
+            wave_dir=wave_dir,
         )
 
 

@@ -12,6 +12,9 @@ dependencies = [
 [tool.uv]
 package = false
 
+[tool.ruff]
+extend-exclude = ["riscv-tests"]
+
 [dependency-groups]
 dev = [
     "types-colorama>=0.4.15.20250801",

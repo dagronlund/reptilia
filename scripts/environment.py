@@ -1,5 +1,7 @@
 """Helpers for discovering tools in the build environment."""
 
+from __future__ import annotations
+
 import shutil
 import subprocess
 from pathlib import Path
@@ -28,9 +30,27 @@ def discover_riscv_objdump() -> Path:
     return find_executable("riscv64-unknown-elf-objdump")
 
 
-def discover_verilator() -> Path:
-    """Discover the Verilator tool"""
-    return find_executable("verilator")
+def discover_verilator(min_version: tuple[int, int] | None = None) -> Path:
+    """Discover Verilator and optionally require a minimum major/minor version."""
+    verilator = find_executable("verilator")
+    if min_version is None:
+        return verilator
+
+    output = subprocess.run(
+        [str(verilator), "--version"], check=True, text=True, capture_output=True
+    ).stdout
+    try:
+        version = output.split()[1]
+        major, minor = (int(part) for part in version.split(".")[:2])
+    except (IndexError, ValueError) as error:
+        raise RuntimeError(
+            f"could not parse the Verilator version from: {output.strip()}"
+        ) from error
+
+    if (major, minor) < min_version:
+        required = f"{min_version[0]}.{min_version[1]:03d}"
+        raise RuntimeError(f"Verilator >= {required} is required; found {version}")
+    return verilator
 
 
 def get_verilator_root(verilator: Path) -> Path:

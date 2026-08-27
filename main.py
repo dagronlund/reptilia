@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 from scripts.build import main
 
@@ -19,8 +20,27 @@ if __name__ == "__main__":
         action="store_true",
         help="run Dhrystone against the Gecko simulator",
     )
+    parser.add_argument(
+        "--rustdv-tests",
+        action="store_true",
+        help="run the rustdv memory and stream regressions",
+    )
+    parser.add_argument(
+        "--wave",
+        choices=("vcd", "fst"),
+        help="export optional rustdv waveforms in the selected format",
+    )
+    parser.add_argument(
+        "--wave-dir",
+        type=Path,
+        default=Path("build/waves"),
+        help="waveform output directory (default: build/waves)",
+    )
     args = parser.parse_args()
     main(
         run_riscv_tests=args.riscv_tests,
         run_dhrystone=args.dhrystone,
+        run_rustdv_tests=args.rustdv_tests,
+        wave=args.wave,
+        wave_dir=args.wave_dir,
     )

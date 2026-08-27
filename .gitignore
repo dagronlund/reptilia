@@ -23,10 +23,12 @@ ucli.key
 obj_dir/
 bin/
 build/
+target/
 misc/
 __pycache__/
 .venv/
 .vscode/
+.cargo/
 
 # Ninja artifacts
 .ninja_log

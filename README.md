@@ -24,6 +24,25 @@ Run the complete RV32UI test suite against the Gecko simulator with
 `uv run ./main.py --riscv-tests`. Add `--dhrystone` to also run the
 Dhrystone benchmark, or use `--dhrystone` by itself.
 
+The memory and stream libraries are verified with Rust testbenches using
+[rustdv](https://github.com/rustdv/rustdv). Run both families with:
+
+```sh
+uv run ./main.py --rustdv-tests
+```
+
+These runs are deterministic through `RUSTDV_RANDOM_SEED`. Optional waveforms
+are available as VCD or FST, with one file per test target and seed:
+
+```sh
+uv run ./main.py --rustdv-tests --wave fst
+uv run ./main.py --rustdv-tests --wave vcd --wave-dir build/my-waves
+```
+
+FST tracing requires `liblz4`; untraced and VCD runs do not.
+Each RTL family owns its Rust crate, flattened simulation tops, and a discovered
+`test/test.py` target manifest under its `rtl/<family>` directory.
+
 ## Cores
 
 ### Gecko
@@ -40,7 +59,7 @@ Gecko core with both integer math, floating point, and vector extensions
 	SystemVerilog modules/packages that are going to be synthesized into logic
 - `tb/`
 	SystemVerilog testbenches for verifying the RTL behavior
-- `tb_cpp/`
+- `cpp/`
 	C++ testbenches for verifying the RTL behavior with Verilator
 - `tests/`
 	C/C++/Assembly code for verifying RISC-V core behavior
