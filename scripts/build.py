@@ -298,7 +298,7 @@ def build(
         )
 
     if run_rustdv_tests:
-        info("Running rustdv memory/stream regressions...")
+        info("Running RustDV Gecko, memory, and stream regressions...")
         run_rustdv_regression(
             source_files,
             wave=wave,

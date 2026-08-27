@@ -1,0 +1,17 @@
+[package]
+name = "gecko_tb"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+rustdv = "=0.2.0"
+
+[dev-dependencies]
+rustdv-vpi-stubs = "=0.2.0"

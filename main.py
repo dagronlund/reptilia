@@ -24,7 +24,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--rustdv-tests",
         action="store_true",
-        help="run the rustdv memory and stream regressions",
+        help="run the rustdv Gecko, memory, and stream regressions",
     )
     parser.add_argument(
         "--format",

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["rtl/mem/test", "rtl/stream/test"]
+members = ["rtl/gecko/test", "rtl/mem/test", "rtl/stream/test"]
 
 [profile.release]
 panic = "unwind"

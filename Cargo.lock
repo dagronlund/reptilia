@@ -3,6 +3,14 @@
 version = 4
 
 [[package]]
+name = "gecko_tb"
+version = "0.1.0"
+dependencies = [
+ "rustdv",
+ "rustdv-vpi-stubs",
+]
+
+[[package]]
 name = "mem_tb"
 version = "0.1.0"
 dependencies = [

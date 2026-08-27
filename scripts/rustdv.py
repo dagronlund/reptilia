@@ -26,7 +26,7 @@ WaveFormat = Literal["vcd", "fst"]
 @dataclass(frozen=True)
 class RustdvTarget:
     name: str
-    family: Literal["mem", "stream"]
+    family: Literal["gecko", "mem", "stream"]
     crate: str
     testcase: str
     top: str
@@ -42,7 +42,7 @@ class RustdvTest:
         self,
         *,
         name: str,
-        family: Literal["mem", "stream"],
+        family: Literal["gecko", "mem", "stream"],
         crate: str,
         testcase: str,
         top: str,
