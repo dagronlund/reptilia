@@ -12,7 +12,7 @@ async fn mem_sequential_single(ctx: RustdvCtx) -> Result<(), TestError> {
     );
     let clk = start(&dut, &[p]).await?;
     let mut rng = ctx.rng();
-    for i in 0..1024u16 {
+    for i in 0..1024u32 {
         transact(
             &clk,
             &p.0,
@@ -21,7 +21,7 @@ async fn mem_sequential_single(ctx: RustdvCtx) -> Result<(), TestError> {
                 read: false,
                 write: 15,
                 addr: i,
-                data: 1023 - i as u32,
+                data: 1023 - i,
                 id: (i & 15) as u8,
                 last: i == 1023,
             },
@@ -30,7 +30,7 @@ async fn mem_sequential_single(ctx: RustdvCtx) -> Result<(), TestError> {
         )
         .await?;
     }
-    for i in 0..1024u16 {
+    for i in 0..1024u32 {
         transact(
             &clk,
             &p.0,
@@ -43,12 +43,12 @@ async fn mem_sequential_single(ctx: RustdvCtx) -> Result<(), TestError> {
                 id: (i & 15) as u8,
                 last: i == 1023,
             },
-            Some((1023 - i as u32, (i & 15) as u8, i == 1023)),
+            Some((1023 - i, (i & 15) as u8, i == 1023)),
             &mut rng,
         )
         .await?;
     }
-    for i in 0..1024u16 {
+    for i in 0..1024u32 {
         transact(
             &clk,
             &p.0,
@@ -57,16 +57,16 @@ async fn mem_sequential_single(ctx: RustdvCtx) -> Result<(), TestError> {
                 read: true,
                 write: 15,
                 addr: i,
-                data: i as u32,
+                data: i,
                 id: (i & 15) as u8,
                 last: i == 1023,
             },
-            Some((1023 - i as u32, (i & 15) as u8, i == 1023)),
+            Some((1023 - i, (i & 15) as u8, i == 1023)),
             &mut rng,
         )
         .await?;
     }
-    for i in 0..1024u16 {
+    for i in 0..1024u32 {
         transact(
             &clk,
             &p.0,
@@ -79,7 +79,7 @@ async fn mem_sequential_single(ctx: RustdvCtx) -> Result<(), TestError> {
                 id: (i & 15) as u8,
                 last: i == 1023,
             },
-            Some((i as u32, (i & 15) as u8, i == 1023)),
+            Some((i, (i & 15) as u8, i == 1023)),
             &mut rng,
         )
         .await?;

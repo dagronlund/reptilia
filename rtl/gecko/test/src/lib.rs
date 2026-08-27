@@ -1,3 +1,4 @@
+mod core;
 mod decode;
 mod execute;
 mod fetch;

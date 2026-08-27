@@ -33,6 +33,7 @@ class RustdvTarget:
     files: tuple[str, ...]
     wrapper: str
     parameters: tuple[tuple[str, str | int], ...] = ()
+    arguments: tuple[str, ...] = ()
 
 
 class RustdvTest:
@@ -49,6 +50,7 @@ class RustdvTest:
         files: tuple[str, ...],
         wrapper: str,
         parameters: tuple[tuple[str, str | int], ...] = (),
+        arguments: tuple[str, ...] = (),
     ) -> None:
         self.target = RustdvTarget(
             name=name,
@@ -59,6 +61,7 @@ class RustdvTest:
             files=files,
             wrapper=wrapper,
             parameters=parameters,
+            arguments=arguments,
         )
 
         frame = currentframe()
@@ -211,7 +214,7 @@ def _write_test_ninja(
         command=(
             "env RUSTDV_TESTCASE=$testcase RUSTDV_RANDOM_SEED=$seed "
             "RUSTDV_RESULTS_XML=$results $wave_env "
-            "$simulator $plugin > $log 2>&1 || "
+            "$simulator $plugin $arguments > $log 2>&1 || "
             "{ status=$$?; cat $log; exit $$status; }; "
             "cat $log; grep -q 'REGRESSION: PASS' $log"
         ),
@@ -234,6 +237,7 @@ def _write_test_ninja(
                 "results": _quote(results),
                 "simulator": _quote(simulator),
                 "plugin": _quote(f"+verilator+vpi+{library}"),
+                "arguments": " ".join(_quote(argument) for argument in target.arguments),
                 "log": _quote(log),
                 "wave_env": "",
             }

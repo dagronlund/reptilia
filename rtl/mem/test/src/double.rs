@@ -17,14 +17,14 @@ async fn mem_sequential_double(ctx: RustdvCtx) -> Result<(), TestError> {
     );
     let clk = start(&dut, &[p0, p1]).await?;
     let mut rng = ctx.rng();
-    for i in 0..64u16 {
+    for i in 0..64u32 {
         // Both requests are held over the same cycle, providing genuine concurrent traffic.
         clk.falling_edge().await;
         let a = MemTransaction {
             read: false,
             write: 15,
             addr: i,
-            data: 0x1000 + i as u32,
+            data: 0x1000 + i,
             id: (i & 15) as u8,
             last: i == 63,
         };
@@ -32,7 +32,7 @@ async fn mem_sequential_double(ctx: RustdvCtx) -> Result<(), TestError> {
             read: false,
             write: 15,
             addr: 64 + i,
-            data: 0x2000 + i as u32,
+            data: 0x2000 + i,
             id: (i & 15) as u8,
             last: i == 63,
         };
@@ -52,7 +52,7 @@ async fn mem_sequential_double(ctx: RustdvCtx) -> Result<(), TestError> {
         p0.0.valid.set_u64(0);
         p1.0.valid.set_u64(0);
     }
-    for i in 0..64u16 {
+    for i in 0..64u32 {
         transact(
             &clk,
             &p0.0,
@@ -65,7 +65,7 @@ async fn mem_sequential_double(ctx: RustdvCtx) -> Result<(), TestError> {
                 id: (i & 15) as u8,
                 last: i == 63,
             },
-            Some((0x2000 + i as u32, (i & 15) as u8, i == 63)),
+            Some((0x2000 + i, (i & 15) as u8, i == 63)),
             &mut rng,
         )
         .await?;
@@ -81,7 +81,7 @@ async fn mem_sequential_double(ctx: RustdvCtx) -> Result<(), TestError> {
                 id: (i & 15) as u8,
                 last: i == 63,
             },
-            Some((0x1000 + i as u32, (i & 15) as u8, i == 63)),
+            Some((0x1000 + i, (i & 15) as u8, i == 63)),
             &mut rng,
         )
         .await?;

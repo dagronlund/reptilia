@@ -26,11 +26,11 @@ async fn mem_sequential_read_write(ctx: RustdvCtx) -> Result<(), TestError> {
     wv.set_u64(0);
     let clk = start(&dut, &[rp]).await?;
     let mut rng = ctx.rng();
-    for i in 0..128u16 {
+    for i in 0..128u32 {
         clk.falling_edge().await;
         wv.set_u64(1);
         wa.set_u64(i as u64);
-        wd.set_u64((0x3000 + i as u32) as u64);
+        wd.set_u64((0x3000 + i) as u64);
         clk.rising_edge().await;
         read_only().await;
         if !wr.is_high() {
@@ -39,12 +39,12 @@ async fn mem_sequential_read_write(ctx: RustdvCtx) -> Result<(), TestError> {
     }
     clk.falling_edge().await;
     wv.set_u64(0);
-    for i in 0..64u16 {
+    for i in 0..64u32 {
         // Write the upper bank while reading the already initialized lower bank.
         clk.falling_edge().await;
         wv.set_u64(1);
         wa.set_u64((64 + i) as u64);
-        wd.set_u64((0x4000 + i as u32) as u64);
+        wd.set_u64((0x4000 + i) as u64);
         clk.rising_edge().await;
         read_only().await;
         transact(
@@ -59,7 +59,7 @@ async fn mem_sequential_read_write(ctx: RustdvCtx) -> Result<(), TestError> {
                 id: (i & 15) as u8,
                 last: i == 63,
             },
-            Some((0x3000 + i as u32, (i & 15) as u8, i == 63)),
+            Some((0x3000 + i, (i & 15) as u8, i == 63)),
             &mut rng,
         )
         .await?;

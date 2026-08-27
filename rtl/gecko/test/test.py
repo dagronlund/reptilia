@@ -17,3 +17,14 @@ for stage, files in (
         files=files,
         wrapper=f"rtl/gecko/test/rtl/gecko_{stage}_tb.sv",
     )
+
+RustdvTest(
+    name="gecko-core",
+    family="gecko",
+    crate="gecko_tb",
+    testcase="gecko_core",
+    top="gecko_core_tb",
+    files=("rtl/gecko/gecko_core.sv",),
+    wrapper="rtl/gecko/test/rtl/gecko_core_tb.sv",
+    arguments=("--binary", "build/basic/basic.bin"),
+)
