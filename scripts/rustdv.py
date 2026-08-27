@@ -5,11 +5,14 @@ from __future__ import annotations
 import os
 import platform
 import runpy
+import shlex
 import subprocess
 from dataclasses import dataclass
 from inspect import currentframe
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
+
+from ninja.ninja_syntax import Writer as NinjaWriter
 
 from .environment import discover_verilator
 from .verilator import VerilatorModel
@@ -188,6 +191,71 @@ def _check_waveform(path: Path, wave: WaveFormat) -> None:
         raise RuntimeError(f"waveform {path} does not have an FST header")
 
 
+def _quote(path_or_value: object) -> str:
+    return shlex.quote(str(path_or_value))
+
+
+def _write_test_ninja(
+    writer: str,
+    targets: tuple[RustdvTarget, ...],
+    simulators: dict[str, Path],
+    seeds: tuple[str, ...],
+    wave: WaveFormat | None,
+    wave_dir: Path,
+    log_dir: Path,
+) -> tuple[Path, ...]:
+    ninja_writer = NinjaWriter(writer)
+    ninja_writer.comment("Run rustdv tests against Verilator models")
+    ninja_writer.rule(
+        name="rustdv_test",
+        command=(
+            "env RUSTDV_TESTCASE=$testcase RUSTDV_RANDOM_SEED=$seed "
+            "RUSTDV_RESULTS_XML=$results $wave_env "
+            "$simulator $plugin > $log 2>&1 || "
+            "{ status=$$?; cat $log; exit $$status; }; "
+            "cat $log; grep -q 'REGRESSION: PASS' $log"
+        ),
+        description="RUSTDV $name seed $seed",
+    )
+
+    ninja_targets: list[str] = []
+    waveforms: list[Path] = []
+    for target in targets:
+        simulator = simulators[target.name].resolve()
+        library = _library_path(target.crate).resolve()
+        for seed_index, seed in enumerate(seeds):
+            name = f"{target.name}-seed-{seed}"
+            log = (log_dir / f"{name}.log").resolve()
+            results = (log_dir / f"{name}.xml").resolve()
+            variables = {
+                "name": target.name,
+                "testcase": _quote(target.testcase),
+                "seed": _quote(seed),
+                "results": _quote(results),
+                "simulator": _quote(simulator),
+                "plugin": _quote(f"+verilator+vpi+{library}"),
+                "log": _quote(log),
+                "wave_env": "",
+            }
+            if wave is not None:
+                waveform = (wave_dir / f"{name}.{wave}").resolve()
+                variables["wave_env"] = f"RUSTDV_WAVE={_quote(waveform)}"
+                waveforms.append(waveform)
+
+            ninja_target = f"rustdv-test-{target.name}-{seed_index}"
+            ninja_writer.build(
+                outputs=[ninja_target],
+                rule="rustdv_test",
+                implicit=[str(simulator), str(library)],
+                variables=variables,
+            )
+            ninja_targets.append(ninja_target)
+
+    ninja_writer.default(ninja_targets)
+    ninja_writer.newline()
+    return tuple(waveforms)
+
+
 def run_rustdv_tests(
     source_files: dict[str, SourceFile],
     *,
@@ -206,35 +274,27 @@ def run_rustdv_tests(
     if wave is not None:
         wave_dir.mkdir(parents=True, exist_ok=True)
 
+    simulators: dict[str, Path] = {}
     for target in targets:
-        simulator = _build_model(target, source_files, wave)
-        library = _library_path(target.crate).resolve()
-        for seed in seeds:
-            env = os.environ.copy()
-            env["RUSTDV_TESTCASE"] = target.testcase
-            env["RUSTDV_RANDOM_SEED"] = seed
-            env["RUSTDV_RESULTS_XML"] = str(
-                (log_dir / f"{target.name}-seed-{seed}.xml").resolve()
-            )
-            waveform: Path | None = None
-            if wave is not None:
-                waveform = wave_dir / f"{target.name}-seed-{seed}.{wave}"
-                env["RUSTDV_WAVE"] = str(waveform.resolve())
-            result = subprocess.run(
-                [str(simulator), f"+verilator+vpi+{library}"],
-                check=True,
-                text=True,
-                capture_output=True,
-                env=env,
-            )
-            transcript = result.stdout + result.stderr
-            (log_dir / f"{target.name}-seed-{seed}.log").write_text(
-                transcript, encoding="utf-8"
-            )
-            print(transcript, end="")
-            if result.returncode != 0 or "REGRESSION: PASS" not in transcript:
-                raise RuntimeError(
-                    f"rustdv target {target.name} seed {seed} failed; see {log_dir}"
-                )
-            if waveform is not None and wave is not None:
-                _check_waveform(waveform, wave)
+        simulators[target.name] = _build_model(target, source_files, wave)
+
+    ninja_path = Path("build/rustdv/tests.ninja")
+    with ninja_path.open("w", encoding="utf-8") as ninja_file:
+        waveforms = _write_test_ninja(
+            cast(str, ninja_file),
+            targets,
+            simulators,
+            seeds,
+            wave,
+            wave_dir,
+            log_dir,
+        )
+    jobs = os.cpu_count() or 1
+    subprocess.run(
+        ["ninja", "-f", str(ninja_path), f"-j{jobs}", "-k", "0"],
+        check=True,
+    )
+
+    if wave is not None:
+        for waveform in waveforms:
+            _check_waveform(waveform, wave)
