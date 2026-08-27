@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "rustdv",
  "rustdv-vpi-stubs",
+ "rustdv_utils",
 ]
 
 [[package]]
@@ -16,6 +17,7 @@ version = "0.1.0"
 dependencies = [
  "rustdv",
  "rustdv-vpi-stubs",
+ "rustdv_utils",
 ]
 
 [[package]]
@@ -91,9 +93,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustdv_utils"
+version = "0.1.0"
+dependencies = [
+ "rustdv",
+]
+
+[[package]]
 name = "stream_tb"
 version = "0.1.0"
 dependencies = [
  "rustdv",
  "rustdv-vpi-stubs",
+ "rustdv_utils",
 ]

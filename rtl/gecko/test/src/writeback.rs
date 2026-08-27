@@ -1,6 +1,7 @@
 use rustdv::prelude::*;
+use rustdv_utils::stream::StreamPort;
 
-use crate::{StreamPort, reset};
+use crate::reset;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct GeckoOperation {
@@ -63,10 +64,13 @@ fn expect_operation(port: &StreamPort, expected: GeckoOperation) -> Result<(), T
 async fn gecko_writeback(ctx: RustdvCtx) -> Result<(), TestError> {
     let dut = ctx.dut();
     let input = [
-        StreamPort::new(&dut, "writeback_results_in[0]")?,
-        StreamPort::new(&dut, "writeback_results_in[1]")?,
+        StreamPort::new(&dut, "writeback_results_in[0]")
+            .map_err(|error| TestError::new(error.to_string()))?,
+        StreamPort::new(&dut, "writeback_results_in[1]")
+            .map_err(|error| TestError::new(error.to_string()))?,
     ];
-    let output = StreamPort::new(&dut, "writeback_result")?;
+    let output = StreamPort::new(&dut, "writeback_result")
+        .map_err(|error| TestError::new(error.to_string()))?;
     for port in &input {
         port.valid.set_u64(0);
         port.payload.set_u64(0);

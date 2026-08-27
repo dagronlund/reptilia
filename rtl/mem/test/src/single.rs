@@ -1,13 +1,14 @@
 use rustdv::prelude::*;
+use rustdv_utils::mem::{MemPort, MemTransaction};
 
-use crate::{MemInputPort, MemOutputPort, MemTransaction, start, transact};
+use crate::{start, transact};
 
 #[rustdv::test(timeout_time = 30, timeout_unit = "ms")]
 async fn mem_sequential_single(ctx: RustdvCtx) -> Result<(), TestError> {
     let dut = ctx.dut();
     let p = (
-        MemInputPort::new(&dut, "mem_in").map_err(|e| TestError::new(e.to_string()))?,
-        MemOutputPort::new(&dut, "mem_out").map_err(|e| TestError::new(e.to_string()))?,
+        MemPort::new(&dut, "mem_in").map_err(|e| TestError::new(e.to_string()))?,
+        MemPort::new(&dut, "mem_out").map_err(|e| TestError::new(e.to_string()))?,
     );
     let clk = start(&dut, &[p]).await?;
     let mut rng = ctx.rng();

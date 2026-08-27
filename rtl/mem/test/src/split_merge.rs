@@ -1,25 +1,15 @@
 use rustdv::prelude::*;
+use rustdv_utils::reset::reset;
 
 #[rustdv::test(timeout_time = 5, timeout_unit = "ms")]
 async fn mem_split_merge(ctx: RustdvCtx) -> Result<(), TestError> {
     let dut = ctx.dut();
-    let clk = dut
-        .signal("clk")
-        .map_err(|e| TestError::new(e.to_string()))?;
-    let rst = dut
-        .signal("rst")
-        .map_err(|e| TestError::new(e.to_string()))?;
     for name in ["mi[0].valid", "mi[1].valid", "mo[0].ready", "mo[1].ready"] {
         dut.signal(name)
             .map_err(|e| TestError::new(e.to_string()))?
             .set_u64(0);
     }
-    rst.set_u64(1);
-    let _clock = Clock::new(&clk, SimDuration::ns(10)).start();
-    for _ in 0..5 {
-        clk.falling_edge().await;
-    }
-    rst.set_u64(0);
+    let clk = reset(&dut).await?;
     let mut input = Vec::new();
     let mut output = Vec::new();
     for i in 0..2 {

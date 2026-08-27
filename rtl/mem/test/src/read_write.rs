@@ -1,6 +1,7 @@
 use rustdv::prelude::*;
+use rustdv_utils::mem::{MemPort, MemTransaction};
 
-use crate::{MemInputPort, MemOutputPort, MemTransaction, start, transact};
+use crate::{start, transact};
 
 #[rustdv::test(timeout_time = 5, timeout_unit = "ms")]
 async fn mem_sequential_read_write(ctx: RustdvCtx) -> Result<(), TestError> {
@@ -19,8 +20,8 @@ async fn mem_sequential_read_write(ctx: RustdvCtx) -> Result<(), TestError> {
         .signal("mem_write_in.data")
         .map_err(|e| TestError::new(e.to_string()))?;
     let rp = (
-        MemInputPort::new(&dut, "mem_read_in").map_err(|e| TestError::new(e.to_string()))?,
-        MemOutputPort::new(&dut, "mem_read_out").map_err(|e| TestError::new(e.to_string()))?,
+        MemPort::new(&dut, "mem_read_in").map_err(|e| TestError::new(e.to_string()))?,
+        MemPort::new(&dut, "mem_read_out").map_err(|e| TestError::new(e.to_string()))?,
     );
     wv.set_u64(0);
     let clk = start(&dut, &[rp]).await?;

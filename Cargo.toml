@@ -1,6 +1,9 @@
 [workspace]
 resolver = "3"
-members = ["rtl/gecko/test", "rtl/mem/test", "rtl/stream/test"]
+members = ["rustdv_utils", "rtl/gecko/test", "rtl/mem/test", "rtl/stream/test"]
+
+[workspace.dependencies]
+rustdv_utils = { path = "rustdv_utils" }
 
 [profile.release]
 panic = "unwind"

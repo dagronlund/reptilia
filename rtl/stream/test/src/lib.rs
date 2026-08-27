@@ -7,91 +7,34 @@ mod stage;
 mod tests;
 
 use rustdv::prelude::*;
+use rustdv_utils::reset::reset;
+use rustdv_utils::stream::StreamPort;
 
 #[cfg(test)]
 use rustdv_vpi_stubs as _;
 
 rustdv::vpi_bootstrap!();
 
-#[derive(Clone, Copy)]
-struct StreamInputPort {
-    valid: LogicHandle,
-    ready: LogicHandle,
-    payload: LogicHandle,
-}
-
-impl StreamInputPort {
-    fn new(dut: &HierarchyHandle, name: &str) -> Result<Self, HandleError> {
-        Ok(Self {
-            valid: dut.signal(&format!("{name}.valid"))?,
-            ready: dut.signal(&format!("{name}.ready"))?,
-            payload: dut.signal(&format!("{name}.payload"))?,
-        })
-    }
-
-    fn idle(&self) {
-        self.valid.set_u64(0);
-        self.payload.set_u64(0);
-    }
-}
-
-#[derive(Clone, Copy)]
-struct StreamOutputPort {
-    valid: LogicHandle,
-    ready: LogicHandle,
-    payload: LogicHandle,
-}
-
-impl StreamOutputPort {
-    fn new(dut: &HierarchyHandle, name: &str) -> Result<Self, HandleError> {
-        Ok(Self {
-            valid: dut.signal(&format!("{name}.valid"))?,
-            ready: dut.signal(&format!("{name}.ready"))?,
-            payload: dut.signal(&format!("{name}.payload"))?,
-        })
-    }
-
-    fn idle(&self) {
-        self.ready.set_u64(0);
-    }
-}
-
-async fn reset(
-    dut: &HierarchyHandle,
-    ports: &[(StreamInputPort, StreamOutputPort)],
-) -> Result<LogicHandle, TestError> {
-    let clk = dut
-        .signal("clk")
-        .map_err(|e| TestError::new(e.to_string()))?;
-    let rst = dut
-        .signal("rst")
-        .map_err(|e| TestError::new(e.to_string()))?;
+fn idle_ports(ports: &[(StreamPort, StreamPort)]) {
     for (input, output) in ports {
-        input.idle();
-        output.idle();
+        input.idle_input();
+        output.idle_output();
     }
-    rst.set_u64(1);
-    let _clock = Clock::new(&clk, SimDuration::ns(10)).start();
-    for _ in 0..5 {
-        clk.falling_edge().await;
-    }
-    rst.set_u64(0);
-    clk.falling_edge().await;
-    Ok(clk)
 }
 
 async fn ordered_flow(
     ctx: &RustdvCtx,
-    ports: &[(StreamInputPort, StreamOutputPort)],
+    ports: &[(StreamPort, StreamPort)],
     count: usize,
 ) -> Result<(), TestError> {
-    let clk = reset(&ctx.dut(), ports).await?;
+    idle_ports(ports);
+    let clk = reset(&ctx.dut()).await?;
     ordered_flow_on_clock(ctx, ports, count, &clk, true).await
 }
 
 async fn ordered_flow_on_clock(
     ctx: &RustdvCtx,
-    ports: &[(StreamInputPort, StreamOutputPort)],
+    ports: &[(StreamPort, StreamPort)],
     count: usize,
     clk: &LogicHandle,
     random_ready: bool,

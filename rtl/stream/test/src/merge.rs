@@ -1,14 +1,9 @@
 use rustdv::prelude::*;
+use rustdv_utils::reset::reset;
 
 #[rustdv::test(timeout_time = 5, timeout_unit = "ms")]
 async fn stream_ordered_merge(ctx: RustdvCtx) -> Result<(), TestError> {
     let dut = ctx.dut();
-    let clk = dut
-        .signal("clk")
-        .map_err(|e| TestError::new(e.to_string()))?;
-    let rst = dut
-        .signal("rst")
-        .map_err(|e| TestError::new(e.to_string()))?;
     for name in [
         "stream_in[0].valid",
         "stream_in[1].valid",
@@ -20,12 +15,7 @@ async fn stream_ordered_merge(ctx: RustdvCtx) -> Result<(), TestError> {
             .map_err(|e| TestError::new(e.to_string()))?
             .set_u64(0);
     }
-    rst.set_u64(1);
-    let _clock = Clock::new(&clk, SimDuration::ns(10)).start();
-    for _ in 0..5 {
-        clk.falling_edge().await;
-    }
-    rst.set_u64(0);
+    let clk = reset(&dut).await?;
 
     // Ordered merge: IDs arrive on deliberately shuffled physical ports.
     let ids = [2u64, 0, 3, 1];

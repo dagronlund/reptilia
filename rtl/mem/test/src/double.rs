@@ -1,18 +1,19 @@
 use rustdv::prelude::*;
+use rustdv_utils::mem::{MemPort, MemTransaction};
 
-use crate::{MemInputPort, MemOutputPort, MemTransaction, start, transact};
+use crate::{start, transact};
 
 #[rustdv::test(timeout_time = 5, timeout_unit = "ms")]
 async fn mem_sequential_double(ctx: RustdvCtx) -> Result<(), TestError> {
     let dut = ctx.dut();
     // Exercise both registered dual-port channels and cross-port visibility.
     let p0 = (
-        MemInputPort::new(&dut, "mem_in[0]").map_err(|e| TestError::new(e.to_string()))?,
-        MemOutputPort::new(&dut, "mem_out[0]").map_err(|e| TestError::new(e.to_string()))?,
+        MemPort::new(&dut, "mem_in[0]").map_err(|e| TestError::new(e.to_string()))?,
+        MemPort::new(&dut, "mem_out[0]").map_err(|e| TestError::new(e.to_string()))?,
     );
     let p1 = (
-        MemInputPort::new(&dut, "mem_in[1]").map_err(|e| TestError::new(e.to_string()))?,
-        MemOutputPort::new(&dut, "mem_out[1]").map_err(|e| TestError::new(e.to_string()))?,
+        MemPort::new(&dut, "mem_in[1]").map_err(|e| TestError::new(e.to_string()))?,
+        MemPort::new(&dut, "mem_out[1]").map_err(|e| TestError::new(e.to_string()))?,
     );
     let clk = start(&dut, &[p0, p1]).await?;
     let mut rng = ctx.rng();

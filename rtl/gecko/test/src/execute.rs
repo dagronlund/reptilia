@@ -1,6 +1,7 @@
 use rustdv::prelude::*;
+use rustdv_utils::{mem::MemPort, stream::StreamPort};
 
-use crate::{MemPort, StreamPort, expect, packed_bits, reset, set_packed, signal};
+use crate::{expect, packed_bits, reset, set_packed, signal};
 
 #[derive(Clone, Copy, Default)]
 pub(crate) struct ExecuteOperation {
@@ -98,11 +99,16 @@ async fn send_alu(
 #[rustdv::test(timeout_time = 5, timeout_unit = "ms")]
 async fn gecko_execute(ctx: RustdvCtx) -> Result<(), TestError> {
     let dut = ctx.dut();
-    let command = StreamPort::new(&dut, "execute_command")?;
-    let mem_command = StreamPort::new(&dut, "mem_command")?;
-    let mem_request = MemPort::new(&dut, "mem_request")?;
-    let result = StreamPort::new(&dut, "execute_result")?;
-    let jump = StreamPort::new(&dut, "jump_command")?;
+    let command = StreamPort::new(&dut, "execute_command")
+        .map_err(|error| TestError::new(error.to_string()))?;
+    let mem_command =
+        StreamPort::new(&dut, "mem_command").map_err(|error| TestError::new(error.to_string()))?;
+    let mem_request =
+        MemPort::new(&dut, "mem_request").map_err(|error| TestError::new(error.to_string()))?;
+    let result = StreamPort::new(&dut, "execute_result")
+        .map_err(|error| TestError::new(error.to_string()))?;
+    let jump =
+        StreamPort::new(&dut, "jump_command").map_err(|error| TestError::new(error.to_string()))?;
 
     command.valid.set_u64(0);
     set_packed(&command.payload, &ExecuteOperation::default().encode());

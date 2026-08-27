@@ -1,6 +1,7 @@
 use rustdv::prelude::*;
+use rustdv_utils::{mem::MemPort, stream::StreamPort};
 
-use crate::{MemPort, StreamPort, expect, packed_bits, reset, set_packed};
+use crate::{expect, packed_bits, reset, set_packed};
 
 #[derive(Clone, Copy, Default)]
 pub(crate) struct JumpOperation {
@@ -52,9 +53,12 @@ impl InstructionOperation {
 #[rustdv::test(timeout_time = 5, timeout_unit = "ms")]
 async fn gecko_fetch(ctx: RustdvCtx) -> Result<(), TestError> {
     let dut = ctx.dut();
-    let jump = StreamPort::new(&dut, "jump_command")?;
-    let instruction = StreamPort::new(&dut, "instruction_command")?;
-    let request = MemPort::new(&dut, "instruction_request")?;
+    let jump =
+        StreamPort::new(&dut, "jump_command").map_err(|error| TestError::new(error.to_string()))?;
+    let instruction = StreamPort::new(&dut, "instruction_command")
+        .map_err(|error| TestError::new(error.to_string()))?;
+    let request = MemPort::new(&dut, "instruction_request")
+        .map_err(|error| TestError::new(error.to_string()))?;
     jump.valid.set_u64(0);
     set_packed(&jump.payload, &JumpOperation::default().encode());
     instruction.ready.set_u64(0);

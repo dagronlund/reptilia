@@ -1,14 +1,9 @@
 use rustdv::prelude::*;
+use rustdv_utils::reset::reset;
 
 #[rustdv::test(timeout_time = 5, timeout_unit = "ms")]
 async fn stream_split_merge(ctx: RustdvCtx) -> Result<(), TestError> {
     let dut = ctx.dut();
-    let clk = dut
-        .signal("clk")
-        .map_err(|e| TestError::new(e.to_string()))?;
-    let rst = dut
-        .signal("rst")
-        .map_err(|e| TestError::new(e.to_string()))?;
     let mut signals = Vec::new();
     for name in [
         "ri[0].valid",
@@ -22,12 +17,7 @@ async fn stream_split_merge(ctx: RustdvCtx) -> Result<(), TestError> {
         h.set_u64(0);
         signals.push(h);
     }
-    rst.set_u64(1);
-    let _clock = Clock::new(&clk, SimDuration::ns(10)).start();
-    for _ in 0..5 {
-        clk.falling_edge().await;
-    }
-    rst.set_u64(0);
+    let clk = reset(&dut).await?;
 
     let rr = [
         (
