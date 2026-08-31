@@ -8,4 +8,4 @@ publish = false
 workspace = true
 
 [dependencies]
-rustdv = "=0.2.0"
+rustdv.workspace = true

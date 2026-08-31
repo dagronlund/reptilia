@@ -3,6 +3,8 @@ resolver = "3"
 members = ["rustdv_utils", "rtl/gecko/test", "rtl/mem/test", "rtl/stream/test"]
 
 [workspace.dependencies]
+rustdv = { git = "https://github.com/dagronlund/rustdv.git", branch = "improvement/fix-clippy-lints" }
+rustdv-vpi-stubs = { git = "https://github.com/dagronlund/rustdv.git", branch = "improvement/fix-clippy-lints" }
 rustdv_utils = { path = "rustdv_utils" }
 
 [profile.release]

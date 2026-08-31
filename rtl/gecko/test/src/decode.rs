@@ -1,7 +1,7 @@
 use rustdv::prelude::*;
 use rustdv_utils::{mem::MemPort, stream::StreamPort};
 
-use crate::{expect, packed_bits, reset, set_packed, signal};
+use crate::{expect, pack_fields, packed_bits, reset, signal};
 
 #[derive(Clone, Copy)]
 pub(crate) struct InstructionOperation {
@@ -13,15 +13,14 @@ pub(crate) struct InstructionOperation {
 }
 
 impl InstructionOperation {
-    pub(crate) fn encode(self) -> String {
-        format!(
-            "{:032b}{:032b}{:01b}{:02b}{:01b}",
-            self.pc,
-            self.next_pc,
-            self.prediction_miss as u8,
-            self.prediction_history & 0x3,
-            self.pc_updated as u8,
-        )
+    pub(crate) fn encode(self) -> LogicArray {
+        pack_fields(&[
+            (u64::from(self.pc), 32),
+            (u64::from(self.next_pc), 32),
+            (self.prediction_miss as u64, 1),
+            (u64::from(self.prediction_history), 2),
+            (self.pc_updated as u64, 1),
+        ])
     }
 }
 
@@ -39,15 +38,18 @@ struct ExecuteOperation {
 
 impl ExecuteOperation {
     fn decode(payload: &LogicHandle) -> Result<Self, TestError> {
+        let payload = payload
+            .get_logic()
+            .map_err(|error| TestError::new(error.to_string()))?;
         Ok(Self {
-            reg_addr: packed_bits(payload, 245, 5)? as u8,
-            reg_status: packed_bits(payload, 242, 3)? as u8,
-            op_type: packed_bits(payload, 235, 3)? as u8,
-            op: packed_bits(payload, 232, 3)? as u8,
-            rs1_value: packed_bits(payload, 195, 32)? as u32,
-            rs2_value: packed_bits(payload, 163, 32)? as u32,
-            current_pc: packed_bits(payload, 35, 32)? as u32,
-            next_pc: packed_bits(payload, 3, 32)? as u32,
+            reg_addr: packed_bits(&payload, 245, 5)? as u8,
+            reg_status: packed_bits(&payload, 242, 3)? as u8,
+            op_type: packed_bits(&payload, 235, 3)? as u8,
+            op: packed_bits(&payload, 232, 3)? as u8,
+            rs1_value: packed_bits(&payload, 195, 32)? as u32,
+            rs2_value: packed_bits(&payload, 163, 32)? as u32,
+            current_pc: packed_bits(&payload, 35, 32)? as u32,
+            next_pc: packed_bits(&payload, 3, 32)? as u32,
         })
     }
 }
@@ -78,9 +80,13 @@ async fn gecko_decode(ctx: RustdvCtx) -> Result<(), TestError> {
     signal(&dut, "instruction_result.id")?.set_u64(0);
     signal(&dut, "instruction_result.last")?.set_u64(0);
     instruction_command.valid.set_u64(0);
-    set_packed(&instruction_command.payload, &"0".repeat(68));
+    instruction_command
+        .payload
+        .set_logic_now(&LogicArray::from_u64(0, 68));
     jump_command.valid.set_u64(0);
-    set_packed(&jump_command.payload, &"0".repeat(72));
+    jump_command
+        .payload
+        .set_logic_now(&LogicArray::from_u64(0, 72));
     writeback_result.valid.set_u64(0);
     writeback_result.payload.set_u64(0);
     system_command.ready.set_u64(0);
@@ -99,7 +105,9 @@ async fn gecko_decode(ctx: RustdvCtx) -> Result<(), TestError> {
         prediction_history: 0,
         pc_updated: false,
     };
-    set_packed(&instruction_command.payload, &operation.encode());
+    instruction_command
+        .payload
+        .set_logic_now(&operation.encode());
     instruction_result.valid.set_u64(1);
     instruction_command.valid.set_u64(1);
 

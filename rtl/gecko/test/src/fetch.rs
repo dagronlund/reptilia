@@ -1,7 +1,7 @@
 use rustdv::prelude::*;
 use rustdv_utils::{mem::MemPort, stream::StreamPort};
 
-use crate::{expect, packed_bits, reset, set_packed};
+use crate::{expect, pack_fields, packed_bits, reset};
 
 #[derive(Clone, Copy, Default)]
 pub(crate) struct JumpOperation {
@@ -17,19 +17,18 @@ pub(crate) struct JumpOperation {
 }
 
 impl JumpOperation {
-    pub(crate) fn encode(self) -> String {
-        format!(
-            "{:01b}{:01b}{:01b}{:032b}{:032b}{:01b}{:02b}{:01b}{:01b}",
-            self.update_pc as u8,
-            self.branched as u8,
-            self.jumped as u8,
-            self.current_pc,
-            self.actual_next_pc,
-            self.prediction_miss as u8,
-            self.prediction_history & 0x3,
-            self.halt as u8,
-            self.mispredicted as u8,
-        )
+    pub(crate) fn encode(self) -> LogicArray {
+        pack_fields(&[
+            (self.update_pc as u64, 1),
+            (self.branched as u64, 1),
+            (self.jumped as u64, 1),
+            (u64::from(self.current_pc), 32),
+            (u64::from(self.actual_next_pc), 32),
+            (self.prediction_miss as u64, 1),
+            (u64::from(self.prediction_history), 2),
+            (self.halt as u64, 1),
+            (self.mispredicted as u64, 1),
+        ])
     }
 }
 
@@ -42,10 +41,13 @@ struct InstructionOperation {
 
 impl InstructionOperation {
     fn decode(payload: &LogicHandle) -> Result<Self, TestError> {
+        let payload = payload
+            .get_logic()
+            .map_err(|error| TestError::new(error.to_string()))?;
         Ok(Self {
-            pc: packed_bits(payload, 36, 32)? as u32,
-            next_pc: packed_bits(payload, 4, 32)? as u32,
-            pc_updated: packed_bits(payload, 0, 1)? != 0,
+            pc: packed_bits(&payload, 36, 32)? as u32,
+            next_pc: packed_bits(&payload, 4, 32)? as u32,
+            pc_updated: packed_bits(&payload, 0, 1)? != 0,
         })
     }
 }
@@ -60,7 +62,8 @@ async fn gecko_fetch(ctx: RustdvCtx) -> Result<(), TestError> {
     let request = MemPort::new(&dut, "instruction_request")
         .map_err(|error| TestError::new(error.to_string()))?;
     jump.valid.set_u64(0);
-    set_packed(&jump.payload, &JumpOperation::default().encode());
+    jump.payload
+        .set_logic_now(&JumpOperation::default().encode());
     instruction.ready.set_u64(0);
     request.ready.set_u64(0);
     let clk = reset(&dut).await?;
@@ -103,7 +106,7 @@ async fn gecko_fetch(ctx: RustdvCtx) -> Result<(), TestError> {
         actual_next_pc: 0x40,
         ..JumpOperation::default()
     };
-    set_packed(&jump.payload, &redirect.encode());
+    jump.payload.set_logic_now(&redirect.encode());
     jump.valid.set_u64(1);
     clk.falling_edge().await;
     jump.valid.set_u64(0);
@@ -126,7 +129,7 @@ async fn gecko_fetch(ctx: RustdvCtx) -> Result<(), TestError> {
         halt: true,
         ..JumpOperation::default()
     };
-    set_packed(&jump.payload, &halt.encode());
+    jump.payload.set_logic_now(&halt.encode());
     jump.valid.set_u64(1);
     clk.falling_edge().await;
     jump.valid.set_u64(0);

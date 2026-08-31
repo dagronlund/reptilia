@@ -11,8 +11,8 @@ workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-rustdv = "=0.2.0"
+rustdv.workspace = true
 rustdv_utils.workspace = true
 
 [dev-dependencies]
-rustdv-vpi-stubs = "=0.2.0"
+rustdv-vpi-stubs.workspace = true

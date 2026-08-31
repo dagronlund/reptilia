@@ -1,7 +1,7 @@
 use rustdv::prelude::*;
 use rustdv_utils::{mem::MemPort, stream::StreamPort};
 
-use crate::{expect, packed_bits, reset, set_packed, signal};
+use crate::{expect, pack_fields, packed_bits, reset, signal};
 
 #[derive(Clone, Copy, Default)]
 pub(crate) struct ExecuteOperation {
@@ -29,41 +29,39 @@ pub(crate) struct ExecuteOperation {
 }
 
 impl ExecuteOperation {
-    pub(crate) fn encode(self) -> String {
-        format!(
-            concat!(
-                "{:05b}{:03b}{:02b}{:01b}{:01b}{:03b}{:03b}{:01b}",
-                "{:01b}{:01b}{:01b}{:01b}",
-                "{:032b}{:032b}{:032b}{:032b}{:032b}{:032b}{:032b}",
-                "{:01b}{:02b}"
-            ),
-            self.reg_addr & 0x1f,
-            self.reg_status & 0x7,
-            self.jump_flag & 0x3,
-            self.pc_updated as u8,
-            self.halt as u8,
-            self.op_type & 0x7,
-            self.op & 0x7,
-            self.alternate as u8,
-            self.reuse_rs1 as u8,
-            self.reuse_rs2 as u8,
-            self.reuse_mem as u8,
-            self.reuse_jump as u8,
-            self.rs1_value,
-            self.rs2_value,
-            self.mem_value,
-            self.jump_value,
-            self.immediate_value,
-            self.current_pc,
-            self.next_pc,
-            self.prediction_miss as u8,
-            self.prediction_history & 0x3,
-        )
+    pub(crate) fn encode(self) -> LogicArray {
+        pack_fields(&[
+            (u64::from(self.reg_addr), 5),
+            (u64::from(self.reg_status), 3),
+            (u64::from(self.jump_flag), 2),
+            (self.pc_updated as u64, 1),
+            (self.halt as u64, 1),
+            (u64::from(self.op_type), 3),
+            (u64::from(self.op), 3),
+            (self.alternate as u64, 1),
+            (self.reuse_rs1 as u64, 1),
+            (self.reuse_rs2 as u64, 1),
+            (self.reuse_mem as u64, 1),
+            (self.reuse_jump as u64, 1),
+            (u64::from(self.rs1_value), 32),
+            (u64::from(self.rs2_value), 32),
+            (u64::from(self.mem_value), 32),
+            (u64::from(self.jump_value), 32),
+            (u64::from(self.immediate_value), 32),
+            (u64::from(self.current_pc), 32),
+            (u64::from(self.next_pc), 32),
+            (self.prediction_miss as u64, 1),
+            (u64::from(self.prediction_history), 2),
+        ])
     }
 }
 
 fn result_value(result: &StreamPort) -> Result<u64, TestError> {
-    packed_bits(&result.payload, 1, 32)
+    let payload = result
+        .payload
+        .get_logic()
+        .map_err(|error| TestError::new(error.to_string()))?;
+    packed_bits(&payload, 1, 32)
 }
 
 async fn send_alu(
@@ -73,7 +71,7 @@ async fn send_alu(
     operation: ExecuteOperation,
     expected: u64,
 ) -> Result<(), TestError> {
-    set_packed(&command.payload, &operation.encode());
+    command.payload.set_logic_now(&operation.encode());
     command.valid.set_u64(1);
     for _ in 0..20 {
         clk.falling_edge().await;
@@ -111,7 +109,9 @@ async fn gecko_execute(ctx: RustdvCtx) -> Result<(), TestError> {
         StreamPort::new(&dut, "jump_command").map_err(|error| TestError::new(error.to_string()))?;
 
     command.valid.set_u64(0);
-    set_packed(&command.payload, &ExecuteOperation::default().encode());
+    command
+        .payload
+        .set_logic_now(&ExecuteOperation::default().encode());
     signal(&dut, "instruction_updated")?.set_u64(0);
     mem_command.ready.set_u64(0);
     mem_request.ready.set_u64(0);
@@ -176,7 +176,7 @@ async fn gecko_execute(ctx: RustdvCtx) -> Result<(), TestError> {
         mem_value: 0xdead_beef,
         ..ExecuteOperation::default()
     };
-    set_packed(&command.payload, &store.encode());
+    command.payload.set_logic_now(&store.encode());
     command.valid.set_u64(1);
     for _ in 0..10 {
         clk.falling_edge().await;

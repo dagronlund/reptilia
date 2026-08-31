@@ -3,12 +3,38 @@
 version = 4
 
 [[package]]
+name = "autocfg"
+version = "1.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
+
+[[package]]
 name = "gecko_tb"
 version = "0.1.0"
 dependencies = [
  "rustdv",
  "rustdv-vpi-stubs",
  "rustdv_utils",
+]
+
+[[package]]
+name = "linkme"
+version = "0.3.37"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3045e122bd98aef8ec3ad58ce84f0791f64e70163d1a02710af4aa11a4d54cc5"
+dependencies = [
+ "linkme-impl",
+]
+
+[[package]]
+name = "linkme-impl"
+version = "0.3.37"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77060ebe535362c3da75682cd17b0431017b6e7c5661e714fc69a7ad017d1301"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -21,11 +47,57 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-bigint"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93e7820bc0a80a0238e650327316f929ba18d5be054b647490a3a6a339f3e7c0"
+dependencies = [
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-integer"
+version = "0.1.47"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ce2d95d4b3734dc35aa2f45e1aa22cd416814592a4f9d9205e11affd5b8e10b"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "num-traits"
+version = "0.2.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
+name = "proc-macro2"
+version = "1.0.107"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
+dependencies = [
+ "unicode-ident",
+]
+
+[[package]]
+name = "quote"
+version = "1.0.47"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001"
+dependencies = [
+ "proc-macro2",
+]
+
+[[package]]
 name = "rustdv"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8e5e76f2752d0a44453724f9dab9f29083b20dd753b3aa42c388ebb40b1fa11"
+source = "git+https://github.com/dagronlund/rustdv.git?branch=improvement%2Ffix-clippy-lints#47948e8c93ef91b5c41ef7b7242e60e8609d1ade"
 dependencies = [
+ "linkme",
  "rustdv-gpi",
  "rustdv-macros",
  "rustdv-methodology",
@@ -36,39 +108,42 @@ dependencies = [
 [[package]]
 name = "rustdv-gpi"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9065f70f05788b9a2d60e9e47d882fe8d6b51986f3722b491590d0eda4935a1"
+source = "git+https://github.com/dagronlund/rustdv.git?branch=improvement%2Ffix-clippy-lints#47948e8c93ef91b5c41ef7b7242e60e8609d1ade"
 dependencies = [
+ "num-bigint",
  "rustdv-gpi-sys",
 ]
 
 [[package]]
 name = "rustdv-gpi-sys"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b00cd5e30d1f97188c03b042f8eacd1f4ec8e0777f1e7cd8969af4f6f8cb06c9"
+source = "git+https://github.com/dagronlund/rustdv.git?branch=improvement%2Ffix-clippy-lints#47948e8c93ef91b5c41ef7b7242e60e8609d1ade"
 
 [[package]]
 name = "rustdv-macros"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94f717a8fb7315dd6e3e93da8d0bb685665bf71456f7c424303b20111f0873e7"
+source = "git+https://github.com/dagronlund/rustdv.git?branch=improvement%2Ffix-clippy-lints#47948e8c93ef91b5c41ef7b7242e60e8609d1ade"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "rustdv-methodology"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3edd7ca6952fa750c6f574971449d410ca1d39106c779c92b75fcaae0ef32b24"
+source = "git+https://github.com/dagronlund/rustdv.git?branch=improvement%2Ffix-clippy-lints#47948e8c93ef91b5c41ef7b7242e60e8609d1ade"
 dependencies = [
+ "linkme",
  "rustdv-sim",
 ]
 
 [[package]]
 name = "rustdv-runner"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32f2f5f7a060e7d5eaa78bb55db29628fd960dd4f2006f246a4d0903f7a00c4d"
+source = "git+https://github.com/dagronlund/rustdv.git?branch=improvement%2Ffix-clippy-lints#47948e8c93ef91b5c41ef7b7242e60e8609d1ade"
 dependencies = [
+ "linkme",
  "rustdv-gpi",
  "rustdv-methodology",
  "rustdv-sim",
@@ -77,8 +152,7 @@ dependencies = [
 [[package]]
 name = "rustdv-sim"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d8ded06a0b7b92a73887859d814255362c2d593f9f5516b39b6eb22909cff2d"
+source = "git+https://github.com/dagronlund/rustdv.git?branch=improvement%2Ffix-clippy-lints#47948e8c93ef91b5c41ef7b7242e60e8609d1ade"
 dependencies = [
  "rustdv-gpi",
 ]
@@ -86,8 +160,7 @@ dependencies = [
 [[package]]
 name = "rustdv-vpi-stubs"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3cff60aa51f1285a42bbe53c6635d2d09adf7f981f9a4cedc77f38db9af6a4d"
+source = "git+https://github.com/dagronlund/rustdv.git?branch=improvement%2Ffix-clippy-lints#47948e8c93ef91b5c41ef7b7242e60e8609d1ade"
 dependencies = [
  "rustdv-gpi-sys",
 ]
@@ -107,3 +180,20 @@ dependencies = [
  "rustdv-vpi-stubs",
  "rustdv_utils",
 ]
+
+[[package]]
+name = "syn"
+version = "3.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6275cddf4610d1775e6d1fe9469b2e77d0f39fd98fb7450901b821e0c53649f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
+
+[[package]]
+name = "unicode-ident"
+version = "1.0.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
