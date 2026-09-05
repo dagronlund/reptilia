@@ -3,6 +3,8 @@ resolver = "3"
 members = ["rustdv_utils", "rtl/gecko/test", "rtl/mem/test", "rtl/stream/test"]
 
 [workspace.dependencies]
+indiscriminant = { version = "0.5.0", features = ["biguint"] }
+num-bigint = "0.5.1"
 rustdv = { git = "https://github.com/dagronlund/rustdv.git", branch = "improvement/fix-clippy-lints" }
 rustdv-vpi-stubs = { git = "https://github.com/dagronlund/rustdv.git", branch = "improvement/fix-clippy-lints" }
 rustdv_utils = { path = "rustdv_utils" }

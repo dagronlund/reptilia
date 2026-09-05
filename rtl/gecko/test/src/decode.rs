@@ -1,84 +1,32 @@
 use rustdv::prelude::*;
-use rustdv_utils::{mem::MemPort, stream::StreamPort};
+use rustdv_utils::{
+    convert::{LogicArrayDecode, LogicArrayEncode},
+    expect_equal,
+    mem::MemPort,
+    reset::reset,
+    stream::StreamPort,
+};
 
-use crate::{expect, pack_fields, packed_bits, reset, signal};
-
-#[derive(Clone, Copy)]
-pub(crate) struct InstructionOperation {
-    pub(crate) pc: u32,
-    pub(crate) next_pc: u32,
-    pub(crate) prediction_miss: bool,
-    pub(crate) prediction_history: u8,
-    pub(crate) pc_updated: bool,
-}
-
-impl InstructionOperation {
-    pub(crate) fn encode(self) -> LogicArray {
-        pack_fields(&[
-            (u64::from(self.pc), 32),
-            (u64::from(self.next_pc), 32),
-            (self.prediction_miss as u64, 1),
-            (u64::from(self.prediction_history), 2),
-            (self.pc_updated as u64, 1),
-        ])
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct ExecuteOperation {
-    reg_addr: u8,
-    reg_status: u8,
-    op_type: u8,
-    op: u8,
-    rs1_value: u32,
-    rs2_value: u32,
-    current_pc: u32,
-    next_pc: u32,
-}
-
-impl ExecuteOperation {
-    fn decode(payload: &LogicHandle) -> Result<Self, TestError> {
-        let payload = payload
-            .get_logic()
-            .map_err(|error| TestError::new(error.to_string()))?;
-        Ok(Self {
-            reg_addr: packed_bits(&payload, 245, 5)? as u8,
-            reg_status: packed_bits(&payload, 242, 3)? as u8,
-            op_type: packed_bits(&payload, 235, 3)? as u8,
-            op: packed_bits(&payload, 232, 3)? as u8,
-            rs1_value: packed_bits(&payload, 195, 32)? as u32,
-            rs2_value: packed_bits(&payload, 163, 32)? as u32,
-            current_pc: packed_bits(&payload, 35, 32)? as u32,
-            next_pc: packed_bits(&payload, 3, 32)? as u32,
-        })
-    }
-}
+use crate::types::{ExecuteOperation, InstructionOperation};
 
 #[rustdv::test(timeout_time = 5, timeout_unit = "ms")]
 async fn gecko_decode(ctx: RustdvCtx) -> Result<(), TestError> {
     let dut = ctx.dut();
-    let instruction_result = MemPort::new(&dut, "instruction_result")
-        .map_err(|error| TestError::new(error.to_string()))?;
-    let instruction_command = StreamPort::new(&dut, "instruction_command")
-        .map_err(|error| TestError::new(error.to_string()))?;
-    let system_command = StreamPort::new(&dut, "system_command")
-        .map_err(|error| TestError::new(error.to_string()))?;
-    let execute_command = StreamPort::new(&dut, "execute_command")
-        .map_err(|error| TestError::new(error.to_string()))?;
-    let float_command = StreamPort::new(&dut, "float_command")
-        .map_err(|error| TestError::new(error.to_string()))?;
-    let jump_command =
-        StreamPort::new(&dut, "jump_command").map_err(|error| TestError::new(error.to_string()))?;
-    let writeback_result = StreamPort::new(&dut, "writeback_result")
-        .map_err(|error| TestError::new(error.to_string()))?;
+    let instruction_result = MemPort::new(&dut, "instruction_result")?;
+    let instruction_command = StreamPort::new(&dut, "instruction_command")?;
+    let system_command = StreamPort::new(&dut, "system_command")?;
+    let execute_command = StreamPort::new(&dut, "execute_command")?;
+    let float_command = StreamPort::new(&dut, "float_command")?;
+    let jump_command = StreamPort::new(&dut, "jump_command")?;
+    let writeback_result = StreamPort::new(&dut, "writeback_result")?;
 
     instruction_result.valid.set_u64(0);
     instruction_result.read_enable.set_u64(0);
     instruction_result.write_enable.set_u64(0);
     instruction_result.addr.set_u64(0);
     instruction_result.data.set_u64(0);
-    signal(&dut, "instruction_result.id")?.set_u64(0);
-    signal(&dut, "instruction_result.last")?.set_u64(0);
+    dut.signal("instruction_result.id")?.set_u64(0);
+    dut.signal("instruction_result.last")?.set_u64(0);
     instruction_command.valid.set_u64(0);
     instruction_command
         .payload
@@ -129,17 +77,16 @@ async fn gecko_decode(ctx: RustdvCtx) -> Result<(), TestError> {
         op: 0,
         rs1_value: 0,
         rs2_value: 42,
+        immediate_value: 42,
+        jump_value: 0x100,
         current_pc: 0x100,
         next_pc: 0x104,
+        ..ExecuteOperation::default()
     };
     if actual != expected {
         return Err(TestError::new(format!(
             "decoded ADDI: expected {expected:?}, got {actual:?}"
         )));
     }
-    expect(
-        &signal(&dut, "error_flag")?,
-        0,
-        "valid instruction error flag",
-    )
+    expect_equal(dut.signal("error_flag")?.get_u64()?, 0)
 }

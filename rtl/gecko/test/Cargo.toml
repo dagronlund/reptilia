@@ -11,6 +11,8 @@ workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+indiscriminant.workspace = true
+num-bigint.workspace = true
 rustdv.workspace = true
 rustdv_utils.workspace = true
 

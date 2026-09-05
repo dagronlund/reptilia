@@ -8,4 +8,5 @@ publish = false
 workspace = true
 
 [dependencies]
+indiscriminant.workspace = true
 rustdv.workspace = true

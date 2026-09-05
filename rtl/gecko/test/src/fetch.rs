@@ -1,66 +1,20 @@
 use rustdv::prelude::*;
-use rustdv_utils::{mem::MemPort, stream::StreamPort};
+use rustdv_utils::{
+    convert::{LogicArrayDecode, LogicArrayEncode},
+    expect_equal,
+    mem::MemPort,
+    reset::reset,
+    stream::StreamPort,
+};
 
-use crate::{expect, pack_fields, packed_bits, reset};
-
-#[derive(Clone, Copy, Default)]
-pub(crate) struct JumpOperation {
-    update_pc: bool,
-    branched: bool,
-    jumped: bool,
-    current_pc: u32,
-    actual_next_pc: u32,
-    prediction_miss: bool,
-    prediction_history: u8,
-    halt: bool,
-    mispredicted: bool,
-}
-
-impl JumpOperation {
-    pub(crate) fn encode(self) -> LogicArray {
-        pack_fields(&[
-            (self.update_pc as u64, 1),
-            (self.branched as u64, 1),
-            (self.jumped as u64, 1),
-            (u64::from(self.current_pc), 32),
-            (u64::from(self.actual_next_pc), 32),
-            (self.prediction_miss as u64, 1),
-            (u64::from(self.prediction_history), 2),
-            (self.halt as u64, 1),
-            (self.mispredicted as u64, 1),
-        ])
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct InstructionOperation {
-    pc: u32,
-    next_pc: u32,
-    pc_updated: bool,
-}
-
-impl InstructionOperation {
-    fn decode(payload: &LogicHandle) -> Result<Self, TestError> {
-        let payload = payload
-            .get_logic()
-            .map_err(|error| TestError::new(error.to_string()))?;
-        Ok(Self {
-            pc: packed_bits(&payload, 36, 32)? as u32,
-            next_pc: packed_bits(&payload, 4, 32)? as u32,
-            pc_updated: packed_bits(&payload, 0, 1)? != 0,
-        })
-    }
-}
+use crate::types::{InstructionOperation, JumpOperation};
 
 #[rustdv::test(timeout_time = 5, timeout_unit = "ms")]
 async fn gecko_fetch(ctx: RustdvCtx) -> Result<(), TestError> {
     let dut = ctx.dut();
-    let jump =
-        StreamPort::new(&dut, "jump_command").map_err(|error| TestError::new(error.to_string()))?;
-    let instruction = StreamPort::new(&dut, "instruction_command")
-        .map_err(|error| TestError::new(error.to_string()))?;
-    let request = MemPort::new(&dut, "instruction_request")
-        .map_err(|error| TestError::new(error.to_string()))?;
+    let jump = StreamPort::new(&dut, "jump_command")?;
+    let instruction = StreamPort::new(&dut, "instruction_command")?;
+    let request = MemPort::new(&dut, "instruction_request")?;
     jump.valid.set_u64(0);
     jump.payload
         .set_logic_now(&JumpOperation::default().encode());
@@ -86,18 +40,16 @@ async fn gecko_fetch(ctx: RustdvCtx) -> Result<(), TestError> {
             pc: expected_pc,
             next_pc: expected_pc + 4,
             pc_updated: false,
+            prediction_history: 0,
+            prediction_miss: true,
         };
         if actual != expected {
             return Err(TestError::new(format!(
                 "instruction operation: expected {expected:?}, got {actual:?}"
             )));
         }
-        expect(
-            &request.addr,
-            u64::from(expected_pc),
-            "instruction request address",
-        )?;
-        expect(&request.read_enable, 1, "instruction request read enable")?;
+        expect_equal(request.addr.get_u64()?, u64::from(expected_pc))?;
+        expect_equal(request.read_enable.get_u64()?, 1)?;
         clk.falling_edge().await;
     }
 
@@ -117,13 +69,15 @@ async fn gecko_fetch(ctx: RustdvCtx) -> Result<(), TestError> {
             pc: 0x40,
             next_pc: 0x44,
             pc_updated: true,
+            prediction_history: 1,
+            prediction_miss: true,
         })
     {
         return Err(TestError::new(format!(
             "redirected instruction mismatch: {redirected:?}"
         )));
     }
-    expect(&request.addr, 0x40, "redirected request address")?;
+    expect_equal(request.addr.get_u64()?, 0x40)?;
 
     let halt = JumpOperation {
         halt: true,
@@ -135,6 +89,6 @@ async fn gecko_fetch(ctx: RustdvCtx) -> Result<(), TestError> {
     jump.valid.set_u64(0);
     clk.falling_edge().await;
     Timer::ns(4).await;
-    expect(&instruction.valid, 0, "halted instruction stream")?;
-    expect(&request.valid, 0, "halted request stream")
+    expect_equal(instruction.valid.get_u64()?, 0)?;
+    expect_equal(request.valid.get_u64()?, 0)
 }
