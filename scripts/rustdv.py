@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Literal, cast
 from ninja.ninja_syntax import Writer as NinjaWriter
 
 from .environment import discover_verilator
+from .riscv import RiscvProgram, write_riscv_ninja_rules
 from .test_runner import run_test_ninja, test_command
 from .verilator import VerilatorModel
 
@@ -35,6 +36,7 @@ class RustdvTarget:
     wrapper: str
     parameters: tuple[tuple[str, str | int], ...] = ()
     arguments: tuple[str, ...] = ()
+    program: RiscvProgram | None = None
 
 
 class RustdvTest:
@@ -52,6 +54,7 @@ class RustdvTest:
         wrapper: str,
         parameters: tuple[tuple[str, str | int], ...] = (),
         arguments: tuple[str, ...] = (),
+        program: RiscvProgram | None = None,
     ) -> None:
         self.target = RustdvTarget(
             name=name,
@@ -63,6 +66,7 @@ class RustdvTest:
             wrapper=wrapper,
             parameters=parameters,
             arguments=arguments,
+            program=program,
         )
 
         frame = currentframe()
@@ -228,6 +232,12 @@ def _write_test_ninja(
     for target in targets:
         simulator = simulators[target.name].resolve()
         library = _library_path(target.crate).resolve()
+        arguments = target.arguments
+        binaries = []
+        if target.program is not None:
+            binary = f"build/{target.program.name}.bin"
+            arguments += ("--binary", binary)
+            binaries.append(binary)
         for seed_index, seed in enumerate(seeds):
             name = f"{target.name}-seed-{seed}"
             log = (log_dir / f"{name}.log").resolve()
@@ -239,9 +249,7 @@ def _write_test_ninja(
                 "results": _quote(results),
                 "simulator": _quote(simulator),
                 "plugin": _quote(f"+verilator+vpi+{library}"),
-                "arguments": " ".join(
-                    _quote(argument) for argument in target.arguments
-                ),
+                "arguments": " ".join(_quote(argument) for argument in arguments),
                 "log": _quote(log),
                 "wave_env": "",
             }
@@ -254,6 +262,7 @@ def _write_test_ninja(
             ninja_writer.build(
                 outputs=[ninja_target],
                 rule="rustdv_test",
+                inputs=binaries,
                 implicit=[str(simulator), str(library)],
                 variables=variables,
             )
@@ -264,31 +273,32 @@ def _write_test_ninja(
     return tuple(waveforms)
 
 
-def run_rustdv_tests(
+def build_rustdv_targets(
     source_files: dict[str, SourceFile],
     *,
     wave: WaveFormat | None,
-    wave_dir: Path,
-    requested_targets: tuple[str, ...] | None = None,
-    output: bool = False,
-) -> None:
-    targets = discover_targets()
-    if requested_targets is not None:
-        names = set(requested_targets)
-        unknown = names - {target.name for target in targets}
-        if unknown:
-            raise ValueError(f"unknown rustdv targets: {sorted(unknown)}")
-        targets = tuple(target for target in targets if target.name in names)
+    targets: tuple[RustdvTarget, ...],
+) -> dict[str, Path]:
+    """Compile program binaries, Rust plugins, and shared Verilator models."""
+    if not targets:
+        raise ValueError("no RustDV targets selected")
+    programs = {
+        target.program.name: target.program
+        for target in targets
+        if target.program is not None
+    }
+    if programs:
+        program_ninja = Path("build/rustdv/programs.ninja")
+        program_ninja.parent.mkdir(parents=True, exist_ok=True)
+        with program_ninja.open("w", encoding="utf-8") as ninja_file:
+            write_riscv_ninja_rules(cast(str, ninja_file))
+            for program in programs.values():
+                program.write_ninja_build(cast(str, ninja_file))
+        subprocess.run(["ninja", "-f", str(program_ninja)], check=True)
+
     crates = sorted({target.crate for target in targets})
     for crate in crates:
         subprocess.run(["cargo", "build", "--release", "-p", crate], check=True)
-
-    requested_seed = os.environ.get("RUSTDV_RANDOM_SEED")
-    seeds = (requested_seed,) if requested_seed is not None else ("1", "24301")
-    log_dir = Path("build/rustdv/logs")
-    log_dir.mkdir(parents=True, exist_ok=True)
-    if wave is not None:
-        wave_dir.mkdir(parents=True, exist_ok=True)
 
     simulators: dict[str, Path] = {}
     models: dict[tuple[object, ...], Path] = {}
@@ -298,6 +308,25 @@ def run_rustdv_tests(
         if key not in models:
             models[key] = _build_model(target, source_files, wave)
         simulators[target.name] = models[key]
+
+    return simulators
+
+
+def run_rustdv_tests(
+    *,
+    targets: tuple[RustdvTarget, ...],
+    simulators: dict[str, Path],
+    wave: WaveFormat | None,
+    wave_dir: Path,
+    output: bool = False,
+) -> None:
+    """Run previously built targets and verify requested waveforms."""
+    requested_seed = os.environ.get("RUSTDV_RANDOM_SEED")
+    seeds = (requested_seed,) if requested_seed is not None else ("1", "24301")
+    log_dir = Path("build/rustdv/logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    if wave is not None:
+        wave_dir.mkdir(parents=True, exist_ok=True)
 
     ninja_path = Path("build/rustdv/tests.ninja")
     with ninja_path.open("w", encoding="utf-8") as ninja_file:

@@ -14,34 +14,62 @@ The build discovers `riscv64-unknown-elf-gcc`,
 `riscv64-unknown-elf-objcopy`, `riscv64-unknown-elf-objdump`, and `verilator`
 from `PATH`. It queries Verilator for its runtime include directory.
 
-Install the locked Python environment with `uv sync`. The RTL can then be
-verified by running `uv run ./main.py`, which will compile the test programs,
-generate the Verilator models, and then compile the Verilator models with the
-test programs loaded into memory. Ninja and the other Python dependencies are
-provided by the uv environment.
+Install the locked Python environment with `uv sync`. Ninja and the other
+Python dependencies are provided by the uv environment.
 
-Run the complete RV32UI test suite against the Gecko simulator with
-`uv run ./main.py --riscv-tests`. Add `--dhrystone` to also run the
-Dhrystone benchmark, or use `--dhrystone` by itself.
-
-The memory and stream libraries are verified with Rust testbenches using
-[rustdv](https://github.com/rustdv/rustdv). Run both families with:
+`build` lints the RTL and compiles the selected program binaries, Rust plugins,
+and Verilator models, without running tests. `test` performs those same build
+steps and then runs the selected tests. Both commands default to all discovered
+targets and accept `--targets` to select a subset:
 
 ```sh
-uv run ./main.py --rustdv-tests
+uv run main.py build
+uv run main.py build --targets gecko-dhrystone
 ```
+
+Use `uv run main.py --format` to format the RTL without building or testing.
+
+Run all discovered RustDV targets, including the Gecko pipeline, memory,
+stream, supported RV32UI tests, and Dhrystone, with:
+
+```sh
+uv run main.py test
+```
+
+Use `--targets` to run specific tests:
+
+```sh
+uv run main.py test --targets gecko-dhrystone
+uv run main.py test --targets gecko-riscv-add gecko-riscv-sub
+```
+
+The program tests use the same binary-loading harness and simulated memory as
+`gecko-core`. FENCE.I and misaligned data-access tests are excluded because
+Gecko does not implement them. Testbenches use
+[rustdv](https://github.com/rustdv/rustdv).
 
 These runs are deterministic through `RUSTDV_RANDOM_SEED`. Optional waveforms
 are available as VCD or FST, with one file per test target and seed:
 
 ```sh
-uv run ./main.py --rustdv-tests --wave fst
-uv run ./main.py --rustdv-tests --wave vcd --wave-dir build/my-waves
+uv run main.py test --wave fst
+uv run main.py test --wave vcd --wave-dir build/my-waves
 ```
 
 FST tracing requires `liblz4`; untraced and VCD runs do not.
-Each RTL family owns its Rust crate, flattened simulation tops, and a discovered
-`test/test.py` target manifest under its `rtl/<family>` directory.
+Test manifests are discovered as `rtl/**/test.py`. The Gecko program suites
+live in `rtl/gecko/test_riscv/test.py` and `rtl/gecko/test_dhrystone/test.py`;
+they declare their build recipes and reuse the existing `gecko_tb` Rust crate
+and core simulation top. Only binaries needed by the selected targets are built.
+
+`--targets` also supports optional waveforms:
+
+```sh
+uv run main.py test --targets gecko-riscv-add gecko-dhrystone --wave vcd
+```
+
+Use `--output` to show successful test output, including Dhrystone's report.
+Logs and XML results are written per target and seed under `build/rustdv/logs`.
 
 ## Cores
 
@@ -60,7 +88,7 @@ Gecko core with both integer math, floating point, and vector extensions
 - `tb/`
 	SystemVerilog testbenches for verifying the RTL behavior
 - `cpp/`
-	C++ testbenches for verifying the RTL behavior with Verilator
+	Shared C++ Verilator host for RustDV testbenches
 - `tests/`
 	C/C++/Assembly code for verifying RISC-V core behavior
 - `wrappers/`

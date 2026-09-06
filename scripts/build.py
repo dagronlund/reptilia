@@ -1,5 +1,5 @@
 """
-Builds the RTL with verilator
+Lints the RTL and runs selected RustDV regressions
 """
 
 from __future__ import annotations
@@ -8,24 +8,12 @@ import copy
 import glob
 import os
 import subprocess
-import time
 from pathlib import Path
 from typing import cast
 
-from .riscv import (
-    RiscvProgram,
-    write_riscv_ninja_rules,
-    write_riscv_test_ninja,
-)
-from .rustdv import WaveFormat
-from .rustdv import run_rustdv_tests as run_rustdv_regression
-from .test_runner import run_test_ninja
+from .rustdv import WaveFormat, build_rustdv_targets, discover_targets, run_rustdv_tests
 from .util import error, info
-from .verilator import (
-    VerilatorProgram,
-    write_verilator_compile_ninja_rules,
-    write_verilator_ninja_rules,
-)
+from .verilator import VerilatorLint, write_verilator_ninja_rules
 
 DependencyInfo = tuple[list[str], list[str], str | None, bool]
 
@@ -136,9 +124,7 @@ def search_sources(path: str) -> dict[str, SourceFile]:
 
 
 def build(
-    run_riscv_tests: bool = False,
-    run_dhrystone: bool = False,
-    run_rustdv_tests: bool = False,
+    run_tests: bool = False,
     wave: WaveFormat | None = None,
     wave_dir: Path = Path("build/waves"),
     rustdv_targets: tuple[str, ...] | None = None,
@@ -155,63 +141,8 @@ def build(
         "rtl/gecko",
         "rtl/gecko/cores",
     ]
-    top_level: list[str] = ["rtl/gecko/cores/gecko_nano.sv"]
-
-    # Make sure the build folder exists
     build_path = Path("build")
     build_path.mkdir(parents=True, exist_ok=True)
-    (build_path / "obj_dir").mkdir(parents=True, exist_ok=True)
-
-    riscv_programs: dict[str, RiscvProgram] = {}
-
-    info("Compiling RISCV programs...")
-    riscv_programs["dhrystone"] = RiscvProgram(
-        "dhrystone/dhrystone",
-        [
-            "tests/lib/crt0.s",
-            "tests/lib/libmem.c",
-            "tests/lib/libio.c",
-            "tests/dhrystone/dhrystone.c",
-            "tests/dhrystone/dhrystone_main.c",
-            "tests/dhrystone/main.c",
-        ],
-        linker_script="tests/gecko_compiled.ld",
-        opt="-O2",
-    )
-    riscv_programs["basic"] = RiscvProgram(
-        "basic/basic",
-        [
-            "tests/lib/crt0.s",
-            "tests/lib/libmem.c",
-            "tests/lib/libio.c",
-            "tests/basic/main.c",
-        ],
-        linker_script="tests/gecko_compiled.ld",
-        opt="-O2",
-    )
-
-    for path in glob.glob("riscv-tests/isa/rv32ui/*.S"):
-        name = Path(path).stem
-        riscv_programs[name] = RiscvProgram(
-            "riscv-tests/" + name + "/" + name,
-            [path],
-            linker_script="tests/gecko_assembled.ld",
-            include_folders=["riscv-tests/isa/macros/scalar/", "tests/"],
-        )
-
-    riscv_ninja_path = build_path / "riscv.ninja"
-    with open(riscv_ninja_path, "w", encoding="utf-8") as ninja_file:
-        write_riscv_ninja_rules(cast(str, ninja_file))
-        for program in riscv_programs.values():
-            program.write_ninja_build(cast(str, ninja_file))
-
-    subprocess.run(
-        ["ninja", "-f", str(riscv_ninja_path)], capture_output=False, check=True
-    )
-
-    for program in riscv_programs.values():
-        program.get_program_stats()
-        # program.print_info()
 
     info("Finding RTL dependencies...")
     header_files: dict[str, HeaderFile] = {}
@@ -237,70 +168,29 @@ def build(
     for source_file in source_files.values():
         source_file.get_dependencies(source_files=source_files)
 
-    info("Verilating RTL...")
-    verilated: list[VerilatorProgram] = []
+    info("Linting RTL...")
     verilator_ninja_path = build_path / "verilator.ninja"
     with open(verilator_ninja_path, "w", encoding="utf-8") as ninja_file:
         write_verilator_ninja_rules(cast(str, ninja_file))
-        for path, source_file in source_files.items():
-            lint_only = path not in top_level
-            verilator_args: list[str] | None = None
-            if not lint_only and len(riscv_programs) > 0:
-                _, program = next(iter(riscv_programs.items()))
-                verilator_args = [f"-GMEMORY_ADDR_WIDTH={program.address_width}"]
-            v = VerilatorProgram(source_file, lint_only=lint_only)
-            v.write_ninja_build_verilate(
-                cast(str, ninja_file), verilator_args=verilator_args
-            )
-            if not lint_only:
-                verilated.append(v)
+        for source_file in source_files.values():
+            VerilatorLint(source_file).write_ninja_build(cast(str, ninja_file))
 
-    subprocess.run(
-        ["ninja", "-f", str(verilator_ninja_path)],
-        capture_output=False,
-        check=True,
-    )
+    subprocess.run(["ninja", "-f", str(verilator_ninja_path)], check=True)
 
-    info("Compiling RTL...")
-    verilator_compile_ninja_path = build_path / "verilator_compile.ninja"
-    with open(verilator_compile_ninja_path, "w", encoding="utf-8") as ninja_file:
-        write_verilator_compile_ninja_rules(cast(str, ninja_file))
-        for v in verilated:
-            v.write_ninja_build_verilate_compile(cast(str, ninja_file))
-
-    start = time.time()
-    subprocess.run(
-        ["ninja", "-f", str(verilator_compile_ninja_path), "-v"],
-        capture_output=False,
-        check=True,
-    )
-    duration = time.time() - start
-    print(f"Time: {duration:.3}s...")
-
-    if run_riscv_tests or run_dhrystone:
-        info("Running programs against the Gecko simulator...")
-        riscv_test_ninja_path = build_path / "riscv_test.ninja"
-        simulator = "build/gecko_nano_simulator"
-        # Gecko does not implement FENCE.I or misaligned data accesses.
-        skipped_isa_tests = {"fence_i", "ma_data"}
-        test_programs: list[RiscvProgram] = []
-        if run_riscv_tests:
-            test_programs.extend(
-                program
-                for name, program in riscv_programs.items()
-                if name not in {"basic", "dhrystone"} | skipped_isa_tests
-            )
-        if run_dhrystone:
-            test_programs.append(riscv_programs["dhrystone"])
-        with open(riscv_test_ninja_path, "w", encoding="utf-8") as ninja_file:
-            write_riscv_test_ninja(cast(str, ninja_file), test_programs, simulator)
-        run_test_ninja(riscv_test_ninja_path, output=output)
-
-    if run_rustdv_tests:
-        info("Running RustDV Gecko, memory, and stream regressions...")
-        run_rustdv_regression(
-            source_files,
-            requested_targets=rustdv_targets,
+    targets = discover_targets()
+    if rustdv_targets is not None:
+        names = set(rustdv_targets)
+        unknown = names - {target.name for target in targets}
+        if unknown:
+            raise ValueError(f"unknown rustdv targets: {sorted(unknown)}")
+        targets = tuple(target for target in targets if target.name in names)
+    info("Building RustDV targets...")
+    simulators = build_rustdv_targets(source_files, targets=targets, wave=wave)
+    if run_tests:
+        info("Running RustDV regressions...")
+        run_rustdv_tests(
+            targets=targets,
+            simulators=simulators,
             output=output,
             wave=wave,
             wave_dir=wave_dir,

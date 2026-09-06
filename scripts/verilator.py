@@ -109,22 +109,10 @@ def write_verilator_ninja_rules(writer: str) -> None:
     verilator = shlex.quote(str(discover_verilator()))
 
     flags = "--prefix V$name -Irtl/ +define+__SYNTH_ONLY__=1"
-    trace = "--trace --trace-structs --output-split 10000 --trace-max-array 1000000"
-    # " --trace-max-width 1000000"
-
     # Create rule for linting SystemVerilog modules
     ninja_writer.rule(
         name="verilator_lint",
         command=f"{verilator} -lint-only {flags} $in > $out",
-    )
-
-    # Create rule for verilating SystemVerilog modules
-    ninja_writer.rule(
-        name="verilator_verilate",
-        command=(
-            f"{verilator} --cc --Mdir build/obj_dir {trace} "
-            f"{flags} $args $in > $out"
-        ),
     )
 
     ninja_writer.newline()
@@ -279,45 +267,23 @@ class VerilatorModel:
         subprocess.run(["ninja", "-f", str(ninja_path)], check=True)
 
 
-class VerilatorProgram:
-    "Compiles Verilator testbenches from SystemVerilog sources"
+class VerilatorLint:
+    """Lint a SystemVerilog module and its dependencies."""
 
-    def __init__(self, source_file: _SourceFile, lint_only: bool = False) -> None:
-        self.path = source_file.path
-        self.module_name = self.path.split("/")[-1].split(".sv")[0]
-        self.cpp_file = f"cpp/{Path(self.path).stem}_tb.cpp"
+    def __init__(self, source_file: _SourceFile) -> None:
         self.source_file = source_file
-        self.lint_only = lint_only
 
-    def write_ninja_build_verilate(
-        self, writer: str, verilator_args: Sequence[str] | None = None
-    ) -> None:
-        "Writes the ninja rules for verilating this module"
+    def write_ninja_build(self, writer: str) -> None:
         if self.source_file.no_lint:
             return
-
-        ninja_writer = NinjaWriter(writer)
-        ninja_writer.comment(f"Build steps for {self.module_name}")
-
-        if verilator_args is None:
-            verilator_args = []
-
-        log_path = Path(f"build/lint/{self.path}").with_suffix(".log")
+        path = self.source_file.path
+        log_path = Path(f"build/lint/{path}").with_suffix(".log")
         log_path.parent.mkdir(parents=True, exist_ok=True)
+        ninja_writer = NinjaWriter(writer)
         ninja_writer.build(
             outputs=[str(log_path)],
-            rule="verilator_lint" if self.lint_only else "verilator_verilate",
+            rule="verilator_lint",
             inputs=self.source_file.get_dependencies(),
-            variables={"name": self.module_name, "args": " ".join(verilator_args)},
+            variables={"name": Path(path).stem},
         )
-
         ninja_writer.newline()
-
-    def write_ninja_build_verilate_compile(self, writer: str) -> None:
-        "Writes the ninja rules for compiling a verilated model"
-        VerilatorModel(
-            prefix=f"V{self.module_name}",
-            model_directory=Path("build/obj_dir"),
-            executable=Path(f"build/{self.module_name}_simulator"),
-            cpp_files=(Path(self.cpp_file),),
-        ).write_ninja_build_compile(writer)

@@ -1,5 +1,6 @@
 """rustdv targets for the Gecko pipeline stages."""
 
+from scripts.riscv import RiscvProgram
 from scripts.rustdv import RustdvTest
 
 for stage, files in [
@@ -26,5 +27,15 @@ RustdvTest(
     top="gecko_core_tb",
     files=("rtl/gecko/gecko_core.sv",),
     wrapper="rtl/gecko/test/rtl/gecko_core_tb.sv",
-    arguments=("--binary", "build/basic/basic.bin"),
+    program=RiscvProgram(
+        "basic/basic",
+        (
+            "tests/lib/crt0.s",
+            "tests/lib/libmem.c",
+            "tests/lib/libio.c",
+            "tests/basic/main.c",
+        ),
+        linker_script="tests/gecko_compiled.ld",
+        opt="-O2",
+    ),
 )

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shlex
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -13,7 +12,6 @@ from .environment import (
     discover_riscv_objcopy,
     discover_riscv_objdump,
 )
-from .test_runner import test_command
 from .util import calculate_address_width, convert_hex_file, debug
 
 
@@ -65,49 +63,6 @@ def write_riscv_ninja_rules(writer: str) -> None:
         command=f"{objdump_path} -t $in > $out",
     )
 
-    ninja_writer.newline()
-
-
-def write_riscv_test_ninja(
-    writer: str,
-    programs: Sequence[RiscvProgram],
-    simulator: str,
-) -> None:
-    """Write Ninja rules that run RISC-V programs against a simulator."""
-    ninja_writer = NinjaWriter(writer)
-    ninja_writer.comment("Run RISC-V ISA tests against Gecko")
-
-    # The simulator writes to a shared VCD path, so invocations must not overlap.
-    ninja_writer.pool(name="gecko_test_pool", depth=1)
-    ninja_writer.rule(
-        name="gecko_test",
-        command=(
-            f"{test_command()} --name $name --log $log -- "
-            "$simulator --binary $binary"
-        ),
-        description="TEST $binary",
-        pool="gecko_test_pool",
-    )
-
-    targets: list[str] = []
-    for program in programs:
-        target = "test-" + program.name.replace("/", "-")
-        binary = f"build/{program.name}.bin"
-        ninja_writer.build(
-            outputs=[target],
-            rule="gecko_test",
-            inputs=[binary],
-            implicit=[simulator],
-            variables={
-                "simulator": shlex.quote(simulator),
-                "binary": shlex.quote(binary),
-                "name": shlex.quote(program.name),
-                "log": shlex.quote(f"build/riscv-test-logs/{target}.log"),
-            },
-        )
-        targets.append(target)
-
-    ninja_writer.default(targets)
     ninja_writer.newline()
 
 

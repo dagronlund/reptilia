@@ -10,19 +10,19 @@ From the repository root, with the existing Rust, uv, and Verilator prerequisite
 
 ```sh
 # Select demo targets through the existing repository runner.
-uv run ./main.py --rustdv-tests --targets gecko-generated-corners
-uv run ./main.py --rustdv-tests --targets gecko-generated-random gecko-generated-stress
-uv run ./main.py --rustdv-tests --targets gecko-generated-instance gecko-generated-named gecko-generated-passive
-uv run ./main.py --rustdv-tests --targets gecko-generated-methodology gecko-generated-config-negative gecko-generated-wiring-negative gecko-generated-checker-negative gecko-generated-timeout-negative
+uv run main.py test --targets gecko-generated-corners
+uv run main.py test --targets gecko-generated-random gecko-generated-stress
+uv run main.py test --targets gecko-generated-instance gecko-generated-named gecko-generated-passive
+uv run main.py test --targets gecko-generated-methodology gecko-generated-config-negative gecko-generated-wiring-negative gecko-generated-checker-negative gecko-generated-timeout-negative
 
 # One seed, configuration lookup tracing, hierarchical debug logs, and waveform.
-RUSTDV_RANDOM_SEED=1 GECKO_RANDOM_CONFIG_TRACE=1 uv run ./main.py --rustdv-tests --targets gecko-generated-corners --wave vcd
+RUSTDV_RANDOM_SEED=1 GECKO_RANDOM_CONFIG_TRACE=1 uv run main.py test --targets gecko-generated-corners --wave vcd
 
 # All existing and new RustDV tests, plus existing Dhrystone.
-uv run ./main.py --rustdv-tests --dhrystone
+uv run main.py test
 ```
 
-Without `--targets`, the repository runner selects all registered RustDV targets, including the demo. `--targets` accepts space-separated manifest target names, implies `--rustdv-tests`, and filters the RustDV regression; the normal repository build preparation still runs. The demo itself generates its instruction image without a compiler or input binary. Default regression seeds are **1 and 24301**. `RUSTDV_RANDOM_SEED` selects one seed. `GECKO_RANDOM_INSTRUCTIONS` sets the number of random image instructions (default 1,000, maximum 4,000), in addition to register initialization and directed cases. Short control-flow blocks remain intact; random ADDI instructions fill a tail too small for a block. Branches skip image instructions and loops repeat instructions, so image length and executed count differ. The watchdog is 200,000 observed cycles, with a separate progress deadline. The timeout-negative variant deliberately uses two cycles.
+Without `--targets`, the repository runner selects all registered RustDV targets, including the demo. `--targets` accepts space-separated manifest target names, filters the selected targets for both `build` and `test`; the normal repository build preparation still runs. The demo itself generates its instruction image without a compiler or input binary. Default regression seeds are **1 and 24301**. `RUSTDV_RANDOM_SEED` selects one seed. `GECKO_RANDOM_INSTRUCTIONS` sets the number of random image instructions (default 1,000, maximum 4,000), in addition to register initialization and directed cases. Short control-flow blocks remain intact; random ADDI instructions fill a tail too small for a block. Branches skip image instructions and loops repeat instructions, so image length and executed count differ. The watchdog is 200,000 observed cycles, with a separate progress deadline. The timeout-negative variant deliberately uses two cycles.
 
 The random/stress and directed variants pass with JALR target masking and load-to-x0 dispatch/response handling fixed. No ISA cases are marked expected failures. Use the runner for the verdict: the underlying Verilator executable can exit zero after a RustDV failure; the runner also requires `REGRESSION: PASS`.
 
@@ -87,7 +87,7 @@ Each test/seed writes beneath `build/rustdv/gecko-random/<test>-seed-<seed>/`:
 Runner logs/XML live in `build/rustdv/logs`; waveforms in `build/waves`. `GECKO_RANDOM_ARTIFACTS` changes the artifact root. A repeat of the same test/seed replaces its artifacts, so use a different root for replays or experiments. Save `memory.bin` elsewhere before replaying into the same output directory.
 
 ```sh
-RUSTDV_RANDOM_SEED=1 GECKO_RANDOM_ARTIFACTS=build/rustdv/replay GECKO_RANDOM_REPLAY=build/rustdv/gecko-random/GeckoRandomTest-seed-1/memory.bin uv run ./main.py --rustdv-tests --targets gecko-generated-random
+RUSTDV_RANDOM_SEED=1 GECKO_RANDOM_ARTIFACTS=build/rustdv/replay GECKO_RANDOM_REPLAY=build/rustdv/gecko-random/GeckoRandomTest-seed-1/memory.bin uv run main.py test --targets gecko-generated-random
 ```
 
 `GECKO_RANDOM_REPLAY` accepts an exact saved `.bin` or a hexadecimal word list with `#` comments. Focused replay reports partial coverage without requiring the full directed suite; all architectural/protocol checks remain enabled.
@@ -100,6 +100,6 @@ Loads dispatch regardless of their destination register. At the memory response 
 
 Rust unit tests exercise known encodings/independent decoding, deterministic bounded generation, complete directed reference coverage, signed byte loads and separate memory, legal cross-register writeback reordering, illegal same-register reordering, duplicate/stale writes and tag wraparound, wrong memory-address effects, missing work, flushed dispatch, cycle reordering, and the load-x0 architectural expectation using the normal directed image. Simulator variants exercise delayed service/backpressure, passive noninterference, factories, concurrent sequence response routing, and specific negative outcomes.
 
-The repository formatting and lint commands are `cargo fmt`, `cargo test`, `cargo check`, `cargo clippy`, `uvx ruff check .`, and `uv run ./main.py --format`. The combined `--rustdv-tests --dhrystone` run executes existing tests and all registered demo variants. The fixes were validated with both default seeds. The waveform-enabled corner run passes and produces a validated VCD header/nonempty file.
+The repository formatting and lint commands are `cargo fmt`, `cargo test`, `cargo check`, `cargo clippy`, `uvx ruff check .`, and `uv run ./main.py --format`. The `test` command executes existing tests and all registered demo variants. The fixes were validated with both default seeds. The waveform-enabled corner run passes and produces a validated VCD header/nonempty file.
 
 RustDV has no sequencer locking/priority arbitration equivalent in these pinned APIs, no UVM register abstraction layer here, and no SV constraint solver or covergroup DSL. Constraints/bins are ordinary Rust, and composition/traits/factories replace class inheritance. The methodology routing self-test demonstrates supported concurrent sequencing, not an invented arbitration policy. This demo verifies one Gecko configuration and a bounded RV32I subset, not exception behavior, all microarchitectural configurations, or exhaustive coverage.

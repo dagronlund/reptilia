@@ -13,25 +13,16 @@ from scripts.rustdv import discover_targets
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--riscv-tests",
-        action="store_true",
-        help="run the RISC-V ISA tests against the Gecko simulator",
-    )
-    parser.add_argument(
-        "--dhrystone",
-        action="store_true",
-        help="run Dhrystone against the Gecko simulator",
-    )
-    parser.add_argument(
-        "--rustdv-tests",
-        action="store_true",
-        help="run the rustdv Gecko, memory, and stream regressions",
+        "command",
+        choices=("build", "test"),
+        nargs="?",
+        help="build selected targets, or build and run their tests",
     )
     parser.add_argument(
         "--targets",
         nargs="+",
         metavar="TARGET",
-        help="run only the named RustDV targets (space-separated; implies --rustdv-tests)",
+        help="select only the named RustDV targets (space-separated; default: all)",
     )
     parser.add_argument(
         "--output",
@@ -46,7 +37,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--wave",
         choices=("vcd", "fst"),
-        help="export optional rustdv waveforms in the selected format",
+        help="enable waveform support (test also exports waveforms)",
     )
     parser.add_argument(
         "--wave-dir",
@@ -55,27 +46,21 @@ if __name__ == "__main__":
         help="waveform output directory (default: build/waves)",
     )
     args = parser.parse_args()
+    if args.command is None and not args.format:
+        parser.error("choose build or test (or use --format to format RTL)")
+    if args.command is None and (args.targets is not None or args.wave is not None):
+        parser.error("--targets and --wave require build or test")
     if args.targets is not None:
         unknown = set(args.targets) - {target.name for target in discover_targets()}
         if unknown:
             parser.error(f"unknown RustDV targets: {', '.join(sorted(unknown))}")
-        args.rustdv_tests = True
 
     if args.format:
         format_systemverilog()
 
-    run_build = (
-        not args.format
-        or args.riscv_tests
-        or args.dhrystone
-        or args.rustdv_tests
-        or args.wave is not None
-    )
-    if run_build:
+    if args.command is not None:
         build(
-            run_riscv_tests=args.riscv_tests,
-            run_dhrystone=args.dhrystone,
-            run_rustdv_tests=args.rustdv_tests,
+            run_tests=args.command == "test",
             rustdv_targets=tuple(args.targets) if args.targets is not None else None,
             output=args.output,
             wave=args.wave,
