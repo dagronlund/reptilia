@@ -78,12 +78,13 @@ class RustdvTest:
 def discover_targets(root: Path = Path("rtl")) -> tuple[RustdvTarget, ...]:
     """Load target declarations colocated with RTL family test directories."""
     targets: list[RustdvTarget] = []
-    manifests = sorted(root.glob("**/test/test.py"))
+    manifests = sorted(root.glob("**/test.py"))
     for manifest in manifests:
         namespace = runpy.run_path(str(manifest))
         declared = namespace.get("_TARGETS")
         if not isinstance(declared, list):
-            raise TypeError(f"{manifest} did not register any RustdvTest objects")
+            # The manifest did not declare any rustdv targets.
+            continue
         for test in declared:
             if not isinstance(test, RustdvTest):
                 raise TypeError(
@@ -237,7 +238,9 @@ def _write_test_ninja(
                 "results": _quote(results),
                 "simulator": _quote(simulator),
                 "plugin": _quote(f"+verilator+vpi+{library}"),
-                "arguments": " ".join(_quote(argument) for argument in target.arguments),
+                "arguments": " ".join(
+                    _quote(argument) for argument in target.arguments
+                ),
                 "log": _quote(log),
                 "wave_env": "",
             }
@@ -265,8 +268,15 @@ def run_rustdv_tests(
     *,
     wave: WaveFormat | None,
     wave_dir: Path,
+    requested_targets: tuple[str, ...] | None = None,
 ) -> None:
     targets = discover_targets()
+    if requested_targets is not None:
+        names = set(requested_targets)
+        unknown = names - {target.name for target in targets}
+        if unknown:
+            raise ValueError(f"unknown rustdv targets: {sorted(unknown)}")
+        targets = tuple(target for target in targets if target.name in names)
     crates = sorted({target.crate for target in targets})
     for crate in crates:
         subprocess.run(["cargo", "build", "--release", "-p", crate], check=True)
@@ -279,8 +289,13 @@ def run_rustdv_tests(
         wave_dir.mkdir(parents=True, exist_ok=True)
 
     simulators: dict[str, Path] = {}
+    models: dict[tuple[object, ...], Path] = {}
     for target in targets:
-        simulators[target.name] = _build_model(target, source_files, wave)
+        # Test variants sharing identical RTL need only one Verilator build.
+        key = (target.top, target.files, target.wrapper, target.parameters)
+        if key not in models:
+            models[key] = _build_model(target, source_files, wave)
+        simulators[target.name] = models[key]
 
     ninja_path = Path("build/rustdv/tests.ninja")
     with ninja_path.open("w", encoding="utf-8") as ninja_file:

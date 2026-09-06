@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["rustdv_utils", "rtl/gecko/test", "rtl/mem/test", "rtl/stream/test"]
+members = ["rustdv_utils", "rtl/gecko/test", "rtl/gecko/random_test", "rtl/mem/test", "rtl/stream/test"]
 
 [workspace.dependencies]
 indiscriminant = { version = "0.5.0", features = ["biguint"] }

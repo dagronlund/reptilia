@@ -89,10 +89,12 @@ package gecko_decode_pkg;
         input riscv32_fields_t instruction_fields, input logic enable_integer_math, input logic enable_floating_point);
         gecko_decode_opcode_status_t status = '{default: 'b0};
         case (riscv32i_opcode_t'(instruction_fields.opcode))
-            RISCV32I_OPCODE_OP, RISCV32I_OPCODE_IMM, RISCV32I_OPCODE_LUI, RISCV32I_OPCODE_AUIPC, RISCV32I_OPCODE_LOAD: begin
+            // Register-based instructions only write to a register if the destination is not x0.
+            RISCV32I_OPCODE_OP, RISCV32I_OPCODE_IMM, RISCV32I_OPCODE_LUI, RISCV32I_OPCODE_AUIPC: begin
                 status.execute_flag = (instruction_fields.rd != 'b0);
             end
-            RISCV32I_OPCODE_STORE, RISCV32I_OPCODE_JAL, RISCV32I_OPCODE_JALR, RISCV32I_OPCODE_BRANCH: begin
+            // Memory-access instructions must access memory even when their destination is x0.
+            RISCV32I_OPCODE_LOAD, RISCV32I_OPCODE_STORE, RISCV32I_OPCODE_JAL, RISCV32I_OPCODE_JALR, RISCV32I_OPCODE_BRANCH: begin
                 status.execute_flag = 'b1;
             end
             RISCV32I_OPCODE_SYSTEM: begin

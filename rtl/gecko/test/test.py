@@ -2,12 +2,12 @@
 
 from scripts.rustdv import RustdvTest
 
-for stage, files in (
+for stage, files in [
     ("fetch", ("rtl/gecko/gecko_fetch.sv",)),
     ("decode", ("rtl/gecko/gecko_decode.sv",)),
     ("execute", ("rtl/gecko/gecko_execute.sv",)),
     ("writeback", ("rtl/gecko/gecko_writeback.sv",)),
-):
+]:
     RustdvTest(
         name=f"gecko-{stage}",
         family="gecko",

@@ -140,6 +140,7 @@ def build(
     run_rustdv_tests: bool = False,
     wave: WaveFormat | None = None,
     wave_dir: Path = Path("build/waves"),
+    rustdv_targets: tuple[str, ...] | None = None,
 ) -> None:
     """Main function"""
     rtl_folders: list[str] = [
@@ -301,6 +302,7 @@ def build(
         info("Running RustDV Gecko, memory, and stream regressions...")
         run_rustdv_regression(
             source_files,
+            requested_targets=rustdv_targets,
             wave=wave,
             wave_dir=wave_dir,
         )

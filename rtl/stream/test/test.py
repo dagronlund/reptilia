@@ -2,19 +2,19 @@
 
 from scripts.rustdv import RustdvTest
 
-STAGE_MODES = (
+STAGE_MODES = [
     ("transparent", "2'h0"),
     ("registered", "2'h1"),
     ("buffered", "2'h2"),
     ("elastic", "2'h3"),
-)
+]
 
-FIFO_MODES = (
+FIFO_MODES = [
     ("combinational", "2'h0"),
     ("combinational-registered", "2'h1"),
     ("sequential", "2'h2"),
     ("sequential-registered", "2'h3"),
-)
+]
 
 for name, value in STAGE_MODES:
     RustdvTest(

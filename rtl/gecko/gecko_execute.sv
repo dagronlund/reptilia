@@ -361,7 +361,9 @@ module gecko_execute
                     produce_jump = 'b1;
 
                     next_jump_command.payload.halt = cmd_in.halt;
+                    // JALR clears bit zero after adding the base and immediate.
                     next_jump_command.payload.actual_next_pc = d + cmd_in.immediate_value;
+                    next_jump_command.payload.actual_next_pc[0] = '0;
                     next_jump_command.payload.jumped = 'b1;
                     next_jump_command.payload.update_pc = (next_jump_command.payload.actual_next_pc != cmd_in.next_pc);
 

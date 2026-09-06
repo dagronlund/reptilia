@@ -146,12 +146,19 @@ module gecko_core
 
     gecko_performance_stats_t performance_stats;
 
+    // Drain loads to x0 without allocating a writeback/status update. Join the
+    // command and response before consuming either, including discarded loads.
+    logic discard_memory_result;
+    always_comb discard_memory_result = mem_command_out.payload.addr == 'b0;
+
     // Turn memory result into normal register result, ignoring data if mispredicted
     always_comb
-        memory_result.valid = mem_command_out.valid && (data_result.valid || mem_command_out.payload.mispredicted);
+        memory_result.valid = mem_command_out.valid && (data_result.valid || mem_command_out.payload.mispredicted) && !discard_memory_result;
     always_comb memory_result.payload = gecko_get_load_operation(mem_command_out.payload, data_result.data);
-    always_comb mem_command_out.ready = memory_result.ready;
-    always_comb data_result.ready = memory_result.ready && !mem_command_out.payload.mispredicted;
+    always_comb
+        mem_command_out.ready = (memory_result.ready || discard_memory_result) && (data_result.valid || mem_command_out.payload.mispredicted);
+    always_comb
+        data_result.ready = (memory_result.ready || discard_memory_result) && mem_command_out.valid && !mem_command_out.payload.mispredicted;
 
     gecko_forwarded_t execute_forwarded;
     gecko_forwarded_t writeback_forwarded;
