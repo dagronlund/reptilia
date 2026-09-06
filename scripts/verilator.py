@@ -5,6 +5,7 @@ from __future__ import annotations
 import platform
 import shlex
 import subprocess
+import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -47,6 +48,15 @@ _MODEL_SWITCHES = (
     "VM_TRACE_VCD",
     "VM_VPI",
 )
+
+
+def _run_build_command(command: Sequence[str]) -> None:
+    result = subprocess.run(
+        command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False
+    )
+    if result.returncode:
+        print(result.stdout, file=sys.stderr, end="", flush=True)
+        result.check_returncode()
 
 
 def _split_makefile_variable(line: str, source_directory: Path) -> list[str]:
@@ -167,7 +177,7 @@ class VerilatorModel:
         self, sources: Sequence[str], verilator_args: Sequence[str] = ()
     ) -> None:
         self.model_directory.mkdir(parents=True, exist_ok=True)
-        subprocess.run(
+        _run_build_command(
             [
                 str(discover_verilator()),
                 "--cc",
@@ -178,7 +188,6 @@ class VerilatorModel:
                 *verilator_args,
                 *sources,
             ],
-            check=True,
         )
 
     def write_ninja_build_compile(self, writer: str) -> None:
@@ -264,7 +273,7 @@ class VerilatorModel:
         with ninja_path.open("w", encoding="utf-8") as ninja_file:
             write_verilator_compile_ninja_rules(cast(str, ninja_file))
             self.write_ninja_build_compile(cast(str, ninja_file))
-        subprocess.run(["ninja", "-f", str(ninja_path)], check=True)
+        _run_build_command(["ninja", "-f", str(ninja_path)])
 
 
 class VerilatorLint:

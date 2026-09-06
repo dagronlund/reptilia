@@ -13,6 +13,7 @@ from inspect import currentframe
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast
 
+from colorama import Fore, Style
 from ninja.ninja_syntax import Writer as NinjaWriter
 
 from .environment import discover_verilator
@@ -150,6 +151,7 @@ def _build_model(
     source_files: dict[str, SourceFile],
     wave: WaveFormat | None,
 ) -> Path:
+    print(f"{Fore.BLUE}Building{Style.RESET_ALL}: {target.name}", flush=True)
     _ = discover_verilator(min_version=(5, 50))
     variant = wave or "fast"
     build = Path("build/rustdv") / target.name / variant
@@ -313,7 +315,7 @@ def build_rustdv_targets(
             write_riscv_ninja_rules(cast(str, ninja_file))
             for program in programs.values():
                 program.write_ninja_build(cast(str, ninja_file))
-        subprocess.run(["ninja", "-f", str(program_ninja)], check=True)
+        subprocess.run(["ninja", "--quiet", "-f", str(program_ninja)], check=True)
 
     crates = sorted({target.crate for target in targets})
     for crate in crates:

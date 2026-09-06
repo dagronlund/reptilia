@@ -182,7 +182,7 @@ def build(
         for source_file in source_files.values():
             VerilatorLint(source_file).write_ninja_build(cast(str, ninja_file))
 
-    subprocess.run(["ninja", "-f", str(verilator_ninja_path)], check=True)
+    subprocess.run(["ninja", "--quiet", "-f", str(verilator_ninja_path)], check=True)
 
     info("Building RustDV targets...")
     simulators = build_rustdv_targets(source_files, targets=targets, wave=wave)
