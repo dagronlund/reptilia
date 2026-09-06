@@ -27,7 +27,7 @@ uv run main.py build
 uv run main.py build --targets gecko-dhrystone
 ```
 
-Use `uv run main.py --format` to format the RTL without building or testing.
+Use `uv run main.py format` to format the RTL without building or testing.
 
 Run all discovered RustDV targets, including the Gecko pipeline, memory,
 stream, supported RV32UI tests, and Dhrystone, with:

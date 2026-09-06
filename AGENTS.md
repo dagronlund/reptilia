@@ -16,7 +16,7 @@ cargo test
 
 Run after systemverilog changes:
 ```sh
-uv run ./main.py --format
+uv run ./main.py format
 uv run main.py test
 ```
 

@@ -14,9 +14,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "command",
-        choices=("build", "test"),
-        nargs="?",
-        help="build selected targets, or build and run their tests",
+        choices=("build", "test", "format"),
+        help="build selected targets, build and run their tests, or format all SystemVerilog files",
     )
     parser.add_argument(
         "--targets",
@@ -30,11 +29,6 @@ if __name__ == "__main__":
         help="show output from every completed test (failed output is always shown at the end)",
     )
     parser.add_argument(
-        "--format",
-        action="store_true",
-        help="format all SystemVerilog files with Verible",
-    )
-    parser.add_argument(
         "--wave",
         choices=("vcd", "fst"),
         help="enable waveform support (test also exports waveforms)",
@@ -46,9 +40,7 @@ if __name__ == "__main__":
         help="waveform output directory (default: build/waves)",
     )
     args = parser.parse_args()
-    if args.command is None and not args.format:
-        parser.error("choose build or test (or use --format to format RTL)")
-    if args.command is None and (args.targets is not None or args.wave is not None):
+    if args.command == "format" and (args.targets is not None or args.wave is not None):
         parser.error("--targets and --wave require build or test")
     if args.targets is not None:
         try:
@@ -56,10 +48,9 @@ if __name__ == "__main__":
         except ValueError as error:
             parser.error(str(error))
 
-    if args.format:
+    if args.command == "format":
         format_systemverilog()
-
-    if args.command is not None:
+    else:
         build(
             run_tests=args.command == "test",
             rustdv_targets=tuple(args.targets) if args.targets is not None else None,
