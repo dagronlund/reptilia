@@ -8,6 +8,7 @@ import runpy
 import shlex
 import subprocess
 from dataclasses import dataclass
+from fnmatch import fnmatchcase
 from inspect import currentframe
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast
@@ -104,6 +105,24 @@ def discover_targets(root: Path = Path("rtl")) -> tuple[RustdvTarget, ...]:
     if not targets:
         raise RuntimeError(f"no rustdv test manifests found below {root}")
     return tuple(targets)
+
+
+def select_targets(
+    targets: tuple[RustdvTarget, ...], patterns: tuple[str, ...] | None
+) -> tuple[RustdvTarget, ...]:
+    """Match case-sensitive shell patterns, preserving discovery order without duplicates."""
+    if patterns is None:
+        return targets
+    selected: set[str] = set()
+    unmatched: list[str] = []
+    for pattern in patterns:
+        names = {target.name for target in targets if fnmatchcase(target.name, pattern)}
+        if not names:
+            unmatched.append(pattern)
+        selected.update(names)
+    if unmatched:
+        raise ValueError(f"no RustDV targets match: {', '.join(sorted(set(unmatched)))}")
+    return tuple(target for target in targets if target.name in selected)
 
 
 def _library_path(crate: str) -> Path:
@@ -224,7 +243,7 @@ def _write_test_ninja(
             "RUSTDV_RESULTS_XML=$results $wave_env "
             "$simulator $plugin $arguments"
         ),
-        description="RUSTDV $name seed $seed",
+        description="RUSTDV $name",
     )
 
     ninja_targets: list[str] = []
@@ -243,7 +262,7 @@ def _write_test_ninja(
             log = (log_dir / f"{name}.log").resolve()
             results = (log_dir / f"{name}.xml").resolve()
             variables = {
-                "name": _quote(name),
+                "name": _quote(f"{target.name} (seed={seed})"),
                 "testcase": _quote(target.testcase),
                 "seed": _quote(seed),
                 "results": _quote(results),

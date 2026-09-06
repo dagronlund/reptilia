@@ -11,7 +11,13 @@ import subprocess
 from pathlib import Path
 from typing import cast
 
-from .rustdv import WaveFormat, build_rustdv_targets, discover_targets, run_rustdv_tests
+from .rustdv import (
+    WaveFormat,
+    build_rustdv_targets,
+    discover_targets,
+    run_rustdv_tests,
+    select_targets,
+)
 from .util import error, info
 from .verilator import VerilatorLint, write_verilator_ninja_rules
 
@@ -131,6 +137,7 @@ def build(
     output: bool = False,
 ) -> None:
     """Main function"""
+    targets = select_targets(discover_targets(), rustdv_targets)
     rtl_folders: list[str] = [
         "rtl/std",
         "rtl/xilinx",
@@ -177,13 +184,6 @@ def build(
 
     subprocess.run(["ninja", "-f", str(verilator_ninja_path)], check=True)
 
-    targets = discover_targets()
-    if rustdv_targets is not None:
-        names = set(rustdv_targets)
-        unknown = names - {target.name for target in targets}
-        if unknown:
-            raise ValueError(f"unknown rustdv targets: {sorted(unknown)}")
-        targets = tuple(target for target in targets if target.name in names)
     info("Building RustDV targets...")
     simulators = build_rustdv_targets(source_files, targets=targets, wave=wave)
     if run_tests:

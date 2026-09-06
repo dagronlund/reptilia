@@ -43,6 +43,17 @@ uv run main.py test --targets gecko-dhrystone
 uv run main.py test --targets gecko-riscv-add gecko-riscv-sub
 ```
 
+Both commands also accept case-sensitive wildcard patterns (`*`, `?`, and
+`[abc]`). Quote patterns so your shell passes them to the runner:
+
+```sh
+uv run main.py test --targets 'gecko-riscv-*' gecko-dhrystone
+uv run main.py build --targets 'stream-*'
+```
+
+Overlapping patterns select each target once. Each name or pattern must match
+at least one target; unmatched patterns report an error.
+
 The program tests use the same binary-loading harness and simulated memory as
 `gecko-core`. FENCE.I and misaligned data-access tests are excluded because
 Gecko does not implement them. Testbenches use
