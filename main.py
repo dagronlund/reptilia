@@ -34,6 +34,11 @@ if __name__ == "__main__":
         help="run only the named RustDV targets (space-separated; implies --rustdv-tests)",
     )
     parser.add_argument(
+        "--output",
+        action="store_true",
+        help="show output from every completed test (failed output is always shown at the end)",
+    )
+    parser.add_argument(
         "--format",
         action="store_true",
         help="format all SystemVerilog files with Verible",
@@ -72,6 +77,7 @@ if __name__ == "__main__":
             run_dhrystone=args.dhrystone,
             run_rustdv_tests=args.rustdv_tests,
             rustdv_targets=tuple(args.targets) if args.targets is not None else None,
+            output=args.output,
             wave=args.wave,
             wave_dir=args.wave_dir,
         )

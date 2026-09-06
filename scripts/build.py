@@ -19,6 +19,7 @@ from .riscv import (
 )
 from .rustdv import WaveFormat
 from .rustdv import run_rustdv_tests as run_rustdv_regression
+from .test_runner import run_test_ninja
 from .util import error, info
 from .verilator import (
     VerilatorProgram,
@@ -141,6 +142,7 @@ def build(
     wave: WaveFormat | None = None,
     wave_dir: Path = Path("build/waves"),
     rustdv_targets: tuple[str, ...] | None = None,
+    output: bool = False,
 ) -> None:
     """Main function"""
     rtl_folders: list[str] = [
@@ -292,17 +294,14 @@ def build(
             test_programs.append(riscv_programs["dhrystone"])
         with open(riscv_test_ninja_path, "w", encoding="utf-8") as ninja_file:
             write_riscv_test_ninja(cast(str, ninja_file), test_programs, simulator)
-        subprocess.run(
-            ["ninja", "-f", str(riscv_test_ninja_path), "-k", "0"],
-            capture_output=False,
-            check=True,
-        )
+        run_test_ninja(riscv_test_ninja_path, output=output)
 
     if run_rustdv_tests:
         info("Running RustDV Gecko, memory, and stream regressions...")
         run_rustdv_regression(
             source_files,
             requested_targets=rustdv_targets,
+            output=output,
             wave=wave,
             wave_dir=wave_dir,
         )

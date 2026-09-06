@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Literal, cast
 from ninja.ninja_syntax import Writer as NinjaWriter
 
 from .environment import discover_verilator
+from .test_runner import run_test_ninja, test_command
 from .verilator import VerilatorModel
 
 if TYPE_CHECKING:
@@ -213,11 +214,11 @@ def _write_test_ninja(
     ninja_writer.rule(
         name="rustdv_test",
         command=(
+            f"{test_command()} --name $name --log $log "
+            "--pass-pattern 'REGRESSION: PASS' -- "
             "env RUSTDV_TESTCASE=$testcase RUSTDV_RANDOM_SEED=$seed "
             "RUSTDV_RESULTS_XML=$results $wave_env "
-            "$simulator $plugin $arguments > $log 2>&1 || "
-            "{ status=$$?; cat $log; exit $$status; }; "
-            "cat $log; grep -q 'REGRESSION: PASS' $log"
+            "$simulator $plugin $arguments"
         ),
         description="RUSTDV $name seed $seed",
     )
@@ -232,7 +233,7 @@ def _write_test_ninja(
             log = (log_dir / f"{name}.log").resolve()
             results = (log_dir / f"{name}.xml").resolve()
             variables = {
-                "name": target.name,
+                "name": _quote(name),
                 "testcase": _quote(target.testcase),
                 "seed": _quote(seed),
                 "results": _quote(results),
@@ -269,6 +270,7 @@ def run_rustdv_tests(
     wave: WaveFormat | None,
     wave_dir: Path,
     requested_targets: tuple[str, ...] | None = None,
+    output: bool = False,
 ) -> None:
     targets = discover_targets()
     if requested_targets is not None:
@@ -308,11 +310,7 @@ def run_rustdv_tests(
             wave_dir,
             log_dir,
         )
-    jobs = os.cpu_count() or 1
-    subprocess.run(
-        ["ninja", "-f", str(ninja_path), f"-j{jobs}", "-k", "0"],
-        check=True,
-    )
+    run_test_ninja(ninja_path, output=output, jobs=os.cpu_count() or 1)
 
     if wave is not None:
         for waveform in waveforms:

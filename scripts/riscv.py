@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shlex
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from .environment import (
     discover_riscv_objcopy,
     discover_riscv_objdump,
 )
+from .test_runner import test_command
 from .util import calculate_address_width, convert_hex_file, debug
 
 
@@ -79,7 +81,10 @@ def write_riscv_test_ninja(
     ninja_writer.pool(name="gecko_test_pool", depth=1)
     ninja_writer.rule(
         name="gecko_test",
-        command="$simulator --binary $binary",
+        command=(
+            f"{test_command()} --name $name --log $log -- "
+            "$simulator --binary $binary"
+        ),
         description="TEST $binary",
         pool="gecko_test_pool",
     )
@@ -93,7 +98,12 @@ def write_riscv_test_ninja(
             rule="gecko_test",
             inputs=[binary],
             implicit=[simulator],
-            variables={"simulator": simulator, "binary": binary},
+            variables={
+                "simulator": shlex.quote(simulator),
+                "binary": shlex.quote(binary),
+                "name": shlex.quote(program.name),
+                "log": shlex.quote(f"build/riscv-test-logs/{target}.log"),
+            },
         )
         targets.append(target)
 
