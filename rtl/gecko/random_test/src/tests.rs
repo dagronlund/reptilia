@@ -71,21 +71,6 @@ fn build_demo(ctx: &mut RustdvCtx, variant: Variant) -> RustdvComp {
     GeckoEnv::create_comp()
 }
 
-macro_rules! demo {
-    ($name:ident, $variant:ident $(, $kind:tt)?) => {
-        #[rustdv::test(timeout_time = 5, timeout_unit = "ms" $(, expect_error = $kind)?)]
-        #[derive(Component, Default)]
-        struct $name { #[component] env: RustdvComp }
-        impl Component for $name {
-            fn build(&mut self, ctx: &mut RustdvCtx) { self.env = build_demo(ctx, Variant::$variant); }
-            async fn run(&mut self, ctx: &mut RustdvCtx) -> Result<(), TestError> {
-                let _objection = ctx.raise_objection("generated program, checking, and protocol drain");
-                run_demo(ctx).await
-            }
-        }
-    };
-}
-
 async fn run_demo(ctx: &RustdvCtx) -> Result<(), TestError> {
     let session: Rc<Session> = ConfigDb::get(Some(ctx), "", "SESSION")?;
     let mut sequence = GeckoVirtualSeq;
@@ -112,18 +97,145 @@ async fn run_demo(ctx: &RustdvCtx) -> Result<(), TestError> {
     }
 }
 
-demo!(GeckoRandomTest, Random);
-demo!(GeckoCornerTest, Corners);
-demo!(GeckoStressTest, Stress);
-demo!(GeckoInstanceTest, Instance);
-demo!(GeckoNamedTest, Named);
-demo!(GeckoPassiveTest, Passive);
-demo!(
-    GeckoCheckerNegativeTest,
-    Corrupt,
-    "gecko_injected_writeback"
-);
-demo!(GeckoTimeoutNegativeTest, Timeout, "gecko_timeout");
+#[rustdv::test(timeout_time = 5, timeout_unit = "ms")]
+#[derive(Component, Default)]
+struct GeckoRandomTest {
+    #[component]
+    env: RustdvComp,
+}
+impl Component for GeckoRandomTest {
+    fn build(&mut self, ctx: &mut RustdvCtx) {
+        self.env = build_demo(ctx, Variant::Random);
+    }
+
+    async fn run(&mut self, ctx: &mut RustdvCtx) -> Result<(), TestError> {
+        let _objection = ctx.raise_objection("generated program, checking, and protocol drain");
+        run_demo(ctx).await
+    }
+}
+
+#[rustdv::test(timeout_time = 5, timeout_unit = "ms")]
+#[derive(Component, Default)]
+struct GeckoCornerTest {
+    #[component]
+    env: RustdvComp,
+}
+impl Component for GeckoCornerTest {
+    fn build(&mut self, ctx: &mut RustdvCtx) {
+        self.env = build_demo(ctx, Variant::Corners);
+    }
+
+    async fn run(&mut self, ctx: &mut RustdvCtx) -> Result<(), TestError> {
+        let _objection = ctx.raise_objection("generated program, checking, and protocol drain");
+        run_demo(ctx).await
+    }
+}
+
+#[rustdv::test(timeout_time = 5, timeout_unit = "ms")]
+#[derive(Component, Default)]
+struct GeckoStressTest {
+    #[component]
+    env: RustdvComp,
+}
+impl Component for GeckoStressTest {
+    fn build(&mut self, ctx: &mut RustdvCtx) {
+        self.env = build_demo(ctx, Variant::Stress);
+    }
+
+    async fn run(&mut self, ctx: &mut RustdvCtx) -> Result<(), TestError> {
+        let _objection = ctx.raise_objection("generated program, checking, and protocol drain");
+        run_demo(ctx).await
+    }
+}
+
+#[rustdv::test(timeout_time = 5, timeout_unit = "ms")]
+#[derive(Component, Default)]
+struct GeckoInstanceTest {
+    #[component]
+    env: RustdvComp,
+}
+impl Component for GeckoInstanceTest {
+    fn build(&mut self, ctx: &mut RustdvCtx) {
+        self.env = build_demo(ctx, Variant::Instance);
+    }
+
+    async fn run(&mut self, ctx: &mut RustdvCtx) -> Result<(), TestError> {
+        let _objection = ctx.raise_objection("generated program, checking, and protocol drain");
+        run_demo(ctx).await
+    }
+}
+
+#[rustdv::test(timeout_time = 5, timeout_unit = "ms")]
+#[derive(Component, Default)]
+struct GeckoNamedTest {
+    #[component]
+    env: RustdvComp,
+}
+impl Component for GeckoNamedTest {
+    fn build(&mut self, ctx: &mut RustdvCtx) {
+        self.env = build_demo(ctx, Variant::Named);
+    }
+
+    async fn run(&mut self, ctx: &mut RustdvCtx) -> Result<(), TestError> {
+        let _objection = ctx.raise_objection("generated program, checking, and protocol drain");
+        run_demo(ctx).await
+    }
+}
+
+#[rustdv::test(timeout_time = 5, timeout_unit = "ms")]
+#[derive(Component, Default)]
+struct GeckoPassiveTest {
+    #[component]
+    env: RustdvComp,
+}
+impl Component for GeckoPassiveTest {
+    fn build(&mut self, ctx: &mut RustdvCtx) {
+        self.env = build_demo(ctx, Variant::Passive);
+    }
+
+    async fn run(&mut self, ctx: &mut RustdvCtx) -> Result<(), TestError> {
+        let _objection = ctx.raise_objection("generated program, checking, and protocol drain");
+        run_demo(ctx).await
+    }
+}
+
+#[rustdv::test(
+    timeout_time = 5,
+    timeout_unit = "ms",
+    expect_error = "gecko_injected_writeback"
+)]
+#[derive(Component, Default)]
+struct GeckoCheckerNegativeTest {
+    #[component]
+    env: RustdvComp,
+}
+impl Component for GeckoCheckerNegativeTest {
+    fn build(&mut self, ctx: &mut RustdvCtx) {
+        self.env = build_demo(ctx, Variant::Corrupt);
+    }
+
+    async fn run(&mut self, ctx: &mut RustdvCtx) -> Result<(), TestError> {
+        let _objection = ctx.raise_objection("generated program, checking, and protocol drain");
+        run_demo(ctx).await
+    }
+}
+
+#[rustdv::test(timeout_time = 5, timeout_unit = "ms", expect_error = "gecko_timeout")]
+#[derive(Component, Default)]
+struct GeckoTimeoutNegativeTest {
+    #[component]
+    env: RustdvComp,
+}
+impl Component for GeckoTimeoutNegativeTest {
+    fn build(&mut self, ctx: &mut RustdvCtx) {
+        self.env = build_demo(ctx, Variant::Timeout);
+    }
+
+    async fn run(&mut self, ctx: &mut RustdvCtx) -> Result<(), TestError> {
+        let _objection = ctx.raise_objection("generated program, checking, and protocol drain");
+        run_demo(ctx).await
+    }
+}
 
 #[rustdv::test(expect_error = "config_not_found")]
 #[derive(Component, Default)]
