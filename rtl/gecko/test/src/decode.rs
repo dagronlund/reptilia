@@ -61,7 +61,7 @@ async fn gecko_decode(ctx: RustdvCtx) -> Result<(), TestError> {
 
     for _ in 0..100 {
         clk.falling_edge().await;
-        Timer::ns(4).await;
+        read_only().await;
         if execute_command.valid.is_high() {
             break;
         }

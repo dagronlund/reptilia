@@ -60,7 +60,7 @@ async fn stream_ordered_merge(ctx: RustdvCtx) -> Result<(), TestError> {
             op[i].2.set_u64(payloads[i]);
         }
         or.set_u64(1);
-        Timer::ns(4).await;
+        read_only().await;
         for i in 0..4 {
             if !accepted[i] && op[i].1.is_high() {
                 accepted[i] = true;

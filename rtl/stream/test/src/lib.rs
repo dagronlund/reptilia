@@ -57,7 +57,7 @@ async fn ordered_flow_on_clock(
             }
             output.ready.set_u64((!random_ready || rng.bool()) as u64);
         }
-        Timer::ns(4).await;
+        read_only().await;
         for (i, (input, output)) in ports.into_iter().enumerate() {
             if driving[i] && input.ready.is_high() {
                 sent[i] += 1;

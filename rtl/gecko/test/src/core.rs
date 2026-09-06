@@ -88,7 +88,7 @@ async fn gecko_core(ctx: RustdvCtx) -> Result<(), TestError> {
         instruction.start_cycle(&mut memory)?;
         data.start_cycle(&mut memory)?;
 
-        Timer::ns(4).await;
+        read_only().await;
         write_tty(&tty_out)?;
         if error_flag.is_high() {
             return Err(TestError::new("Gecko stopped with its error flag set"));

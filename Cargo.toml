@@ -11,8 +11,8 @@ members = [
 [workspace.dependencies]
 indiscriminant = { version = "0.5.0", features = ["biguint"] }
 num-bigint = "0.5.1"
-rustdv = { git = "https://github.com/dagronlund/rustdv.git", branch = "improvement/fix-clippy-lints" }
-rustdv-vpi-stubs = { git = "https://github.com/dagronlund/rustdv.git", branch = "improvement/fix-clippy-lints" }
+rustdv = { git = "https://github.com/dagronlund/rustdv.git", branch = "fix/phase-wait" }
+rustdv-vpi-stubs = { git = "https://github.com/dagronlund/rustdv.git", branch = "fix/phase-wait" }
 rustdv_utils = { path = "rustdv_utils" }
 
 [profile.release]

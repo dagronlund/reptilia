@@ -40,7 +40,7 @@ async fn transact(
         input.drive(t);
         input.valid.set_u64((!accepted) as u64);
         output.ready.set_u64(rng.bool() as u64);
-        Timer::ns(4).await;
+        read_only().await;
         if !accepted && input.ready.is_high() {
             accepted = true;
         }

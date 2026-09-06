@@ -117,7 +117,6 @@ async fn monitor_cycles(
     let mut corrupted = false;
     for cycle in 1..=session.config.max_cycles {
         bfm.clk.falling_edge().await;
-        Timer::ns(4).await;
         read_only().await;
         let mut sample = bfm.sample(cycle).map_err(|e| session.fail(e))?;
         session.cycles.set(cycle);
@@ -152,7 +151,6 @@ impl Component for RequestMonitor {
         let mut stalled_response = None;
         loop {
             bfm.clk.falling_edge().await;
-            Timer::ns(4).await;
             read_only().await;
             // Fetch is a cancellable combinational offer: a redirect/halt
             // changes an unaccepted request. Accepted requests are immutable
@@ -324,7 +322,6 @@ impl Component for PassiveMonitor {
         bfm.session.started.wait().await;
         loop {
             bfm.clk.falling_edge().await;
-            Timer::ns(4).await;
             read_only().await;
             if accepted(&bfm.request)?.is_some() {
                 bfm.session

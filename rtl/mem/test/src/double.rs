@@ -42,9 +42,9 @@ async fn mem_sequential_double(ctx: RustdvCtx) -> Result<(), TestError> {
         p1.0.valid.set_u64(1);
         p0.1.ready.set_u64(1);
         p1.1.ready.set_u64(1);
-        // Observe the settled combinational handshake immediately before the
+        // Observe the settled combinational handshake before the
         // active edge. Sampling after the edge can see the next selected input.
-        Timer::ns(4).await;
+        read_only().await;
         if !p0.0.ready.is_high() || !p1.0.ready.is_high() {
             return Err(TestError::new("dual-port write stalled unexpectedly"));
         }

@@ -26,7 +26,7 @@ async fn gecko_fetch(ctx: RustdvCtx) -> Result<(), TestError> {
     request.ready.set_u64(1);
     for expected_pc in [0u32, 4, 8] {
         for _ in 0..80 {
-            Timer::ns(4).await;
+            read_only().await;
             if instruction.valid.is_high() && request.valid.is_high() {
                 break;
             }
@@ -62,7 +62,7 @@ async fn gecko_fetch(ctx: RustdvCtx) -> Result<(), TestError> {
     jump.valid.set_u64(1);
     clk.falling_edge().await;
     jump.valid.set_u64(0);
-    Timer::ns(4).await;
+    read_only().await;
     let redirected = InstructionOperation::decode(&instruction.payload)?;
     if redirected
         != (InstructionOperation {
@@ -83,12 +83,14 @@ async fn gecko_fetch(ctx: RustdvCtx) -> Result<(), TestError> {
         halt: true,
         ..JumpOperation::default()
     };
+    // Let the checked redirect transfer before driving the halt command.
+    clk.falling_edge().await;
     jump.payload.set_logic_now(&halt.encode());
     jump.valid.set_u64(1);
     clk.falling_edge().await;
     jump.valid.set_u64(0);
     clk.falling_edge().await;
-    Timer::ns(4).await;
+    read_only().await;
     expect_equal(instruction.valid.get_u64()?, 0)?;
     expect_equal(request.valid.get_u64()?, 0)
 }

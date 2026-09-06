@@ -77,7 +77,12 @@ async fn run_demo(ctx: &RustdvCtx) -> Result<(), TestError> {
     // The pinned phaser joins child errors before returning them. Releasing
     // the root objection on a failure event prevents an error from being
     // obscured by a still-waiting program sequence.
-    let deadline = Timer::ns(session.config.max_cycles * 10 + 1000);
+    let core: Rc<CoreBfm> = ConfigDb::get(Some(ctx), "", "CORE_BFM")?;
+    let deadline = async {
+        for _ in 0..session.config.max_cycles + 100 {
+            core.clk.falling_edge().await;
+        }
+    };
     match first2(
         sequence.start_virtual(),
         first2(session.failed.wait(), deadline),
@@ -264,10 +269,11 @@ struct ReverseResponseDriver {
     items: SeqItemPort<u32, u32>,
 }
 impl Component for ReverseResponseDriver {
-    async fn run(&mut self, _: &mut RustdvCtx) -> Result<(), TestError> {
+    async fn run(&mut self, ctx: &mut RustdvCtx) -> Result<(), TestError> {
+        let clk = ctx.dut().signal("clk")?;
         let mut pending: Vec<(TxnId, u32, u32)> = Vec::new();
         loop {
-            Timer::ns(10).await;
+            clk.falling_edge().await;
             if let Some(item) = self.items.try_next_item() {
                 pending.push((item.txn_id(), *item.payload(), *item.payload()));
                 self.items.item_done(None);
@@ -285,9 +291,9 @@ impl Component for ReverseResponseDriver {
     }
 }
 
-#[derive(Default)]
 struct TicketSequence {
     reverse: bool,
+    clk: LogicHandle,
 }
 impl Sequence for TicketSequence {
     type Req = u32;
@@ -321,7 +327,8 @@ impl Sequence for TicketSequence {
                 ctx.info(&format!("ticketed responses: {order:?}"));
                 return Ok(());
             }
-            Timer::ns(10).await;
+            // Poll between the driver's falling edges so completion order is stable.
+            self.clk.rising_edge().await;
         }
         Err(SeqError::from("ticket routing watchdog expired"))
     }
@@ -347,9 +354,18 @@ impl Component for GeckoMethodologyTest {
     }
     async fn run(&mut self, ctx: &mut RustdvCtx) -> Result<(), TestError> {
         let _objection = ctx.raise_objection("ticket reversal and concurrent sequence arbitration");
-        TicketSequence { reverse: true }.start(&self.seqr).await?;
-        let mut first = TicketSequence::default();
-        let mut second = TicketSequence::default();
+        let clk = ctx.dut().signal("clk")?;
+        TicketSequence { reverse: true, clk }
+            .start(&self.seqr)
+            .await?;
+        let mut first = TicketSequence {
+            reverse: false,
+            clk,
+        };
+        let mut second = TicketSequence {
+            reverse: false,
+            clk,
+        };
         let (a, b) = join2(first.start(&self.seqr), second.start(&self.seqr)).await;
         a?;
         b?;

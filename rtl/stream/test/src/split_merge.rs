@@ -85,7 +85,7 @@ async fn stream_split_merge(ctx: RustdvCtx) -> Result<(), TestError> {
             rr[i].2.set_u64((i * 1000 + sent[i]) as u64);
             rr[i].4.set_u64(rng.bool() as u64);
         }
-        Timer::ns(4).await;
+        read_only().await;
         if mid_valid.is_high() && mid_ready.is_high() {
             let id = mid_id
                 .get_u64()

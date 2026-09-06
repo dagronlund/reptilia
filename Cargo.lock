@@ -201,7 +201,7 @@ dependencies = [
 [[package]]
 name = "rustdv"
 version = "0.2.0"
-source = "git+https://github.com/dagronlund/rustdv.git?branch=improvement%2Ffix-clippy-lints#47948e8c93ef91b5c41ef7b7242e60e8609d1ade"
+source = "git+https://github.com/dagronlund/rustdv.git?branch=fix%2Fphase-wait#52efb48098360608abe507a8759a2d0bc5909ccb"
 dependencies = [
  "linkme",
  "rustdv-gpi",
@@ -214,7 +214,7 @@ dependencies = [
 [[package]]
 name = "rustdv-gpi"
 version = "0.2.0"
-source = "git+https://github.com/dagronlund/rustdv.git?branch=improvement%2Ffix-clippy-lints#47948e8c93ef91b5c41ef7b7242e60e8609d1ade"
+source = "git+https://github.com/dagronlund/rustdv.git?branch=fix%2Fphase-wait#52efb48098360608abe507a8759a2d0bc5909ccb"
 dependencies = [
  "num-bigint",
  "rustdv-gpi-sys",
@@ -223,12 +223,12 @@ dependencies = [
 [[package]]
 name = "rustdv-gpi-sys"
 version = "0.2.0"
-source = "git+https://github.com/dagronlund/rustdv.git?branch=improvement%2Ffix-clippy-lints#47948e8c93ef91b5c41ef7b7242e60e8609d1ade"
+source = "git+https://github.com/dagronlund/rustdv.git?branch=fix%2Fphase-wait#52efb48098360608abe507a8759a2d0bc5909ccb"
 
 [[package]]
 name = "rustdv-macros"
 version = "0.2.0"
-source = "git+https://github.com/dagronlund/rustdv.git?branch=improvement%2Ffix-clippy-lints#47948e8c93ef91b5c41ef7b7242e60e8609d1ade"
+source = "git+https://github.com/dagronlund/rustdv.git?branch=fix%2Fphase-wait#52efb48098360608abe507a8759a2d0bc5909ccb"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -238,7 +238,7 @@ dependencies = [
 [[package]]
 name = "rustdv-methodology"
 version = "0.2.0"
-source = "git+https://github.com/dagronlund/rustdv.git?branch=improvement%2Ffix-clippy-lints#47948e8c93ef91b5c41ef7b7242e60e8609d1ade"
+source = "git+https://github.com/dagronlund/rustdv.git?branch=fix%2Fphase-wait#52efb48098360608abe507a8759a2d0bc5909ccb"
 dependencies = [
  "linkme",
  "rustdv-sim",
@@ -247,7 +247,7 @@ dependencies = [
 [[package]]
 name = "rustdv-runner"
 version = "0.2.0"
-source = "git+https://github.com/dagronlund/rustdv.git?branch=improvement%2Ffix-clippy-lints#47948e8c93ef91b5c41ef7b7242e60e8609d1ade"
+source = "git+https://github.com/dagronlund/rustdv.git?branch=fix%2Fphase-wait#52efb48098360608abe507a8759a2d0bc5909ccb"
 dependencies = [
  "linkme",
  "rustdv-gpi",
@@ -258,7 +258,7 @@ dependencies = [
 [[package]]
 name = "rustdv-sim"
 version = "0.2.0"
-source = "git+https://github.com/dagronlund/rustdv.git?branch=improvement%2Ffix-clippy-lints#47948e8c93ef91b5c41ef7b7242e60e8609d1ade"
+source = "git+https://github.com/dagronlund/rustdv.git?branch=fix%2Fphase-wait#52efb48098360608abe507a8759a2d0bc5909ccb"
 dependencies = [
  "rustdv-gpi",
 ]
@@ -266,7 +266,7 @@ dependencies = [
 [[package]]
 name = "rustdv-vpi-stubs"
 version = "0.2.0"
-source = "git+https://github.com/dagronlund/rustdv.git?branch=improvement%2Ffix-clippy-lints#47948e8c93ef91b5c41ef7b7242e60e8609d1ade"
+source = "git+https://github.com/dagronlund/rustdv.git?branch=fix%2Fphase-wait#52efb48098360608abe507a8759a2d0bc5909ccb"
 dependencies = [
  "rustdv-gpi-sys",
 ]

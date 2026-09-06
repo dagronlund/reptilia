@@ -93,7 +93,7 @@ async fn mem_split_merge(ctx: RustdvCtx) -> Result<(), TestError> {
         }
         // Sample the settled request/response routing before the active edge.
         // After the edge, the arbiter may already expose the next input.
-        Timer::ns(4).await;
+        read_only().await;
         if midv.is_high() && midr.is_high() {
             let id = midi.get_u64().map_err(|e| TestError::new(e.to_string()))? >> 1;
             if locked.is_some() && locked != Some(id) {

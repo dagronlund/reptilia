@@ -18,25 +18,25 @@ async fn send_alu(
 ) -> Result<(), TestError> {
     command.payload.set_logic_now(&operation.encode());
     command.valid.set_u64(1);
+    let mut accepted = false;
     for _ in 0..20 {
+        read_only().await;
+        accepted |= command.valid.is_high() && command.ready.is_high();
+        let received = result.valid.is_high() && result.ready.is_high();
+        if received {
+            let actual = u64::from(GeckoOperation::decode(&result.payload)?.value);
+            expect_equal(actual, expected)?;
+            expect_equal(accepted, true)?;
+        }
+        // The sampled handshakes occur at the intervening rising edge.
+        // Withdraw the command on the next falling edge to send it only once.
         clk.falling_edge().await;
-        Timer::ns(4).await;
-        if result.valid.is_high() {
-            break;
+        command.valid.set_u64((!accepted) as u64);
+        if received {
+            return Ok(());
         }
     }
-    if !result.valid.is_high() {
-        return Err(TestError::new("execute result timed out"));
-    }
-    let actual = u64::from(GeckoOperation::decode(&result.payload)?.value);
-    if actual != expected {
-        return Err(TestError::new(format!(
-            "ALU result: expected {expected:#x}, got {actual:#x}"
-        )));
-    }
-    command.valid.set_u64(0);
-    clk.falling_edge().await;
-    Ok(())
+    Err(TestError::new("execute result timed out"))
 }
 
 #[rustdv::test(timeout_time = 5, timeout_unit = "ms")]
@@ -118,19 +118,26 @@ async fn gecko_execute(ctx: RustdvCtx) -> Result<(), TestError> {
     };
     command.payload.set_logic_now(&store.encode());
     command.valid.set_u64(1);
+    let mut accepted = false;
+    let mut requested = false;
     for _ in 0..10 {
+        read_only().await;
+        accepted |= command.valid.is_high() && command.ready.is_high();
+        requested = mem_request.valid.is_high();
+        if requested {
+            expect_equal(mem_request.addr.get_u64()?, 0x108)?;
+            expect_equal(mem_request.data.get_u64()?, 0xdead_beef)?;
+            expect_equal(mem_request.write_enable.get_u64()?, 0xf)?;
+        }
         clk.falling_edge().await;
-        Timer::ns(4).await;
-        if mem_request.valid.is_high() {
+        command.valid.set_u64((!accepted) as u64);
+        if requested && accepted {
             break;
         }
     }
-    if !mem_request.valid.is_high() {
+    if !requested || !accepted {
         return Err(TestError::new("store request timed out"));
     }
-    expect_equal(mem_request.addr.get_u64()?, 0x108)?;
-    expect_equal(mem_request.data.get_u64()?, 0xdead_beef)?;
-    expect_equal(mem_request.write_enable.get_u64()?, 0xf)?;
 
     // A stalled store must complete before FENCE.I redirects even when the
     // predicted next PC already equals PC+4. It must not write a register.
@@ -141,24 +148,31 @@ async fn gecko_execute(ctx: RustdvCtx) -> Result<(), TestError> {
         ..ExecuteOperation::default()
     };
     command.payload.set_logic_now(&fence.encode());
+    command.valid.set_u64(1);
     for _ in 0..3 {
-        clk.falling_edge().await;
-        Timer::ns(4).await;
+        read_only().await;
         expect_equal(command.ready.get_u64()?, 0)?;
         expect_equal(jump.valid.get_u64()?, 0)?;
         expect_equal(result.valid.get_u64()?, 0)?;
+        clk.falling_edge().await;
     }
     mem_request.ready.set_u64(1);
+    let mut accepted = false;
     for _ in 0..10 {
-        clk.falling_edge().await;
-        Timer::ns(4).await;
-        if jump.valid.is_high() {
+        read_only().await;
+        accepted |= command.valid.is_high() && command.ready.is_high();
+        let redirected = jump.valid.is_high() && jump.ready.is_high();
+        if redirected {
             let actual = JumpOperation::decode(&jump.payload)?;
             expect_equal(actual.actual_next_pc as u64, 0x204)?;
             expect_equal(actual.update_pc as u64, 1)?;
             expect_equal(actual.mispredicted as u64, 0)?;
             expect_equal(result.valid.get_u64()?, 0)?;
-            command.valid.set_u64(0);
+            expect_equal(accepted, true)?;
+        }
+        clk.falling_edge().await;
+        command.valid.set_u64((!accepted) as u64);
+        if redirected {
             return Ok(());
         }
     }

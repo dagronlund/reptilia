@@ -47,19 +47,33 @@ async fn gecko_writeback(ctx: RustdvCtx) -> Result<(), TestError> {
     input[0].valid.set_u64(1);
     input[1].valid.set_u64(1);
 
-    for (index, expected) in [first, second].into_iter().enumerate() {
-        for _ in 0..10 {
-            clk.falling_edge().await;
-            Timer::ns(4).await;
-            if output.valid.is_high() {
-                break;
-            }
+    let mut accepted = [false; 2];
+    let mut received = 0;
+    for _ in 0..10 {
+        read_only().await;
+        for (index, port) in (&input).into_iter().enumerate() {
+            accepted[index] |= port.valid.is_high() && port.ready.is_high();
         }
-        if !output.valid.is_high() {
-            return Err(TestError::new("writeback arbitration timed out"));
+        if output.valid.is_high() && output.ready.is_high() {
+            let expected = [first, second]
+                .get(received)
+                .copied()
+                .ok_or_else(|| TestError::new("unexpected extra writeback"))?;
+            expect_equal(GeckoOperation::decode(&output.payload)?, expected)?;
+            received += 1;
         }
-        expect_equal(GeckoOperation::decode(&output.payload)?, expected)?;
-        input[index].valid.set_u64(0);
+        // Retire each input after its own handshake, independently of the
+        // registered output, so neither input is submitted twice.
+        clk.falling_edge().await;
+        for (index, port) in (&input).into_iter().enumerate() {
+            port.valid.set_u64((!accepted[index]) as u64);
+        }
+        if received == 2 {
+            break;
+        }
+    }
+    if received != 2 || accepted != [true, true] {
+        return Err(TestError::new("writeback arbitration timed out"));
     }
 
     // Register 1 now expects status 1; stale status 0 must remain blocked.
@@ -73,11 +87,12 @@ async fn gecko_writeback(ctx: RustdvCtx) -> Result<(), TestError> {
     input[0].payload.set_logic(&stale.encode());
     input[0].valid.set_u64(1);
     for _ in 0..3 {
-        clk.falling_edge().await;
-        Timer::ns(4).await;
+        read_only().await;
+        expect_equal(input[0].ready.get_u64()?, 0)?;
         if output.valid.is_high() {
             return Err(TestError::new("stale writeback status was accepted"));
         }
+        clk.falling_edge().await;
     }
     let next = GeckoOperation {
         addr: 1,
@@ -87,15 +102,20 @@ async fn gecko_writeback(ctx: RustdvCtx) -> Result<(), TestError> {
         mispredicted: false,
     };
     input[0].payload.set_logic(&next.encode());
+    let mut accepted = false;
     for _ in 0..10 {
+        read_only().await;
+        accepted |= input[0].valid.is_high() && input[0].ready.is_high();
+        let received = output.valid.is_high() && output.ready.is_high();
+        if received {
+            expect_equal(GeckoOperation::decode(&output.payload)?, next)?;
+            expect_equal(accepted, true)?;
+        }
         clk.falling_edge().await;
-        Timer::ns(4).await;
-        if output.valid.is_high() {
-            break;
+        input[0].valid.set_u64((!accepted) as u64);
+        if received {
+            return Ok(());
         }
     }
-    if !output.valid.is_high() {
-        return Err(TestError::new("next-status writeback timed out"));
-    }
-    expect_equal(GeckoOperation::decode(&output.payload)?, next)
+    Err(TestError::new("next-status writeback timed out"))
 }
