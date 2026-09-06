@@ -22,5 +22,5 @@ for name, testcase in [
         testcase=testcase,
         top="gecko_random_tb",
         files=("rtl/gecko/gecko_core.sv",),
-        wrapper="rtl/gecko/random_test/rtl/gecko_random_tb.sv",
+        wrapper="rtl/gecko/test_random/rtl/gecko_random_tb.sv",
     )
