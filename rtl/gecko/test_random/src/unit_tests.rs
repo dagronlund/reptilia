@@ -272,3 +272,29 @@ fn samples_reject_reordering_and_flushed_dispatch() {
             .is_err()
     );
 }
+
+#[test]
+fn fences_preserve_registers_and_memory() {
+    let program = finish(
+        vec![
+            i(0x13, 0, 8, 0, 123),
+            i(0x0f, 0, 8, 8, 0xff),
+            i(0x0f, 1, 8, 8, 0xff),
+            i(0x13, 0, 9, 8, 1),
+        ],
+        &mut Rng::new(1),
+    )
+    .unwrap();
+    let mut reference = ReferenceModel::new(&program);
+    reference.step().unwrap();
+    for pc in [4, 8] {
+        let expected = reference.step().unwrap();
+        assert_eq!(expected.pc, pc);
+        assert_eq!(expected.next_pc, pc + 4);
+        assert_eq!(expected.write, None);
+        assert_eq!(expected.memory, None);
+        assert_eq!(reference.hart.registers[8], 123);
+        assert_eq!(reference.memory.bytes, program.memory);
+    }
+    assert_eq!(reference.step().unwrap().write, Some((9, 124)));
+}

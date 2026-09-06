@@ -151,7 +151,8 @@ package gecko_pkg;
         GECKO_EXECUTE_TYPE_STORE = 3'b010,
         GECKO_EXECUTE_TYPE_BRANCH = 3'b011,
         GECKO_EXECUTE_TYPE_JUMP = 3'b100,
-        GECKO_EXECUTE_TYPE_MUL_DIV = 3'b101
+        GECKO_EXECUTE_TYPE_MUL_DIV = 3'b101,
+        GECKO_EXECUTE_TYPE_FENCE_I = 3'b110
     } gecko_execute_type_t;
 
     typedef struct packed {

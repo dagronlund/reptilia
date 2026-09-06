@@ -77,11 +77,13 @@ impl Checker {
         // rd=x0 arithmetic is allowed to disappear in decode; a load still
         // owes its architectural memory access even when its value is unused.
         let opcode = expected.instruction & 127;
+        let fence_i = expected.instruction & 0x707f == 0x100f;
         let requires_execute = expected.write.is_some()
             || expected.memory.is_some()
             || opcode == 0x63
             || opcode == 0x6f
-            || opcode == 0x67;
+            || opcode == 0x67
+            || fence_i;
         if requires_execute && !decode.execute {
             return Err(format!(
                 "{:#010x}: {} was accepted but not dispatched",
@@ -116,12 +118,12 @@ impl Checker {
         if let Some(effect) = &expected.memory {
             self.memory.push_back((decode.pc, effect.clone()));
         }
-        if opcode == 0x63 || opcode == 0x6f || opcode == 0x67 {
+        if opcode == 0x63 || opcode == 0x6f || opcode == 0x67 || fence_i {
             self.branches.push_back((
                 decode.pc,
                 expected.next_pc,
                 opcode == 0x63 && expected.next_pc != decode.pc.wrapping_add(4),
-                opcode != 0x63,
+                opcode == 0x6f || opcode == 0x67,
                 false,
             ));
         }

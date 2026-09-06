@@ -7,7 +7,7 @@ use rustdv_utils::{
     stream::StreamPort,
 };
 
-use crate::types::{ExecuteOperation, GeckoOperation};
+use crate::types::{ExecuteOperation, GeckoOperation, JumpOperation};
 
 async fn send_alu(
     command: &StreamPort,
@@ -106,6 +106,7 @@ async fn gecko_execute(ctx: RustdvCtx) -> Result<(), TestError> {
     .await?;
 
     // Store word: address = rs1 + rs2, data = mem_value.
+    mem_request.ready.set_u64(0);
     let store = ExecuteOperation {
         reg_addr: 3,
         op_type: 2,
@@ -129,5 +130,37 @@ async fn gecko_execute(ctx: RustdvCtx) -> Result<(), TestError> {
     }
     expect_equal(mem_request.addr.get_u64()?, 0x108)?;
     expect_equal(mem_request.data.get_u64()?, 0xdead_beef)?;
-    expect_equal(mem_request.write_enable.get_u64()?, 0xf)
+    expect_equal(mem_request.write_enable.get_u64()?, 0xf)?;
+
+    // A stalled store must complete before FENCE.I redirects even when the
+    // predicted next PC already equals PC+4. It must not write a register.
+    let fence = ExecuteOperation {
+        op_type: 6,
+        current_pc: 0x200,
+        next_pc: 0x204,
+        ..ExecuteOperation::default()
+    };
+    command.payload.set_logic_now(&fence.encode());
+    for _ in 0..3 {
+        clk.falling_edge().await;
+        Timer::ns(4).await;
+        expect_equal(command.ready.get_u64()?, 0)?;
+        expect_equal(jump.valid.get_u64()?, 0)?;
+        expect_equal(result.valid.get_u64()?, 0)?;
+    }
+    mem_request.ready.set_u64(1);
+    for _ in 0..10 {
+        clk.falling_edge().await;
+        Timer::ns(4).await;
+        if jump.valid.is_high() {
+            let actual = JumpOperation::decode(&jump.payload)?;
+            expect_equal(actual.actual_next_pc as u64, 0x204)?;
+            expect_equal(actual.update_pc as u64, 1)?;
+            expect_equal(actual.mispredicted as u64, 0)?;
+            expect_equal(result.valid.get_u64()?, 0)?;
+            command.valid.set_u64(0);
+            return Ok(());
+        }
+    }
+    Err(TestError::new("FENCE.I redirect timed out"))
 }

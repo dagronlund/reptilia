@@ -97,6 +97,11 @@ package gecko_decode_pkg;
             RISCV32I_OPCODE_LOAD, RISCV32I_OPCODE_STORE, RISCV32I_OPCODE_JAL, RISCV32I_OPCODE_JALR, RISCV32I_OPCODE_BRANCH: begin
                 status.execute_flag = 'b1;
             end
+            RISCV32I_OPCODE_FENCE: begin
+                // FENCE uses the ordered data interface; FENCE.I serializes fetch.
+                status.execute_flag = instruction_fields.funct3 == 3'b001;
+                status.error_flag   = instruction_fields.funct3 > 3'b001;
+            end
             RISCV32I_OPCODE_SYSTEM: begin
                 case (riscv32i_funct3_sys_t'(instruction_fields.funct3))
                     RISCV32I_FUNCT3_SYS_ENV: begin
@@ -182,6 +187,7 @@ package gecko_decode_pkg;
     function automatic logic is_opcode_control_flow(input riscv32_fields_t instruction_fields);
         case (riscv32i_opcode_t'(instruction_fields.opcode))
             RISCV32I_OPCODE_JAL, RISCV32I_OPCODE_JALR, RISCV32I_OPCODE_BRANCH: return 'b1;
+            RISCV32I_OPCODE_FENCE: return instruction_fields.funct3 == 3'b001;
             default: return 'b0;
         endcase
     endfunction
@@ -217,8 +223,7 @@ package gecko_decode_pkg;
         RISCV32I_OPCODE_LUI,
         RISCV32I_OPCODE_AUIPC, 
         RISCV32I_OPCODE_JAL,
-        RISCV32I_OPCODE_JALR, 
-        RISCV32I_OPCODE_FENCE:
+        RISCV32I_OPCODE_JALR:
             return instruction_fields.rd;
             RISCV32I_OPCODE_STORE, RISCV32I_OPCODE_BRANCH: return 'b0;
             RISCV32I_OPCODE_SYSTEM: begin
@@ -396,6 +401,12 @@ package gecko_decode_pkg;
         execute_op.pc_updated = instruction_op.pc_updated;
 
         case (riscv32i_opcode_t'(instruction_fields.opcode))
+            RISCV32I_OPCODE_FENCE: begin
+                execute_op.op_type = GECKO_EXECUTE_TYPE_FENCE_I;
+                execute_op.op = '0;
+                execute_op.alu_alternate = GECKO_NORMAL;
+                execute_op.reg_addr = '0;
+            end
             RISCV32I_OPCODE_OP: begin
                 execute_op.op_type = (instruction_fields.funct7 == RISCV32M_FUNCT7_MUL_DIV) ? 
                     GECKO_EXECUTE_TYPE_MUL_DIV : GECKO_EXECUTE_TYPE_EXECUTE;

@@ -55,8 +55,8 @@ Overlapping patterns select each target once. Each name or pattern must match
 at least one target; unmatched patterns report an error.
 
 The program tests use the same binary-loading harness and simulated memory as
-`gecko-core`. FENCE.I and misaligned data-access tests are excluded because
-Gecko does not implement them. Testbenches use
+`gecko-core`. The FENCE.I self-modifying-code test is included; misaligned data-access
+tests are excluded because Gecko does not implement them. Testbenches use
 [rustdv](https://github.com/rustdv/rustdv).
 
 These runs are deterministic through `RUSTDV_RANDOM_SEED`. Optional waveforms

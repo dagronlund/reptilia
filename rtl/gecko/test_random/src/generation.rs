@@ -4,10 +4,11 @@ use rustdv::prelude::Rng;
 
 use crate::transactions::{DATA_END, DATA_START, EBREAK, MEMORY_BYTES, Program};
 
-pub const OPERATIONS: [&str; 37] = [
+pub const OPERATIONS: [&str; 39] = [
     "add", "sub", "sll", "slt", "sltu", "xor", "srl", "sra", "or", "and", "addi", "slti", "sltiu",
     "xori", "ori", "andi", "slli", "srli", "srai", "lui", "auipc", "beq", "bne", "blt", "bge",
-    "bltu", "bgeu", "jal", "jalr", "lb", "lh", "lw", "lbu", "lhu", "sb", "sh", "sw",
+    "bltu", "bgeu", "jal", "jalr", "lb", "lh", "lw", "lbu", "lhu", "sb", "sh", "sw", "fence",
+    "fence.i",
 ];
 
 pub fn operation(word: u32) -> &'static str {
@@ -36,6 +37,8 @@ pub fn operation(word: u32) -> &'static str {
             6 => "ori",
             _ => "andi",
         },
+        0x0f if funct == 0 => "fence",
+        0x0f if funct == 1 => "fence.i",
         0x37 => "lui",
         0x17 => "auipc",
         0x6f => "jal",
@@ -134,6 +137,9 @@ fn directed(words: &mut Vec<u32>) {
             words.push(i(0x13, 5, 5, 1, 0x400 | shamt));
         }
     }
+    // Reserved register fields are ignored, without allocating a writeback tag.
+    words.push(i(0x0f, 0, 8, 8, 0));
+    words.push(i(0x0f, 1, 8, 8, 0xff));
     // x0 is both an operand and a discarded destination.
     words.push(r(0, false, 0, 1, 2));
     words.push(i(0x13, 0, 8, 0, 0));
@@ -158,6 +164,8 @@ fn directed(words: &mut Vec<u32>) {
         let size = 1 << funct;
         for lane in (0..4).step_by(size) {
             words.push(s(funct, 31, 1, lane));
+            words.push(i(0x0f, 0, 0, 0, 0xff));
+            words.push(i(0x0f, 1, 0, 0, 0));
             words.push(i(0x03, funct, 9, 31, lane));
             words.push(r(0, false, 10, 9, 2));
             words.push(i(0x03, funct, 0, 31, lane));
@@ -184,7 +192,7 @@ pub fn generate(seed: u64, count: usize) -> Result<Program, String> {
         let rs1 = rng.below(29) as u32;
         let rs2 = rng.below(29) as u32;
         let funct = rng.below(8) as u32;
-        match rng.below(10) {
+        match rng.below(12) {
             0..=3 => words.push(r(
                 funct,
                 (funct == 0 || funct == 5) && rng.bool(),
@@ -215,7 +223,9 @@ pub fn generate(seed: u64, count: usize) -> Result<Program, String> {
                 words.push(b([0, 1, 4, 5, 6, 7][rng.below(6) as usize], rs1, rs2, 8));
                 words.push(i(0x13, 0, 20, 20, 1));
             }
-            _ => jumps(&mut words, rng.bool()),
+            9 => jumps(&mut words, rng.bool()),
+            10 => words.push(i(0x0f, 0, 0, 0, rng.below(256) as i32)),
+            _ => words.push(i(0x0f, 1, 0, 0, 0)),
         }
         // Keep branch/jump blocks intact while honoring the exact image budget.
         // Fill a short tail with independent legal instructions if a block will

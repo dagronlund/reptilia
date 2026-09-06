@@ -5,9 +5,9 @@ from pathlib import Path
 from scripts.riscv import RiscvProgram
 from scripts.rustdv import RustdvTest
 
-# Gecko does not implement FENCE.I or misaligned data accesses.
+# Gecko does not implement misaligned data accesses.
 for source in sorted(Path("riscv-tests/isa/rv32ui").glob("*.S")):
-    if source.stem in {"fence_i", "ma_data"}:
+    if source.stem == "ma_data":
         continue
     RustdvTest(
         name=f"gecko-riscv-{source.stem}",

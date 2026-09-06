@@ -341,6 +341,15 @@ module gecko_execute
                     next_mem_request.data = store_result.value;
                     next_mem_request.write_enable = store_result.mask;
                 end
+                GECKO_EXECUTE_TYPE_FENCE_I: begin
+                    // Stores complete when the ordered data request is accepted.
+                    // Drain the output stage before refetching modified code.
+                    consume = !mem_request.valid;
+                    produce_jump = consume;
+                    next_jump_command.payload.actual_next_pc = cmd_in.current_pc + 'd4;
+                    next_jump_command.payload.update_pc = 'b1;
+                    if (consume) mispredicted_next = 'b1;
+                end
                 GECKO_EXECUTE_TYPE_BRANCH: begin
                     produce_jump = 'b1;
 
