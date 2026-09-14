@@ -52,7 +52,11 @@ _MODEL_SWITCHES = (
 
 def _run_build_command(command: Sequence[str]) -> None:
     result = subprocess.run(
-        command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=False,
     )
     if result.returncode:
         print(result.stdout, file=sys.stderr, end="", flush=True)
@@ -173,9 +177,13 @@ class VerilatorModel:
     compile_flags: tuple[str, ...] = ()
     link_flags: tuple[str, ...] = ()
 
-    def verilate(
-        self, sources: Sequence[str], verilator_args: Sequence[str] = ()
-    ) -> None:
+    def verilate(self, dotfile_path: Path, verilator_args: Sequence[str] = ()) -> None:
+        """Run Verilator to generate C++ model files.
+
+        Args:
+            dotfile_path: Path to the file listing all Verilog source files (*.f normally)
+            verilator_args: Additional command-line arguments to pass to Verilator.
+        """
         self.model_directory.mkdir(parents=True, exist_ok=True)
         _run_build_command(
             [
@@ -186,7 +194,8 @@ class VerilatorModel:
                 "--Mdir",
                 str(self.model_directory),
                 *verilator_args,
-                *sources,
+                "-f",
+                str(dotfile_path),
             ],
         )
 

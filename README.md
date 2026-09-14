@@ -81,6 +81,12 @@ uv run main.py test --targets gecko-riscv-add gecko-dhrystone --wave vcd
 
 Use `--output` to show successful test output, including Dhrystone's report.
 Logs and XML results are written per target and seed under `build/rustdv/logs`.
+Each selected test's ordered RTL file list is generated at
+`build/rustdv/<test-name>/sources.f` and passed to Verilator with `-f` when its
+model is built. These files also contain the RTL include path and preprocessor
+defines; other Verilator options remain command-line arguments.
+Paths in these files are relative to the repository root.
+Tests with identical RTL still share a compiled model.
 
 ## Cores
 

@@ -122,7 +122,9 @@ def select_targets(
             unmatched.append(pattern)
         selected.update(names)
     if unmatched:
-        raise ValueError(f"no RustDV targets match: {', '.join(sorted(set(unmatched)))}")
+        raise ValueError(
+            f"no RustDV targets match: {', '.join(sorted(set(unmatched)))}"
+        )
     return tuple(target for target in targets if target.name in selected)
 
 
@@ -146,9 +148,25 @@ def _ordered_sources(
     return result
 
 
-def _build_model(
+def _write_dotfile(
+    path: Path,
     target: RustdvTarget,
     source_files: dict[str, SourceFile],
+) -> None:
+    """Write the target's includes, defines, and ordered RTL to the given file path."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "-Irtl/\n"
+        "+define+__SYNTH_ONLY__=1\n"
+        "+define+__RUSTDV__=1\n"
+        + "".join(f"{source}\n" for source in _ordered_sources(target, source_files)),
+        encoding="utf-8",
+    )
+
+
+def _build_model(
+    target: RustdvTarget,
+    dotfile_path: Path,
     wave: WaveFormat | None,
 ) -> Path:
     print(f"{Fore.BLUE}Building{Style.RESET_ALL}: {target.name}", flush=True)
@@ -168,9 +186,6 @@ def _build_model(
         "-Wno-UNOPTFLAT",
         "--top-module",
         target.top,
-        "-Irtl/",
-        "+define+__SYNTH_ONLY__=1",
-        "+define+__RUSTDV__=1",
     ]
     verilator_args.extend(f"-G{name}={value}" for name, value in target.parameters)
     compile_flags: tuple[str, ...] = ()
@@ -203,7 +218,7 @@ def _build_model(
         link_flags=link_flags,
     )
     model.verilate(
-        _ordered_sources(target, source_files),
+        dotfile_path,
         verilator_args,
     )
     model.build()
@@ -324,10 +339,12 @@ def build_rustdv_targets(
     simulators: dict[str, Path] = {}
     models: dict[tuple[object, ...], Path] = {}
     for target in targets:
+        dotfile_path = Path("build/rustdv") / target.name / "sources.f"
+        _write_dotfile(dotfile_path, target, source_files)
         # Test variants sharing identical RTL need only one Verilator build.
         key = (target.top, target.files, target.wrapper, target.parameters)
         if key not in models:
-            models[key] = _build_model(target, source_files, wave)
+            models[key] = _build_model(target, dotfile_path, wave)
         simulators[target.name] = models[key]
 
     return simulators
