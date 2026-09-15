@@ -11,11 +11,13 @@ from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from inspect import currentframe
 from pathlib import Path
+from time import perf_counter
 from typing import TYPE_CHECKING, Literal, cast
 
 from colorama import Fore, Style
 from ninja.ninja_syntax import Writer as NinjaWriter
 
+from .circt import run as circt_run
 from .environment import discover_verilator
 from .riscv import RiscvProgram, write_riscv_ninja_rules
 from .test_runner import run_test_ninja, test_command
@@ -153,12 +155,20 @@ def _write_dotfile(
     target: RustdvTarget,
     source_files: dict[str, SourceFile],
 ) -> None:
-    """Write the target's includes, defines, and ordered RTL to the given file path."""
+    """Write includes, defines, timescale, parameter overrides, and ordered RTL."""
+    # Double quotes preserve Verilog apostrophes in both tools' file parsers.
+    parameter_args = [f"-G{name}={value}" for name, value in target.parameters]
+    parameter_lines = "".join(
+        '"' + argument.replace("\\", "\\\\").replace('"', '\\"') + '"\n'
+        for argument in parameter_args
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         "-Irtl/\n"
         "+define+__SYNTH_ONLY__=1\n"
         "+define+__RUSTDV__=1\n"
+        "--timescale 1ns/1ps\n"
+        + parameter_lines
         + "".join(f"{source}\n" for source in _ordered_sources(target, source_files)),
         encoding="utf-8",
     )
@@ -169,8 +179,20 @@ def _build_model(
     dotfile_path: Path,
     wave: WaveFormat | None,
 ) -> Path:
-    print(f"{Fore.BLUE}Building{Style.RESET_ALL}: {target.name}", flush=True)
-    _ = discover_verilator(min_version=(5, 50))
+    print(
+        f"{Fore.BLUE}Building CIRCT{Style.RESET_ALL}: {target.name}",
+        end=" ",
+        flush=True,
+    )
+    circt_start = perf_counter()
+    circt_run(dotfile_path, top=target.top)
+    print(f"({perf_counter() - circt_start:.2f}s)", flush=True)
+    print(
+        f"{Fore.BLUE}Building Verilator{Style.RESET_ALL}: {target.name}",
+        end=" ",
+        flush=True,
+    )
+    verilator_start = perf_counter()
     variant = wave or "fast"
     build = Path("build/rustdv") / target.name / variant
     obj = build / "obj_dir"
@@ -180,14 +202,11 @@ def _build_model(
         "-sv",
         "--timing",
         "--vpi",
-        "--timescale",
-        "1ns/1ps",
         "-Wno-TIMESCALEMOD",
         "-Wno-UNOPTFLAT",
         "--top-module",
         target.top,
     ]
-    verilator_args.extend(f"-G{name}={value}" for name, value in target.parameters)
     compile_flags: tuple[str, ...] = ()
     link_flags: tuple[str, ...] = ()
     if wave == "vcd":
@@ -222,6 +241,7 @@ def _build_model(
         verilator_args,
     )
     model.build()
+    print(f"({perf_counter() - verilator_start:.2f}s)", flush=True)
     return model.executable
 
 
@@ -318,6 +338,10 @@ def build_rustdv_targets(
     """Compile program binaries, Rust plugins, and shared Verilator models."""
     if not targets:
         raise ValueError("no RustDV targets selected")
+
+    # Verify that Verilator meets the minimum version requirement.
+    _ = discover_verilator(min_version=(5, 50))
+
     programs = {
         target.program.name: target.program
         for target in targets

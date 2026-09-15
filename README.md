@@ -83,9 +83,14 @@ Use `--output` to show successful test output, including Dhrystone's report.
 Logs and XML results are written per target and seed under `build/rustdv/logs`.
 Each selected test's ordered RTL file list is generated at
 `build/rustdv/<test-name>/sources.f` and passed to Verilator with `-f` when its
-model is built. These files also contain the RTL include path and preprocessor
-defines; other Verilator options remain command-line arguments.
+model is built. These files also contain the RTL include path, preprocessor
+defines, timescale, and parameter overrides; other Verilator options remain
+command-line arguments.
 Paths in these files are relative to the repository root.
+When `circt-verilog` is on `PATH`, each distinct model is also built with CIRCT
+using the same file list, top module, and parameter overrides. Its generated IR
+is saved as `build/rustdv/<test-name>/circt.mlir` beside the model's source list.
+CIRCT failures stop the build; this step is skipped when the executable is absent.
 Tests with identical RTL still share a compiled model.
 
 ## Cores

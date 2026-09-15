@@ -47,9 +47,8 @@ module stream_merge
     output logic                          stream_out_last
 );
 
-    typedef bit [$bits(stream_out.T_LOGIC)-1:0] payload_width_temp_t;
-    localparam int PAYLOAD_WIDTH = $bits(payload_width_temp_t);
-    // localparam PAYLOAD_WIDTH = $bits(stream_out.payload);
+    typedef stream_out.T payload_type_t;
+    localparam int PAYLOAD_WIDTH = $bits(payload_type_t);
 
     typedef logic [PAYLOAD_WIDTH-1:0] payload_t;
     typedef logic [ID_WIDTH-1:0] index_t;

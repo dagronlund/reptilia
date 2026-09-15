@@ -38,8 +38,7 @@ module stream_stage
     `STATIC_ASSERT($bits(T) == $bits(stream_in.payload))
     `STATIC_ASSERT($bits(T) == $bits(stream_out.payload))
 
-    typedef bit [$bits(stream_out.T_LOGIC)-1:0] payload_width_temp_t;
-    localparam int PAYLOAD_WIDTH = $bits(payload_width_temp_t);
+    localparam int PAYLOAD_WIDTH = $bits(T);
     typedef logic [PAYLOAD_WIDTH-1:0] payload_t;
 
     generate
