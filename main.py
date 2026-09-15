@@ -8,14 +8,15 @@ from pathlib import Path
 
 from scripts.build import build
 from scripts.format import format_systemverilog
+from scripts.lint import lint_verilog
 from scripts.rustdv import discover_targets, select_targets
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "command",
-        choices=("build", "test", "format"),
-        help="build selected targets, build and run their tests, or format all SystemVerilog files",
+        choices=("build", "test", "format", "lint"),
+        help="build selected targets, run tests, format SystemVerilog, or lint all Verilog",
     )
     parser.add_argument(
         "--targets",
@@ -40,7 +41,9 @@ if __name__ == "__main__":
         help="waveform output directory (default: build/waves)",
     )
     args = parser.parse_args()
-    if args.command == "format" and (args.targets is not None or args.wave is not None):
+    if args.command in ("format", "lint") and (
+        args.targets is not None or args.wave is not None
+    ):
         parser.error("--targets and --wave require build or test")
     if args.targets is not None:
         try:
@@ -50,6 +53,8 @@ if __name__ == "__main__":
 
     if args.command == "format":
         format_systemverilog()
+    elif args.command == "lint":
+        raise SystemExit(lint_verilog())
     else:
         build(
             run_tests=args.command == "test",

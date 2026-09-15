@@ -30,6 +30,12 @@ uv run main.py build --targets gecko-dhrystone
 Use `uv run main.py format` to format the RTL without building or testing.
 This requires `slang-format` on `PATH` and uses `.slang/format.json` for settings.
 
+Use `uv run ./main.py lint` to print slang diagnostics for all `.sv` and `.v`
+sources under `rtl`, `wrappers`, and `tb`, without building or testing. This
+requires `slang` on `PATH`, includes headers through the `rtl` include path,
+and returns slang's exit status. The command uses slang's
+[`--lint-only` mode](https://sv-lang.com/command-line-ref.html) with no error limit.
+
 Run all discovered RustDV targets, including the Gecko pipeline, memory,
 stream, supported RV32UI tests, and Dhrystone, with:
 
