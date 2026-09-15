@@ -7,14 +7,14 @@ package riscv32m_pkg;
     import riscv32_pkg::*;
 
     typedef enum riscv32_funct3_t {
-        RISCV32M_FUNCT3_MUL = 'h0,
-        RISCV32M_FUNCT3_MULH = 'h1,
+        RISCV32M_FUNCT3_MUL    = 'h0,
+        RISCV32M_FUNCT3_MULH   = 'h1,
         RISCV32M_FUNCT3_MULHSU = 'h2,
-        RISCV32M_FUNCT3_MULHU = 'h3,
-        RISCV32M_FUNCT3_DIV = 'h4,
-        RISCV32M_FUNCT3_DIVU = 'h5,
-        RISCV32M_FUNCT3_REM = 'h6,
-        RISCV32M_FUNCT3_REMU = 'h7
+        RISCV32M_FUNCT3_MULHU  = 'h3,
+        RISCV32M_FUNCT3_DIV    = 'h4,
+        RISCV32M_FUNCT3_DIVU   = 'h5,
+        RISCV32M_FUNCT3_REM    = 'h6,
+        RISCV32M_FUNCT3_REMU   = 'h7
     } riscv32m_funct3_t;
 
     typedef enum riscv32_funct7_t {

@@ -28,6 +28,7 @@ uv run main.py build --targets gecko-dhrystone
 ```
 
 Use `uv run main.py format` to format the RTL without building or testing.
+This requires `slang-format` on `PATH` and uses `.slang/format.json` for settings.
 
 Run all discovered RustDV targets, including the Gecko pipeline, memory,
 stream, supported RV32UI tests, and Dhrystone, with:
@@ -89,7 +90,8 @@ command-line arguments.
 Paths in these files are relative to the repository root.
 When `circt-verilog` is on `PATH`, each distinct model is also built with CIRCT
 using the same file list, top module, and parameter overrides. Its generated IR
-is saved as `build/rustdv/<test-name>/circt.mlir` beside the model's source list.
+is saved as `circt.moore.mlir`, `circt.llhd.mlir`, and `circt.hw.mlir` in
+`build/rustdv/<test-name>/`, beside the model's source list.
 CIRCT failures stop the build; this step is skipped when the executable is absent.
 Tests with identical RTL still share a compiled model.
 

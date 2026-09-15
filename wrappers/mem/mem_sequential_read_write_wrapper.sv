@@ -4,20 +4,12 @@ module mem_sequential_read_write_wrapper (
 );
 
     mem_intf
-        mem_read_in (
-            .clk,
-            .rst
-        ),
-        mem_read_out (
-            .clk,
-            .rst
-        ),
-        mem_write_in (
-            .clk,
-            .rst
-        );
+      mem_read_in  (.clk, .rst),
+      mem_read_out (.clk, .rst),
+      mem_write_in (.clk, .rst);
 
-    mem_sequential_read_write inst (
+    mem_sequential_read_write
+      inst (
         .clk,
         .rst,
         .mem_read_in,

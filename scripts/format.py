@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-VERIBLE_FORMAT_CONFIG = REPO_ROOT / ".rules.verible_format"
+SLANG_FORMAT_CONFIG = REPO_ROOT / ".slang" / "format.json"
 
 
 def format_systemverilog() -> None:
@@ -17,8 +17,9 @@ def format_systemverilog() -> None:
 
     subprocess.run(
         [
-            "verible-verilog-format",
-            f"--flagfile={VERIBLE_FORMAT_CONFIG}",
+            "slang-format",
+            "--config",
+            str(SLANG_FORMAT_CONFIG),
             "--inplace",
             *(path.relative_to(REPO_ROOT) for path in source_files),
         ],

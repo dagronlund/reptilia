@@ -2,23 +2,23 @@
 
 `ifdef __LINTER__
 
-`include "../../lib/std/std_util.svh"
-`include "../../lib/isa/rv.svh"
-`include "../../lib/isa/rv32.svh"
-`include "../../lib/isa/rv32f.svh"
-`include "../../lib/fpu/fpu.svh"
-`include "../../lib/fpu/fpu_operations.svh"
-`include "../../lib/basilisk/basilisk.svh"
+    `include "../../lib/std/std_util.svh"
+    `include "../../lib/isa/rv.svh"
+    `include "../../lib/isa/rv32.svh"
+    `include "../../lib/isa/rv32f.svh"
+    `include "../../lib/fpu/fpu.svh"
+    `include "../../lib/fpu/fpu_operations.svh"
+    `include "../../lib/basilisk/basilisk.svh"
 
 `else
 
-`include "std_util.svh"
-`include "rv.svh"
-`include "rv32.svh"
-`include "rv32f.svh"
-`include "basilisk.svh"
-`include "fpu.svh"
-`include "fpu_operations.svh"
+    `include "std_util.svh"
+    `include "rv.svh"
+    `include "rv32.svh"
+    `include "rv32f.svh"
+    `include "basilisk.svh"
+    `include "fpu.svh"
+    `include "fpu_operations.svh"
 
 `endif
 
@@ -32,15 +32,14 @@ module basilisk_mult_add_round
 #(
     parameter int OUTPUT_REGISTER_MODE = 1
 ) (
-    input logic clk,
-    rst,
+    input logic         clk, rst,
 
-    std_stream_intf.in mult_add_normalize_command,  // basilisk_mult_add_normalize_command_t
+    std_stream_intf.in  mult_add_normalize_command,  // basilisk_mult_add_normalize_command_t
     std_stream_intf.out mult_add_command  // basilisk_add_command_t
 );
 
     std_stream_intf #(
-        .T(basilisk_add_command_t)
+        .T (basilisk_add_command_t)
     ) next_mult_add_command (
         .clk,
         .rst
@@ -49,17 +48,17 @@ module basilisk_mult_add_round
     logic enable, consume, produce;
 
     std_flow_lite #(
-        .NUM_INPUTS (1),
-        .NUM_OUTPUTS(1)
+        .NUM_INPUTS  (1),
+        .NUM_OUTPUTS (1)
     ) std_flow_lite_inst (
         .clk,
         .rst,
 
-        .valid_input({mult_add_normalize_command.valid}),
-        .ready_input({mult_add_normalize_command.ready}),
+        .valid_input  ({mult_add_normalize_command.valid}),
+        .ready_input  ({mult_add_normalize_command.ready}),
 
-        .valid_output({next_mult_add_command.valid}),
-        .ready_output({next_mult_add_command.ready}),
+        .valid_output ({next_mult_add_command.valid}),
+        .ready_output ({next_mult_add_command.ready}),
 
         .consume,
         .produce,
@@ -67,13 +66,13 @@ module basilisk_mult_add_round
     );
 
     std_flow_stage #(
-        .T(basilisk_add_command_t),
-        .MODE(OUTPUT_REGISTER_MODE)
+        .T    (basilisk_add_command_t),
+        .MODE (OUTPUT_REGISTER_MODE)
     ) output_stage_inst (
         .clk,
         .rst,
-        .stream_in (next_mult_add_command),
-        .stream_out(mult_add_command)
+        .stream_in  (next_mult_add_command),
+        .stream_out (mult_add_command)
     );
 
     always_comb begin
@@ -82,15 +81,15 @@ module basilisk_mult_add_round
         consume = 'b1;
         produce = 'b1;
 
-        next_mult_add_command.payload.a = fpu_decode_float(fpu_operations_round(mult_result));
+        next_mult_add_command.payload.a            = fpu_decode_float(fpu_operations_round(mult_result));
         next_mult_add_command.payload.conditions_a = fpu_get_conditions(next_mult_add_command.payload.a);
 
-        next_mult_add_command.payload.b = mult_add_normalize_command.payload.c;
+        next_mult_add_command.payload.b            = mult_add_normalize_command.payload.c;
         next_mult_add_command.payload.conditions_b = fpu_get_conditions(next_mult_add_command.payload.b);
 
         next_mult_add_command.payload.mode = mult_result.mode;
 
-        next_mult_add_command.payload.dest_reg_addr = mult_add_normalize_command.payload.dest_reg_addr;
+        next_mult_add_command.payload.dest_reg_addr    = mult_add_normalize_command.payload.dest_reg_addr;
         next_mult_add_command.payload.dest_offset_addr = mult_add_normalize_command.payload.dest_offset_addr;
     end
 

@@ -6,20 +6,19 @@ module stream_controller_interfaced #(
     parameter int NUM_INPUTS  = 1,
     parameter int NUM_OUTPUTS = 1
 ) (
-    input wire clk,
-    rst,
+    input  wire                   clk, rst,
 
-    stream_intf.in  inputs [ NUM_INPUTS],
-    stream_intf.out outputs[NUM_OUTPUTS],
+    stream_intf.in                inputs[NUM_INPUTS],
+    stream_intf.out               outputs[NUM_OUTPUTS],
 
-    input wire [ NUM_INPUTS-1:0] consume,  // If input being read this cycle
-    input wire [NUM_OUTPUTS-1:0] produce,  // If an output will be present next cycle
+    input  wire [NUM_INPUTS-1:0]  consume,  // If input being read this cycle
+    input  wire [NUM_OUTPUTS-1:0] produce,  // If an output will be present next cycle
 
-    output logic enable  // Enable for current state
+    output logic                  enable    // Enable for current state
 );
 
-    logic [ NUM_INPUTS-1:0] valid_input;
-    logic [ NUM_INPUTS-1:0] ready_input;
+    logic [NUM_INPUTS-1:0] valid_input;
+    logic [NUM_INPUTS-1:0] ready_input;
 
     logic [NUM_OUTPUTS-1:0] valid_output;
     logic [NUM_OUTPUTS-1:0] ready_output;
@@ -42,8 +41,8 @@ module stream_controller_interfaced #(
     endgenerate
 
     stream_controller #(
-        .NUM_INPUTS (NUM_INPUTS),
-        .NUM_OUTPUTS(NUM_OUTPUTS)
+        .NUM_INPUTS  (NUM_INPUTS),
+        .NUM_OUTPUTS (NUM_OUTPUTS)
     ) stream_controller_inst (
         .clk,
         .rst,

@@ -3,16 +3,16 @@
 module std_register
     import std_pkg::*;
 #(
-    parameter std_clock_info_t CLOCK_INFO = 'b0,
-    parameter type T = logic,
-    parameter T RESET_VECTOR = 'b0
+    parameter std_clock_info_t CLOCK_INFO   = 'b0,
+    parameter type             T            = logic,
+    parameter T                RESET_VECTOR = 'b0
 ) (
-    input wire clk,
-    input wire rst,
+    input  wire clk,
+    input  wire rst,
 
-    input wire enable,
-    input T next,
-    output T value
+    input  wire enable,
+    input  T    next,
+    output T    value
 );
 
     // Maybe this will be supported by synthesis?

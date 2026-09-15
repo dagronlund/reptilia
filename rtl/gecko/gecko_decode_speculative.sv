@@ -6,11 +6,11 @@
 
 // Speculation is handled with a small table and front/rear counters used for
 // indexing into that table. The front counter is incremented when a branch/jump
-// instruction is encountered, and the rear counter when that branch is 
-// resolved, either having been predicted correctly or incorrectly. While the 
-// counters are not equal no branch/jump instructions execute, and all other 
-// instructions are marked as speculative. When a branch is resolved the rear 
-// counter increments and the mispredicted flag is set for that entry. When a 
+// instruction is encountered, and the rear counter when that branch is
+// resolved, either having been predicted correctly or incorrectly. While the
+// counters are not equal no branch/jump instructions execute, and all other
+// instructions are marked as speculative. When a branch is resolved the rear
+// counter increments and the mispredicted flag is set for that entry. When a
 // writeback happens, the front counter with that writeback is used to lookup if
 // that writeback was mispredicted.
 
@@ -26,70 +26,70 @@ module gecko_decode_speculative
     parameter std_technology_t TECHNOLOGY    = STD_TECHNOLOGY_FPGA_XILINX,
     parameter int              COUNTER_WIDTH = 2
 ) (
-    input wire clk,
-    input wire rst,
+    input  wire              clk,
+    input  wire              rst,
 
     // From decode
-    input wire instruction_enable,
-    input wire instruction_branch_jump,
-    input wire instruction_updated,
+    input  wire              instruction_enable,
+    input  wire              instruction_branch_jump,
+    input  wire              instruction_updated,
 
     // From execute
-    input wire speculation_resolved,
-    input wire speculation_mispredicted,
+    input  wire              speculation_resolved,
+    input  wire              speculation_mispredicted,
 
-    output logic mispredicted,
-    output logic speculating,
-    output logic speculation_full,
+    output logic             mispredicted,
+    output logic             speculating,
+    output logic             speculation_full,
 
     output gecko_jump_flag_t execute_flag,
 
-    output logic reset_done
+    output logic             reset_done
 );
 
     localparam int HISTORY_DEPTH = 1 << $bits(gecko_jump_flag_t);
-    typedef logic [COUNTER_WIDTH-1:0] counter_t;
+    typedef logic     [COUNTER_WIDTH-1:0] counter_t;
     typedef counter_t [HISTORY_DEPTH-1:0] counter_table_t;
 
     // Track speculation status
-    gecko_jump_flag_t front_flag, rear_flag;
+    gecko_jump_flag_t front_flag,      rear_flag;
     gecko_jump_flag_t front_flag_next, rear_flag_next;
-    logic mispredicted_next;
+    logic             mispredicted_next;
 
     std_register #(
-        .CLOCK_INFO(CLOCK_INFO),
-        .T(gecko_jump_flag_t),
-        .RESET_VECTOR('b0)
+        .CLOCK_INFO   (CLOCK_INFO),
+        .T            (gecko_jump_flag_t),
+        .RESET_VECTOR ('b0)
     ) front_flag_register_inst (
         .clk,
         .rst,
-        .enable(instruction_enable),
-        .next  (front_flag_next),
-        .value (front_flag)
+        .enable (instruction_enable),
+        .next   (front_flag_next),
+        .value  (front_flag)
     );
 
     std_register #(
-        .CLOCK_INFO(CLOCK_INFO),
-        .T(gecko_jump_flag_t),
-        .RESET_VECTOR('b0)
+        .CLOCK_INFO   (CLOCK_INFO),
+        .T            (gecko_jump_flag_t),
+        .RESET_VECTOR ('b0)
     ) rear_flag_register_inst (
         .clk,
         .rst,
-        .enable('b1),
-        .next  (rear_flag_next),
-        .value (rear_flag)
+        .enable ('b1),
+        .next   (rear_flag_next),
+        .value  (rear_flag)
     );
 
     std_register #(
-        .CLOCK_INFO(CLOCK_INFO),
-        .T(logic),
-        .RESET_VECTOR('b0)
+        .CLOCK_INFO   (CLOCK_INFO),
+        .T            (logic),
+        .RESET_VECTOR ('b0)
     ) mispredicted_register_inst (
         .clk,
         .rst,
-        .enable('b1),
-        .next  (mispredicted_next),
-        .value (mispredicted)
+        .enable ('b1),
+        .next   (mispredicted_next),
+        .value  (mispredicted)
     );
 
     always_comb begin

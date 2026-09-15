@@ -5,56 +5,38 @@ module gecko_core_tb
     logic clk, rst;
 
     mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32)
-    ) inst_request (
-        .clk,
-        .rst
-    );
+        .DATA_WIDTH (32),
+        .ADDR_WIDTH (32)
+    ) inst_request (.clk, .rst);
     mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32)
-    ) inst_result (
-        .clk,
-        .rst
-    );
+        .DATA_WIDTH (32),
+        .ADDR_WIDTH (32)
+    ) inst_result (.clk, .rst);
     mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32)
-    ) data_request (
-        .clk,
-        .rst
-    );
+        .DATA_WIDTH (32),
+        .ADDR_WIDTH (32)
+    ) data_request (.clk, .rst);
     mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32)
-    ) data_result (
-        .clk,
-        .rst
-    );
+        .DATA_WIDTH (32),
+        .ADDR_WIDTH (32)
+    ) data_result (.clk, .rst);
     mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32)
-    ) float_mem_request (
-        .clk,
-        .rst
-    );
+        .DATA_WIDTH (32),
+        .ADDR_WIDTH (32)
+    ) float_mem_request (.clk, .rst);
     mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32)
-    ) float_mem_result (
-        .clk,
-        .rst
-    );
+        .DATA_WIDTH (32),
+        .ADDR_WIDTH (32)
+    ) float_mem_result (.clk, .rst);
 
     stream_intf #(
-        .T(logic [7:0])
+        .T (logic [7:0])
     ) tty_in (
         .clk,
         .rst
     );
     stream_intf #(
-        .T(logic [7:0])
+        .T (logic [7:0])
     ) tty_out (
         .clk,
         .rst
@@ -66,7 +48,7 @@ module gecko_core_tb
     /* verilator public_off */
 
     gecko_core #(
-        .CONFIG(gecko_get_basic_config(1, 1, 0))
+        .CONFIG (gecko_get_basic_config(1, 1, 0))
     ) inst (
         .clk,
         .rst,

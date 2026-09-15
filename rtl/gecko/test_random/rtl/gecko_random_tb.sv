@@ -7,56 +7,38 @@ module gecko_random_tb
     always #5 clk = ~clk;
 
     mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32)
-    ) inst_request (
-        .clk,
-        .rst
-    );
+        .DATA_WIDTH (32),
+        .ADDR_WIDTH (32)
+    ) inst_request (.clk, .rst);
     mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32)
-    ) inst_result (
-        .clk,
-        .rst
-    );
+        .DATA_WIDTH (32),
+        .ADDR_WIDTH (32)
+    ) inst_result (.clk, .rst);
     mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32)
-    ) data_request (
-        .clk,
-        .rst
-    );
+        .DATA_WIDTH (32),
+        .ADDR_WIDTH (32)
+    ) data_request (.clk, .rst);
     mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32)
-    ) data_result (
-        .clk,
-        .rst
-    );
+        .DATA_WIDTH (32),
+        .ADDR_WIDTH (32)
+    ) data_result (.clk, .rst);
     mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32)
-    ) float_mem_request (
-        .clk,
-        .rst
-    );
+        .DATA_WIDTH (32),
+        .ADDR_WIDTH (32)
+    ) float_mem_request (.clk, .rst);
     mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32)
-    ) float_mem_result (
-        .clk,
-        .rst
-    );
+        .DATA_WIDTH (32),
+        .ADDR_WIDTH (32)
+    ) float_mem_result (.clk, .rst);
 
     stream_intf #(
-        .T(logic [7:0])
+        .T (logic [7:0])
     ) tty_in (
         .clk,
         .rst
     );
     stream_intf #(
-        .T(logic [7:0])
+        .T (logic [7:0])
     ) tty_out (
         .clk,
         .rst
@@ -67,12 +49,13 @@ module gecko_random_tb
     logic [7:0] exit_code;
 
     // Read-only observation aliases. No production RTL behavior is changed.
-    logic       trace_reset_done;
+    logic trace_reset_done;
     always_comb trace_reset_done = inst.gecko_decode_inst.reset_done;
 
     logic trace_decode_valid;
-    always_comb
-        trace_decode_valid = inst.instruction_command_break.valid && inst.instruction_command_break.ready && inst.inst_result_break.valid && inst.inst_result_break.ready && !rst && inst.gecko_decode_inst.reset_done && inst.gecko_decode_inst.state_temp != 3;
+    always_comb trace_decode_valid = inst.instruction_command_break.valid && inst.instruction_command_break.ready
+                                         && inst.inst_result_break.valid && inst.inst_result_break.ready && !rst
+                                         && inst.gecko_decode_inst.reset_done && inst.gecko_decode_inst.state_temp != 3;
 
     logic trace_decode_flush;
     always_comb trace_decode_flush = inst.gecko_decode_inst.instruction_status.flush_instruction;
@@ -145,7 +128,7 @@ module gecko_random_tb
     /* verilator public_off */
 
     gecko_core #(
-        .CONFIG(gecko_get_basic_config(1, 1, 0))
+        .CONFIG (gecko_get_basic_config(1, 1, 0))
     ) inst (
         .clk,
         .rst,

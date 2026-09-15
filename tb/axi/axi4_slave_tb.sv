@@ -9,57 +9,53 @@ module axi4_slave_tb #() ();
     import axi4::*;
 
     logic clk, rst;
-    clk_rst_gen clk_rst_gen_inst (
-        .clk,
-        .rst
-    );
+    clk_rst_gen
+      clk_rst_gen_inst (.clk, .rst);
 
     axi4_ar_intf #(
-        .ID_WIDTH(4)
+        .ID_WIDTH (4)
     ) axi_ar (
         .clk,
         .rst
     );
     axi4_aw_intf #(
-        .ID_WIDTH(4)
+        .ID_WIDTH (4)
     ) axi_aw (
         .clk,
         .rst
     );
-    axi4_w_intf axi_w (
-        .clk,
-        .rst
-    );
+    axi4_w_intf
+      axi_w (.clk, .rst);
     axi4_r_intf #(
-        .ID_WIDTH(4)
+        .ID_WIDTH (4)
     ) axi_r (
         .clk,
         .rst
     );
     axi4_b_intf #(
-        .ID_WIDTH(4)
+        .ID_WIDTH (4)
     ) axi_b (
         .clk,
         .rst
     );
 
     std_mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32)
+        .DATA_WIDTH (32),
+        .ADDR_WIDTH (32)
     ) mem_request (
         .clk,
         .rst
     );
     std_mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32)
+        .DATA_WIDTH (32),
+        .ADDR_WIDTH (32)
     ) mem_response (
         .clk,
         .rst
     );
 
     axi4_slave #(
-        .AXI_ID_WIDTH(4)
+        .AXI_ID_WIDTH (4)
     ) axi4_slave_inst (
         .clk,
         .rst,
@@ -97,36 +93,57 @@ module axi4_slave_tb #() ();
     //     .masters('{master0, master1})
     // );
 
-    logic re;
-    logic [3:0] we;
+    logic        re;
+    logic [3:0]  we;
     logic [31:0] data, addr;
-    logic id;
+    logic        id;
 
-    axi4_resp_t temp_resp;
+    axi4_resp_t  temp_resp;
     logic [31:0] temp_data;
-    logic temp_last;
-    logic [3:0] temp_id;
+    logic        temp_last;
+    logic [3:0]  temp_id;
 
     initial begin
-        axi_ar.arvalid = 'b0;
-        axi_aw.awvalid = 'b0;
-        axi_w.wvalid = 'b0;
+        axi_ar.arvalid     = 'b0;
+        axi_aw.awvalid     = 'b0;
+        axi_w.wvalid       = 'b0;
         mem_response.valid = 'b0;
-        axi_b.bready = 'b0;
-        axi_r.rready = 'b0;
-        mem_request.ready = 'b0;
-        while (rst) @(posedge clk);
+        axi_b.bready       = 'b0;
+        axi_r.rready       = 'b0;
+        mem_request.ready  = 'b0;
+        while (rst)
+            @(posedge clk);
 
         fork
             begin
-                axi_aw.send('h50000400, AXI4_BURST_INCR, axi4_cache_t'(4'b0), 'h1, AXI4_LOCK_NORMAL, axi4_prot_t'(3'b0),
-                            'b0, 'h2, 'b0, 'h5);
+                axi_aw.send(
+                    'h50000400,
+                    AXI4_BURST_INCR,
+                    axi4_cache_t'(4'b0),
+                    'h1,
+                    AXI4_LOCK_NORMAL,
+                    axi4_prot_t'(3'b0),
+                    'b0,
+                    'h2,
+                    'b0,
+                    'h5
+                );
 
                 axi_w.send('h42, 'hF, 'h1);
                 axi_w.send('h69, 'hF, 'h1);
 
-                axi_ar.send('h400, AXI4_BURST_INCR, axi4_cache_t'(4'b0), 'h1, AXI4_LOCK_NORMAL, axi4_prot_t'(3'b0), 'b0,
-                            'h2, 'b0, 'h4);
+                axi_ar.send(
+                    'h400,
+                    AXI4_BURST_INCR,
+                    axi4_cache_t'(4'b0),
+                    'h1,
+                    AXI4_LOCK_NORMAL,
+                    axi4_prot_t'(3'b0),
+                    'b0,
+                    'h2,
+                    'b0,
+                    'h4
+                );
 
             end
             begin

@@ -4,16 +4,11 @@ module stream_fifo_wrapper (
 );
 
     stream_intf
-        stream_in (
-            .clk,
-            .rst
-        ),
-        stream_out (
-            .clk,
-            .rst
-        );
+      stream_in  (.clk, .rst),
+      stream_out (.clk, .rst);
 
-    stream_fifo inst (
+    stream_fifo
+      inst (
         .clk,
         .rst,
         .stream_in,

@@ -18,7 +18,7 @@ package std_pkg;
     } std_reset_clocking_t;
 
     typedef struct packed {
-        std_clock_edge_t clock_edge;
+        std_clock_edge_t     clock_edge;
         std_reset_polarity_t reset_polarity;
         std_reset_clocking_t reset_clocking;
     } std_clock_info_t;

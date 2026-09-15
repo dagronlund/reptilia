@@ -2,23 +2,23 @@
 
 `ifdef __LINTER__
 
-`include "../../lib/std/std_util.svh"
-`include "../../lib/isa/rv.svh"
-`include "../../lib/isa/rv32.svh"
-`include "../../lib/isa/rv32f.svh"
-`include "../../lib/fpu/fpu.svh"
-`include "../../lib/fpu/fpu_operations.svh"
-`include "../../lib/basilisk/basilisk.svh"
+    `include "../../lib/std/std_util.svh"
+    `include "../../lib/isa/rv.svh"
+    `include "../../lib/isa/rv32.svh"
+    `include "../../lib/isa/rv32f.svh"
+    `include "../../lib/fpu/fpu.svh"
+    `include "../../lib/fpu/fpu_operations.svh"
+    `include "../../lib/basilisk/basilisk.svh"
 
 `else
 
-`include "std_util.svh"
-`include "rv.svh"
-`include "rv32.svh"
-`include "rv32f.svh"
-`include "basilisk.svh"
-`include "fpu.svh"
-`include "fpu_operations.svh"
+    `include "std_util.svh"
+    `include "rv.svh"
+    `include "rv32.svh"
+    `include "rv32f.svh"
+    `include "basilisk.svh"
+    `include "fpu.svh"
+    `include "fpu_operations.svh"
 
 `endif
 
@@ -31,17 +31,16 @@ module basilisk_writeback
     import basilisk::*;
 #(
     parameter int OUTPUT_REGISTER_MODE = 1,
-    parameter int PORTS = 1
+    parameter int PORTS                = 1
 ) (
-    input logic clk,
-    rst,
+    input logic         clk, rst,
 
-    std_stream_intf.in writeback_results_in[PORTS],  // basilisk_result_t
+    std_stream_intf.in  writeback_results_in[PORTS],  // basilisk_result_t
     std_stream_intf.out writeback_result  // basilisk_writeback_result_t
 );
 
     std_stream_intf #(
-        .T(basilisk_writeback_result_t)
+        .T (basilisk_writeback_result_t)
     ) next_writeback_result (
         .clk,
         .rst
@@ -54,29 +53,29 @@ module basilisk_writeback
         genvar k;
         for (k = 0; k < PORTS; k++) begin
             always_comb begin
-                results_in_valid[k] = writeback_results_in[k].valid;
-                results_in[k] = writeback_results_in[k].payload;
+                results_in_valid[k]           = writeback_results_in[k].valid;
+                results_in[k]                 = writeback_results_in[k].payload;
                 writeback_results_in[k].ready = results_in_ready[k];
             end
         end
     endgenerate
 
-    logic enable;
+    logic             enable;
     logic [PORTS-1:0] consume;
-    logic produce;
+    logic             produce;
 
     std_flow_lite #(
-        .NUM_INPUTS (PORTS),
-        .NUM_OUTPUTS(1)
+        .NUM_INPUTS  (PORTS),
+        .NUM_OUTPUTS (1)
     ) std_flow_lite_inst (
         .clk,
         .rst,
 
-        .valid_input(results_in_valid),
-        .ready_input(results_in_ready),
+        .valid_input  (results_in_valid),
+        .ready_input  (results_in_ready),
 
-        .valid_output({next_writeback_result.valid}),
-        .ready_output({next_writeback_result.ready}),
+        .valid_output ({next_writeback_result.valid}),
+        .ready_output ({next_writeback_result.ready}),
 
         .consume,
         .produce,
@@ -84,13 +83,13 @@ module basilisk_writeback
     );
 
     std_flow_stage #(
-        .T(basilisk_writeback_result_t),
-        .MODE(OUTPUT_REGISTER_MODE)
+        .T    (basilisk_writeback_result_t),
+        .MODE (OUTPUT_REGISTER_MODE)
     ) output_stage_inst (
         .clk,
         .rst,
-        .stream_in (next_writeback_result),
-        .stream_out(writeback_result)
+        .stream_in  (next_writeback_result),
+        .stream_out (writeback_result)
     );
 
     parameter int COUNTER_WIDTH = ($clog2(PORTS) > 0) ? $clog2(PORTS) : 1;
@@ -115,13 +114,13 @@ module basilisk_writeback
     end
 
     always_comb begin
-        automatic counter_t iterated_counter;
-        automatic fpu_result_t chosen_result;
-        automatic rv32_reg_addr_t chosen_dest_reg_addr;
+        automatic counter_t              iterated_counter;
+        automatic fpu_result_t           chosen_result;
+        automatic rv32_reg_addr_t        chosen_dest_reg_addr;
         automatic basilisk_offset_addr_t chosen_dest_offset_addr;
 
-        consume = 'b0;
-        produce = 'b1;
+        consume      = 'b0;
+        produce      = 'b1;
         next_counter = increment_counter(current_counter);
 
         iterated_counter = current_counter;
@@ -131,14 +130,14 @@ module basilisk_writeback
 
         for (int i = 0; i < PORTS; i++) begin
             if (results_in_valid[iterated_counter]) begin
-                consume = 'b0;
+                consume                   = 'b0;
                 consume[iterated_counter] = 'b1;
                 break;
             end
             iterated_counter = increment_counter(iterated_counter);
         end
 
-        next_writeback_result.payload.dest_reg_addr = results_in[iterated_counter].dest_reg_addr;
+        next_writeback_result.payload.dest_reg_addr    = results_in[iterated_counter].dest_reg_addr;
         next_writeback_result.payload.dest_offset_addr = results_in[iterated_counter].dest_offset_addr;
         next_writeback_result.payload.result =
             fpu_decode_float(fpu_operations_round(results_in[iterated_counter].result));

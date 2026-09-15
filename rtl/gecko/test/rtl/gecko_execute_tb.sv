@@ -5,32 +5,29 @@ module gecko_execute_tb
     /* verilator public_flat_rw_on */
     logic clk, rst;
     stream_intf #(
-        .T(gecko_execute_operation_t)
+        .T (gecko_execute_operation_t)
     ) execute_command (
         .clk,
         .rst
     );
     stream_intf #(
-        .T(gecko_mem_operation_t)
+        .T (gecko_mem_operation_t)
     ) mem_command (
         .clk,
         .rst
     );
     mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(32)
-    ) mem_request (
-        .clk,
-        .rst
-    );
+        .DATA_WIDTH (32),
+        .ADDR_WIDTH (32)
+    ) mem_request (.clk, .rst);
     stream_intf #(
-        .T(gecko_operation_t)
+        .T (gecko_operation_t)
     ) execute_result (
         .clk,
         .rst
     );
     stream_intf #(
-        .T(gecko_jump_operation_t)
+        .T (gecko_jump_operation_t)
     ) jump_command (
         .clk,
         .rst
@@ -40,7 +37,7 @@ module gecko_execute_tb
     /* verilator public_off */
 
     gecko_execute #(
-        .ENABLE_INTEGER_MATH(1'b1)
+        .ENABLE_INTEGER_MATH (1'b1)
     ) inst (
         .clk,
         .rst,

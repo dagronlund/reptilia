@@ -5,27 +5,26 @@ package fpu_sqrt_pkg;
     import fpu_pkg::*;
 
     typedef struct packed {
-        logic mantissa_lsb;
-        logic [1:0] mantissa_msb;
+        logic        mantissa_lsb;
+        logic [1:0]  mantissa_msb;
         logic [47:0] mantissa_acc;
         logic [47:0] mantissa_temp;
     } fpu_reference_float_sqrt_partial_t;
 
     typedef struct packed {
-        logic sign;
-        logic [7:0] exponent;
-        logic [26:0] mantissa;
-        logic [23:0] actual_mantissa;
+        logic                              sign;
+        logic [7:0]                        exponent;
+        logic [26:0]                       mantissa;
+        logic [23:0]                       actual_mantissa;
         fpu_reference_float_sqrt_partial_t sqrt_partial;
-        logic infinity, nan, zero, exponent_negative;  //, valid;
-        fpu_round_mode_t mode;
+        logic                              infinity, nan, zero, exponent_negative;  //, valid;
+        fpu_round_mode_t                   mode;
     } fpu_sqrt_result_t;
 
-    function automatic fpu_reference_float_sqrt_partial_t fpu_reference_float_sqrt_partial(
-        input fpu_reference_float_sqrt_partial_t args);
-        logic mantissa_acc_lsb = 'b0;
+    function automatic fpu_reference_float_sqrt_partial_t fpu_reference_float_sqrt_partial(input fpu_reference_float_sqrt_partial_t args);
+        logic        mantissa_acc_lsb = 'b0;
         logic [47:0] sub_result;
-        logic sub_carry;
+        logic        sub_carry;
 
         // Shift in two mantissa bits
         args.mantissa_temp = {args.mantissa_temp[45:0], args.mantissa_msb};
@@ -37,7 +36,7 @@ package fpu_sqrt_pkg;
             args.mantissa_lsb  = 'b1;
             args.mantissa_acc += 'b1;
         end else begin
-            args.mantissa_lsb = 'b0;
+            args.mantissa_lsb    = 'b0;
             args.mantissa_acc[0] = 'b0;
         end
 
@@ -50,20 +49,21 @@ package fpu_sqrt_pkg;
         input fpu_float_fields_t number,
         input fpu_float_conditions_t conditions,
         // input valid,
-        input fpu_round_mode_t mode);
+        input fpu_round_mode_t mode
+    );
 
-        logic denormalized, mantissa_zero, exponent_negative, number_zero;
-        logic [23:0] actual_mantissa;
-        logic [26:0] result_mantissa;
-        logic [7:0] actual_exponent, result_exponent;
-        logic [4:0] zeros;
-        logic generates_nan;
+        logic                              denormalized, mantissa_zero, exponent_negative, number_zero;
+        logic [23:0]                       actual_mantissa;
+        logic [26:0]                       result_mantissa;
+        logic [7:0]                        actual_exponent, result_exponent;
+        logic [4:0]                        zeros;
+        logic                              generates_nan;
         fpu_reference_float_sqrt_partial_t sqrt_partial;
-        fpu_float_fields_t y;
-        fpu_sqrt_result_t result;
+        fpu_float_fields_t                 y;
+        fpu_sqrt_result_t                  result;
 
         // Find flags for floating point input
-        denormalized = !conditions.norm;
+        denormalized      = !conditions.norm;
         exponent_negative = (number.exponent < 8'd127);
 
         // Decode the actual mantissa based on normalization
@@ -88,22 +88,22 @@ package fpu_sqrt_pkg;
         end
         // Halve the exponent
         result.actual_mantissa = actual_mantissa;
-        result.exponent = actual_exponent >> 1;
+        result.exponent        = actual_exponent >> 1;
 
         // Perform square root on the mantissa
-        result.mantissa = 27'd0;
-        result.sign = number.sign;
-        result.sqrt_partial.mantissa_msb = actual_mantissa[23:22];
-        result.sqrt_partial.mantissa_acc = 48'd1;
+        result.mantissa                   = 27'd0;
+        result.sign                       = number.sign;
+        result.sqrt_partial.mantissa_msb  = actual_mantissa[23:22];
+        result.sqrt_partial.mantissa_acc  = 48'd1;
         result.sqrt_partial.mantissa_temp = 48'd0;
 
 
-        result.nan = conditions.nan || number.sign;
-        result.infinity = conditions.infinity;
-        result.zero = conditions.zero;
+        result.nan               = conditions.nan || number.sign;
+        result.infinity          = conditions.infinity;
+        result.zero              = conditions.zero;
         result.exponent_negative = exponent_negative;
         // result.valid = valid;
-        result.mode = mode;
+        result.mode              = mode;
 
         return result;
 
@@ -113,10 +113,10 @@ package fpu_sqrt_pkg;
 
         result.sqrt_partial = fpu_reference_float_sqrt_partial(result.sqrt_partial);
         // Update mantissa
-        result.mantissa = {result.mantissa[25:0], result.sqrt_partial.mantissa_lsb};
+        result.mantissa     = {result.mantissa[25:0], result.sqrt_partial.mantissa_lsb};
 
         // Shift in new digits from original mantissa
-        result.actual_mantissa = result.actual_mantissa << 2;
+        result.actual_mantissa           = result.actual_mantissa << 2;
         result.sqrt_partial.mantissa_msb = result.actual_mantissa[23:22];
 
         return result;
@@ -124,24 +124,27 @@ package fpu_sqrt_pkg;
 
     function automatic fpu_result_t fpu_float_sqrt_normalize(input fpu_sqrt_result_t y);
 
-        logic [4:0] zeros;
+        logic [4:0]  zeros;
         logic [26:0] result_mantissa;
 
         fpu_reference_float_sqrt_partial_t sqrt_partial;
-        fpu_result_t result;
+        fpu_result_t                       result;
 
-        sqrt_partial = y.sqrt_partial;
+        sqrt_partial    = y.sqrt_partial;
         result_mantissa = y.mantissa;
         result.exponent = y.exponent;
 
-        if (sqrt_partial.mantissa_temp != 'd0) result_mantissa[0] |= 1'b1;
+        if (sqrt_partial.mantissa_temp != 'd0)
+            result_mantissa[0] |= 1'b1;
 
 
         // Normalize
-        zeros = get_leading_zeros_27(result_mantissa);
+        zeros           = get_leading_zeros_27(result_mantissa);
         result_mantissa = result_mantissa << zeros;
-        if (y.exponent_negative) result.exponent += zeros;
-        else result.exponent -= zeros;
+        if (y.exponent_negative)
+            result.exponent += zeros;
+        else
+            result.exponent -= zeros;
 
         // if (sqrt_partial.mantissa_temp != 'd0) result_mantissa[0] |= 1'b1;
 
@@ -153,14 +156,14 @@ package fpu_sqrt_pkg;
             result.exponent = result.exponent + 8'd127;
         end
 
-        result.sign = y.sign;
+        result.sign     = y.sign;
         result.mantissa = result_mantissa[26:3];
-        result.guard = result_mantissa[2:0];
-        result.nan = y.nan;
+        result.guard    = result_mantissa[2:0];
+        result.nan      = y.nan;
         result.infinity = y.infinity;
-        result.zero = y.zero;
+        result.zero     = y.zero;
         // result.valid = y.valid;
-        result.mode = y.mode;
+        result.mode     = y.mode;
 
         // round
         // y = FPU_round(result_mantissa[26:3], actual_exponent, result_mantissa[2:0], number.sign, mode);

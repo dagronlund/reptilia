@@ -5,13 +5,13 @@ package fpu_divide_pkg;
     import fpu_pkg::*;
 
     typedef struct packed {
-        logic sign;
-        logic [50:0] b;
-        logic [50:0] A;
-        logic [26:0] y;
-        logic nan, infinity, zero;
-        logic [8:0] exponent;
-        logic exp_neg;
+        logic            sign;
+        logic [50:0]     b;
+        logic [50:0]     A;
+        logic [26:0]     y;
+        logic            nan, infinity, zero;
+        logic [8:0]      exponent;
+        logic            exp_neg;
         fpu_round_mode_t mode;
     } fpu_div_result_t;
 
@@ -19,9 +19,9 @@ package fpu_divide_pkg;
 
         fpu_float_conditions_t c;
 
-        c.zero = (a.exponent == 0 && a.mantissa == 0);
-        c.norm = (a.exponent != 0);
-        c.nan = (a == FPU_FLOAT_NAN);
+        c.zero     = (a.exponent == 0 && a.mantissa == 0);
+        c.norm     = (a.exponent != 0);
+        c.nan      = (a == FPU_FLOAT_NAN);
         c.infinity = (a == FPU_FLOAT_POS_INF || a == FPU_FLOAT_NEG_INF);
 
         return c;
@@ -33,16 +33,18 @@ package fpu_divide_pkg;
         fpu_float_conditions_t conditions_A,
         conditions_B,
         // logic valid,
-        fpu_round_mode_t mode);
+        fpu_round_mode_t mode
+    );
 
         fpu_div_result_t result;
 
-        logic zero, exp_neg, sign, overflow, underflow, sticky;
+        logic       zero, exp_neg, sign, overflow, underflow, sticky;
         logic [8:0] exponent;
         // Divide exponents
-        zero = 0;
+        zero            = 0;
         result.exponent = a.exponent - b.exponent;
-        if (!conditions_A.norm || !conditions_B.norm) zero = 1'b1;
+        if (!conditions_A.norm || !conditions_B.norm)
+            zero = 1'b1;
 
         result.exp_neg = 0;
         if (a.exponent < b.exponent) begin
@@ -55,18 +57,20 @@ package fpu_divide_pkg;
         underflow = 0;
         // $display("DIVIDE: %h - %h = %h", a.exponent, b.exponent, exponent);
         if (result.exponent > 127) begin
-            if (result.exp_neg) underflow = 1;
-            else overflow = 1;
+            if (result.exp_neg)
+                underflow = 1;
+            else
+                overflow = 1;
         end
 
         result.infinity = overflow || conditions_A.infinity;
-        result.nan = conditions_B.infinity || conditions_B.nan || conditions_A.nan || conditions_B.zero;
-        result.zero = underflow || conditions_A.zero || zero;
-        result.A = {1'b1, a.mantissa} << 26;
-        result.b = {1'b1, b.mantissa} << 26;
-        result.sign = a.sign ^ b.sign;
+        result.nan      = conditions_B.infinity || conditions_B.nan || conditions_A.nan || conditions_B.zero;
+        result.zero     = underflow || conditions_A.zero || zero;
+        result.A        = {1'b1, a.mantissa} << 26;
+        result.b        = {1'b1, b.mantissa} << 26;
+        result.sign     = a.sign ^ b.sign;
         // result.valid = valid;
-        result.mode = mode;
+        result.mode     = mode;
 
         return result;
 
@@ -87,33 +91,34 @@ package fpu_divide_pkg;
 
         result.y = result.y << 1;
         if (result.b <= result.A) begin
-            result.A = result.A - result.b;
+            result.A    = result.A - result.b;
             result.y[0] = 1;
         end else begin
             result.y[0] = 0;
         end
 
-        result.b = result.b >> 1;
+        result.b        = result.b >> 1;
         result.exponent = result.exponent;
 
         return result;
     endfunction
 
     function automatic fpu_result_t fpu_float_div_normalize(input fpu_div_result_t y);
-        // normalize 
-        logic exp_neg, underflow;
-        logic [4:0] leading_zeros;
+        // normalize
+        logic        exp_neg, underflow;
+        logic [4:0]  leading_zeros;
         logic [26:0] div_result;
-        logic [8:0] exponent;
+        logic [8:0]  exponent;
 
         fpu_result_t result;
 
-        underflow = 'b0;
+        underflow  = 'b0;
         div_result = y.y;
-        exponent = y.exponent;
-        exp_neg = y.exp_neg;
+        exponent   = y.exponent;
+        exp_neg    = y.exp_neg;
 
-        if (y.A != 0) div_result[0] = 1'b1;
+        if (y.A != 0)
+            div_result[0] = 1'b1;
 
         leading_zeros = fpu_get_leading_zeros_27(div_result);
 
@@ -122,8 +127,10 @@ package fpu_divide_pkg;
             if (leading_zeros > exponent && exp_neg) begin
                 underflow = 1;
             end else begin
-                if (exp_neg) exponent += leading_zeros;
-                else exponent -= leading_zeros;
+                if (exp_neg)
+                    exponent += leading_zeros;
+                else
+                    exponent -= leading_zeros;
             end
         end
         // diff = 23 - leading_zeros;
@@ -133,7 +140,7 @@ package fpu_divide_pkg;
         //     div_result[0] |= sticky;
         //   if (diff >= 255-result.exponent && !exp_neg) overflow = 1;
         //   else begin
-        //     if (exp_neg) result.exponent -= diff - 1; 
+        //     if (exp_neg) result.exponent -= diff - 1;
         //     else result.exponent += diff - 1;
         //   end
         // end else begin
@@ -146,15 +153,15 @@ package fpu_divide_pkg;
         //   end
         // end
 
-        result.sign = y.sign;
+        result.sign     = y.sign;
         result.exponent = (exp_neg) ? 127 - exponent : exponent + 127;
         result.mantissa = div_result[26:3];
-        result.guard = div_result[2:0];
-        result.nan = y.nan;
-        result.zero = y.zero || underflow || result.exponent == 'd0;
+        result.guard    = div_result[2:0];
+        result.nan      = y.nan;
+        result.zero     = y.zero || underflow || result.exponent == 'd0;
         result.infinity = y.infinity;
         // result.valid = y.valid;
-        result.mode = y.mode;
+        result.mode     = y.mode;
 
         return result;
     endfunction

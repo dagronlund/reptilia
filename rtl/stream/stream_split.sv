@@ -17,23 +17,22 @@ module stream_split
     import std_pkg::*;
     import stream_pkg::*;
 #(
-    parameter std_clock_info_t CLOCK_INFO = 'b0,
-    parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
-    parameter stream_select_mode_t STREAM_SELECT_MODE = STREAM_SELECT_MODE_ROUND_ROBIN,  // Unused
-    parameter int PORTS = 2,
-    parameter int ID_WIDTH = (PORTS > 1) ? $clog2(PORTS) : 1,
-    parameter int USE_LAST = 0
+    parameter std_clock_info_t       CLOCK_INFO         = 'b0,
+    parameter stream_pipeline_mode_t PIPELINE_MODE      = STREAM_PIPELINE_MODE_REGISTERED,
+    parameter stream_select_mode_t   STREAM_SELECT_MODE = STREAM_SELECT_MODE_ROUND_ROBIN,  // Unused
+    parameter int                    PORTS              = 2,
+    parameter int                    ID_WIDTH           = (PORTS > 1) ? $clog2(PORTS) : 1,
+    parameter int                    USE_LAST           = 0
 ) (
-    input wire clk,
-    rst,
+    input  wire                 clk, rst,
 
-          stream_intf.in                stream_in,
-    input wire           [ID_WIDTH-1:0] stream_in_id,
-    input wire                          stream_in_last,
+    stream_intf.in              stream_in,
+    input  wire [ID_WIDTH-1:0]  stream_in_id,
+    input  wire                 stream_in_last,
 
-           stream_intf.out                stream_out     [PORTS],
-    output logic           [ID_WIDTH-1:0] stream_out_id  [PORTS],
-    output logic                          stream_out_last[PORTS]
+    stream_intf.out             stream_out[PORTS],
+    output logic [ID_WIDTH-1:0] stream_out_id[PORTS],
+    output logic                stream_out_last[PORTS]
 );
 
     typedef stream_in.T payload_type_t;
@@ -55,13 +54,13 @@ module stream_split
             `PROCEDURAL_ASSERT(PAYLOAD_WIDTH == $bits(stream_out[k].payload))
 
             stream_intf #(
-                .T(payload_last_t)
+                .T (payload_last_t)
             ) stream_out_next (
                 .clk,
                 .rst
             );
             stream_intf #(
-                .T(payload_last_t)
+                .T (payload_last_t)
             ) stream_out_temp (
                 .clk,
                 .rst
@@ -71,50 +70,53 @@ module stream_split
                 automatic payload_last_t stream_out_next_payload, stream_out_temp_payload;
 
                 /* verilator lint_off WIDTH */
-                stream_out_next.valid = stream_out_valid[k];
-                stream_out_ready[k] = stream_out_next.ready;
-                stream_out_next_payload = '{payload: stream_in.payload, last: stream_in_last};
+                stream_out_next.valid   = stream_out_valid[k];
+                stream_out_ready[k]     = stream_out_next.ready;
+                stream_out_next_payload = '{
+                    payload: stream_in.payload,
+                    last:    stream_in_last
+                };
                 stream_out_next.payload = stream_out_next_payload;
 
                 stream_out_temp_payload = stream_out_temp.payload;
 
-                stream_out[k].valid = stream_out_temp.valid;
+                stream_out[k].valid   = stream_out_temp.valid;
                 stream_out_temp.ready = stream_out[k].ready;
                 stream_out[k].payload = stream_out_temp_payload.payload;
-                stream_out_last[k] = stream_out_temp_payload.last;
+                stream_out_last[k]    = stream_out_temp_payload.last;
                 /* verilator lint_on WIDTH */
             end
 
             stream_stage #(
-                .CLOCK_INFO(CLOCK_INFO),
-                .PIPELINE_MODE(PIPELINE_MODE),
-                .T(payload_last_t)
+                .CLOCK_INFO    (CLOCK_INFO),
+                .PIPELINE_MODE (PIPELINE_MODE),
+                .T             (payload_last_t)
             ) stream_stage_inst (
                 .clk,
                 .rst,
 
-                .stream_in (stream_out_next),
-                .stream_out(stream_out_temp)
+                .stream_in  (stream_out_next),
+                .stream_out (stream_out_temp)
             );
         end
     endgenerate
 
-    logic enable;
-    logic consume;
+    logic             enable;
+    logic             consume;
     logic [PORTS-1:0] produce;
 
     stream_controller #(
-        .NUM_INPUTS (1),
-        .NUM_OUTPUTS(PORTS)
+        .NUM_INPUTS  (1),
+        .NUM_OUTPUTS (PORTS)
     ) stream_controller_inst (
         .clk,
         .rst,
 
-        .valid_input(stream_in.valid),
-        .ready_input(stream_in.ready),
+        .valid_input  (stream_in.valid),
+        .ready_input  (stream_in.ready),
 
-        .valid_output(stream_out_valid),
-        .ready_output(stream_out_ready),
+        .valid_output (stream_out_valid),
+        .ready_output (stream_out_ready),
 
         .consume,
         .produce,
@@ -124,9 +126,9 @@ module stream_split
     always_comb begin
         automatic int i;
 
-        consume = 'b1;
-        produce = 'b0;
-        produce[(PORTS>1)?stream_in_id : 'b0] = 'b1;
+        consume                             = 'b1;
+        produce                             = 'b0;
+        produce[(PORTS>1)?stream_in_id:'b0] = 'b1;
 
         for (i = 0; i < PORTS; i++) begin
             stream_out_id[i] = index_t'(i);

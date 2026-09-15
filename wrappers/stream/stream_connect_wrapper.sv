@@ -4,18 +4,10 @@ module stream_connect_wrapper (
 );
 
     stream_intf
-        stream_in (
-            .clk,
-            .rst
-        ),
-        stream_out (
-            .clk,
-            .rst
-        );
+      stream_in  (.clk, .rst),
+      stream_out (.clk, .rst);
 
-    stream_connect inst (
-        .stream_in,
-        .stream_out
-    );
+    stream_connect
+      inst (.stream_in, .stream_out);
 
 endmodule

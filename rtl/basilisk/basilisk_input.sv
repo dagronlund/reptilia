@@ -17,8 +17,7 @@ module basilisk_input
     import rv32i::*;
     import gecko::*;
 (
-    input logic clk,
-    rst,
+    input logic        clk, rst,
 
     std_stream_intf.in input_command,  // ...
     std_stream_intf.in output_command  // ...

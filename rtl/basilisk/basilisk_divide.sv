@@ -2,23 +2,23 @@
 
 `ifdef __LINTER__
 
-`include "../../lib/std/std_util.svh"
-`include "../../lib/isa/rv.svh"
-`include "../../lib/isa/rv32.svh"
-`include "../../lib/isa/rv32f.svh"
-`include "../../lib/fpu/fpu.svh"
-`include "../../lib/fpu/fpu_divide.svh"
-`include "../../lib/basilisk/basilisk.svh"
+    `include "../../lib/std/std_util.svh"
+    `include "../../lib/isa/rv.svh"
+    `include "../../lib/isa/rv32.svh"
+    `include "../../lib/isa/rv32f.svh"
+    `include "../../lib/fpu/fpu.svh"
+    `include "../../lib/fpu/fpu_divide.svh"
+    `include "../../lib/basilisk/basilisk.svh"
 
 `else
 
-`include "std_util.svh"
-`include "rv.svh"
-`include "rv32.svh"
-`include "rv32f.svh"
-`include "basilisk.svh"
-`include "fpu.svh"
-`include "fpu_divide.svh"
+    `include "std_util.svh"
+    `include "rv.svh"
+    `include "rv32.svh"
+    `include "rv32f.svh"
+    `include "basilisk.svh"
+    `include "fpu.svh"
+    `include "fpu_divide.svh"
 
 `endif
 
@@ -32,28 +32,27 @@ module basilisk_divide
 #(
     parameter int OUTPUT_REGISTER_MODE = 1
 ) (
-    input logic clk,
-    rst,
+    input logic         clk, rst,
 
-    std_stream_intf.in divide_command,  // basilisk_divide_command_t
+    std_stream_intf.in  divide_command,  // basilisk_divide_command_t
     std_stream_intf.out divide_result_command  // basilisk_result_t
 );
 
     std_stream_intf #(
-        .T(basilisk_divide_result_t)
+        .T (basilisk_divide_result_t)
     ) divide_exponent_command (
         .clk,
         .rst
     );
     std_stream_intf #(
-        .T(basilisk_divide_result_t)
+        .T (basilisk_divide_result_t)
     ) divide_operation_command (
         .clk,
         .rst
     );
 
     basilisk_divide_exponent #(
-        .OUTPUT_REGISTER_MODE(OUTPUT_REGISTER_MODE)
+        .OUTPUT_REGISTER_MODE (OUTPUT_REGISTER_MODE)
     ) basilisk_divide_exponent_inst (
         .clk,
         .rst,
@@ -62,7 +61,7 @@ module basilisk_divide
     );
 
     basilisk_divide_operation #(
-        .OUTPUT_REGISTER_MODE(OUTPUT_REGISTER_MODE)
+        .OUTPUT_REGISTER_MODE (OUTPUT_REGISTER_MODE)
     ) basilisk_divide_operation_inst (
         .clk,
         .rst,
@@ -71,7 +70,7 @@ module basilisk_divide
     );
 
     basilisk_divide_normalize #(
-        .OUTPUT_REGISTER_MODE(OUTPUT_REGISTER_MODE)
+        .OUTPUT_REGISTER_MODE (OUTPUT_REGISTER_MODE)
     ) basilisk_divide_normalize_inst (
         .clk,
         .rst,

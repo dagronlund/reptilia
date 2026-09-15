@@ -2,15 +2,15 @@
 
 `ifdef __LINTER__
 
-`include "../../lib/std/std_util.svh"
-`include "../../lib/std/std_mem.svh"
-`include "../../lib/axi/axi4.svh"
+    `include "../../lib/std/std_util.svh"
+    `include "../../lib/std/std_mem.svh"
+    `include "../../lib/axi/axi4.svh"
 
 `else
 
-`include "std_util.svh"
-`include "std_mem.svh"
-`include "axi4.svh"
+    `include "std_util.svh"
+    `include "std_mem.svh"
+    `include "axi4.svh"
 
 `endif
 
@@ -29,14 +29,13 @@ module axi4_slave
     parameter int MEM_DATA_WIDTH = 32,
     parameter int MEM_MASK_WIDTH = MEM_DATA_WIDTH / 8
 ) (
-    input logic clk,
-    rst,
+    input logic      clk, rst,
 
-    axi4_ar_intf.in axi_ar,
-    axi4_aw_intf.in axi_aw,
-    axi4_w_intf.in  axi_w,
-    axi4_r_intf.out axi_r,   // Buffered
-    axi4_b_intf.out axi_b,   // Buffered
+    axi4_ar_intf.in  axi_ar,
+    axi4_aw_intf.in  axi_aw,
+    axi4_w_intf.in   axi_w,
+    axi4_r_intf.out  axi_r,  // Buffered
+    axi4_b_intf.out  axi_b,  // Buffered
 
     std_mem_intf.out mem_request,  // Buffered
     std_mem_intf.in  mem_response
@@ -59,10 +58,10 @@ module axi4_slave
     // localparam int AXI_ADDR_OFFSET = $clog2($bits(axi_ar.araddr));
     localparam int AXI_ADDR_PAGE_WIDTH = (AXI_ADDR_WIDTH > 12) ? 12 : AXI_ADDR_WIDTH;
 
-    typedef logic [AXI_ADDR_WIDTH-1:0] base_addr_t;
+    typedef logic [AXI_ADDR_WIDTH-1:0]      base_addr_t;
     typedef logic [AXI_ADDR_PAGE_WIDTH-1:0] page_addr_t;
 
-    typedef logic [AXI_ID_WIDTH-1:0] id_t;
+    typedef logic [AXI_ID_WIDTH-1:0]        id_t;
 
     function automatic base_addr_t get_actual_address(input base_addr_t base_addr, input page_addr_t page_addr);
         base_addr_t mask = ~('hFFF);
@@ -93,121 +92,121 @@ module axi4_slave
     logic produce_axi_r, produce_axi_b, produce_mem_request;
 
     std_stream_intf #(
-        .T(mem_t)
+        .T (mem_t)
     ) mem_request_mid (
         .clk,
         .rst
     );
     std_stream_intf #(
-        .T(mem_t)
+        .T (mem_t)
     ) mem_request_packed (
         .clk,
         .rst
     );
 
     std_stream_intf #(
-        .T(axi_r_t)
+        .T (axi_r_t)
     ) axi_r_mid (
         .clk,
         .rst
     );
     std_stream_intf #(
-        .T(axi_r_t)
+        .T (axi_r_t)
     ) axi_r_packed (
         .clk,
         .rst
     );
 
     std_stream_intf #(
-        .T(axi_b_t)
+        .T (axi_b_t)
     ) axi_b_mid (
         .clk,
         .rst
     );
     std_stream_intf #(
-        .T(axi_b_t)
+        .T (axi_b_t)
     ) axi_b_packed (
         .clk,
         .rst
     );
 
     always_comb begin
-        mem_request.valid = mem_request_packed.valid;
-        mem_request.read_enable = mem_request_packed.payload.read_enable;
+        mem_request.valid        = mem_request_packed.valid;
+        mem_request.read_enable  = mem_request_packed.payload.read_enable;
         mem_request.write_enable = mem_request_packed.payload.write_enable;
-        mem_request.addr = mem_request_packed.payload.addr;
-        mem_request.data = mem_request_packed.payload.data;
+        mem_request.addr         = mem_request_packed.payload.addr;
+        mem_request.data         = mem_request_packed.payload.data;
         // mem_request.id = mem_request_packed.payload.id;
         mem_request_packed.ready = mem_request.ready;
 
-        axi_r.rvalid = axi_r_packed.valid;
-        axi_r.rdata = axi_r_packed.payload.rdata;
-        axi_r.rlast = axi_r_packed.payload.rlast;
-        axi_r.rresp = axi_r_packed.payload.rresp;
-        axi_r.rid = axi_r_packed.payload.rid;
+        axi_r.rvalid       = axi_r_packed.valid;
+        axi_r.rdata        = axi_r_packed.payload.rdata;
+        axi_r.rlast        = axi_r_packed.payload.rlast;
+        axi_r.rresp        = axi_r_packed.payload.rresp;
+        axi_r.rid          = axi_r_packed.payload.rid;
         axi_r_packed.ready = axi_r.rready;
 
-        axi_b.bvalid = axi_b_packed.valid;
-        axi_b.bresp = axi_b_packed.payload.bresp;
-        axi_b.bid = axi_b_packed.payload.bid;
+        axi_b.bvalid       = axi_b_packed.valid;
+        axi_b.bresp        = axi_b_packed.payload.bresp;
+        axi_b.bid          = axi_b_packed.payload.bid;
         axi_b_packed.ready = axi_b.bready;
     end
 
     std_flow_lite #(
-        .NUM_INPUTS (4),
-        .NUM_OUTPUTS(3)
+        .NUM_INPUTS  (4),
+        .NUM_OUTPUTS (3)
     ) std_flow_lite_inst (
         .clk,
         .rst,
 
-        .valid_input({axi_ar.arvalid, axi_aw.awvalid, axi_w.wvalid, mem_response.valid}),
-        .ready_input({axi_ar.arready, axi_aw.awready, axi_w.wready, mem_response.ready}),
+        .valid_input  ({axi_ar.arvalid, axi_aw.awvalid, axi_w.wvalid, mem_response.valid}),
+        .ready_input  ({axi_ar.arready, axi_aw.awready, axi_w.wready, mem_response.ready}),
 
-        .valid_output({axi_r_mid.valid, axi_b_mid.valid, mem_request_mid.valid}),
-        .ready_output({axi_r_mid.ready, axi_b_mid.ready, mem_request_mid.ready}),
+        .valid_output ({axi_r_mid.valid, axi_b_mid.valid, mem_request_mid.valid}),
+        .ready_output ({axi_r_mid.ready, axi_b_mid.ready, mem_request_mid.ready}),
 
-        .consume({consume_axi_ar, consume_axi_aw, consume_axi_w, consume_mem_response}),
-        .produce({produce_axi_r, produce_axi_b, produce_mem_request}),
+        .consume      ({consume_axi_ar, consume_axi_aw, consume_axi_w, consume_mem_response}),
+        .produce      ({produce_axi_r, produce_axi_b, produce_mem_request}),
         .enable
     );
 
     std_flow_stage #(
-        .T(mem_t),
-        .MODE(2)
+        .T    (mem_t),
+        .MODE (2)
     ) std_flow_stage_mem_request_inst (
         .clk,
         .rst,
-        .stream_in (mem_request_mid),
-        .stream_out(mem_request_packed)
+        .stream_in  (mem_request_mid),
+        .stream_out (mem_request_packed)
     );
 
     std_flow_stage #(
-        .T(axi_r_t),
-        .MODE(2)
+        .T    (axi_r_t),
+        .MODE (2)
     ) std_flow_stage_axi_r_inst (
         .clk,
         .rst,
-        .stream_in (axi_r_mid),
-        .stream_out(axi_r_packed)
+        .stream_in  (axi_r_mid),
+        .stream_out (axi_r_packed)
     );
 
     std_flow_stage #(
-        .T(axi_b_t),
-        .MODE(2)
+        .T    (axi_b_t),
+        .MODE (2)
     ) std_flow_stage_axi_b_inst (
         .clk,
         .rst,
-        .stream_in (axi_b_mid),
-        .stream_out(axi_b_packed)
+        .stream_in  (axi_b_mid),
+        .stream_out (axi_b_packed)
     );
 
     typedef enum logic [2:0] {
-        IDLE = 3'b000,
-        WRITE = 3'b001,
+        IDLE        = 3'b000,
+        WRITE       = 3'b001,
         WRITE_FIXED = 3'b010,
-        READ = 3'b011,
-        READ_FIXED = 3'b100,
-        UNDEF = 3'bXXX
+        READ        = 3'b011,
+        READ_FIXED  = 3'b100,
+        UNDEF       = 3'bXXX
     } state_t;
 
     base_addr_t current_base_addr, next_base_addr;
@@ -215,8 +214,8 @@ module axi4_slave
     page_addr_t current_page_step, next_page_step;
 
     axi4_len_t current_burst_limit, next_burst_limit;
-    axi4_len_t current_burst, next_burst;
-    axi4_len_t current_burst_read, next_burst_read;
+    axi4_len_t current_burst,       next_burst;
+    axi4_len_t current_burst_read,  next_burst_read;
 
     id_t current_id, next_id;
 
@@ -231,8 +230,8 @@ module axi4_slave
             current_page_step <= 'b1;
 
             current_burst_limit <= 'b0;
-            current_burst <= 'b0;
-            current_burst_read <= 'b0;
+            current_burst       <= 'b0;
+            current_burst_read  <= 'b0;
 
             current_id <= 'b0;
 
@@ -245,8 +244,8 @@ module axi4_slave
             current_page_step <= next_page_step;
 
             current_burst_limit <= next_burst_limit;
-            current_burst <= next_burst;
-            current_burst_read <= next_burst_read;
+            current_burst       <= next_burst;
+            current_burst_read  <= next_burst_read;
 
             current_id <= next_id;
 
@@ -258,16 +257,16 @@ module axi4_slave
 
     always_comb begin
         automatic mem_t   next_mem_request = '{default: 'b0};
-        automatic axi_r_t next_axi_r = '{default: 'b0};
-        automatic axi_b_t next_axi_b = '{default: 'b0};
+        automatic axi_r_t next_axi_r       = '{default: 'b0};
+        automatic axi_b_t next_axi_b       = '{default: 'b0};
 
-        consume_axi_ar = 'b0;
-        consume_axi_aw = 'b0;
-        consume_axi_w = 'b0;
+        consume_axi_ar       = 'b0;
+        consume_axi_aw       = 'b0;
+        consume_axi_w        = 'b0;
         consume_mem_response = 'b0;
 
-        produce_axi_r = 'b0;
-        produce_axi_b = 'b0;
+        produce_axi_r       = 'b0;
+        produce_axi_b       = 'b0;
         produce_mem_request = 'b0;
 
         next_state = current_state;
@@ -277,19 +276,19 @@ module axi4_slave
         next_page_step = current_page_step;
 
         next_burst_limit = current_burst_limit;
-        next_burst = current_burst;
-        next_burst_read = current_burst_read;
+        next_burst       = current_burst;
+        next_burst_read  = current_burst_read;
 
         next_id = current_id;
 
         next_read_request_done = current_read_request_done;
 
-        next_axi_r.rlast = 'b0;
-        next_axi_r.rdata = mem_response.data;
-        next_axi_r.rresp = AXI4_RESP_OKAY;
-        next_axi_r.rid = current_id;
-        next_axi_b.bresp = AXI4_RESP_OKAY;
-        next_axi_b.bid = current_id;
+        next_axi_r.rlast      = 'b0;
+        next_axi_r.rdata      = mem_response.data;
+        next_axi_r.rresp      = AXI4_RESP_OKAY;
+        next_axi_r.rid        = current_id;
+        next_axi_b.bresp      = AXI4_RESP_OKAY;
+        next_axi_b.bid        = current_id;
         next_mem_request.addr = get_actual_address(next_base_addr, next_page_addr);
         next_mem_request.data = axi_w.wdata;
 
@@ -298,7 +297,7 @@ module axi4_slave
                 next_burst = 'b0;
                 if (axi_aw.awvalid) begin
                     consume_axi_aw = 'b1;
-                    next_state = (axi_aw.awburst == AXI4_BURST_FIXED) ? WRITE_FIXED : WRITE;
+                    next_state     = (axi_aw.awburst == AXI4_BURST_FIXED) ? WRITE_FIXED : WRITE;
 
                     next_base_addr = axi_aw.awaddr;
                     next_page_addr = axi_aw.awaddr;
@@ -309,7 +308,7 @@ module axi4_slave
                     next_id = axi_aw.awid;
                 end else if (axi_ar.arvalid) begin
                     consume_axi_ar = 'b1;
-                    next_state = (axi_ar.arburst == AXI4_BURST_FIXED) ? READ_FIXED : READ;
+                    next_state     = (axi_ar.arburst == AXI4_BURST_FIXED) ? READ_FIXED : READ;
 
                     next_base_addr = axi_ar.araddr;
                     next_page_addr = axi_ar.araddr;
@@ -322,26 +321,28 @@ module axi4_slave
                     next_read_request_done = 'b0;
                 end
             end
-            WRITE, WRITE_FIXED: begin
-                consume_axi_w = 'b1;
+            WRITE,
+            WRITE_FIXED: begin
+                consume_axi_w       = 'b1;
                 produce_mem_request = 'b1;
 
-                next_mem_request.read_enable = 'b0;
+                next_mem_request.read_enable  = 'b0;
                 next_mem_request.write_enable = axi_w.wstrb;
 
                 if (next_burst == next_burst_limit) begin
                     produce_axi_b = 'b1;
-                    next_state = IDLE;
+                    next_state    = IDLE;
                 end else begin
                     next_burst += 1;
                 end
 
                 next_page_addr += (next_state == WRITE) ? next_page_step : 'b0;
             end
-            READ, READ_FIXED: begin
+            READ,
+            READ_FIXED: begin
                 produce_mem_request = (!next_read_request_done);
 
-                next_mem_request.read_enable = 'b1;
+                next_mem_request.read_enable  = 'b1;
                 next_mem_request.write_enable = 'b0;
 
                 if (next_burst == next_burst_limit) begin
@@ -351,12 +352,12 @@ module axi4_slave
                 end
 
                 if (mem_response.valid) begin
-                    produce_axi_r = 'b1;
+                    produce_axi_r        = 'b1;
                     consume_mem_response = 'b1;
 
                     if (next_burst_read == next_burst_limit) begin
                         next_axi_r.rlast = 'b1;
-                        next_state = IDLE;
+                        next_state       = IDLE;
                     end else begin
                         next_burst_read += 1;
                     end
@@ -368,8 +369,8 @@ module axi4_slave
         endcase
 
         mem_request_mid.payload = next_mem_request;
-        axi_r_mid.payload = next_axi_r;
-        axi_b_mid.payload = next_axi_b;
+        axi_r_mid.payload       = next_axi_r;
+        axi_b_mid.payload       = next_axi_b;
     end
 
 endmodule

@@ -15,11 +15,11 @@ module stream_connect
 );
 
     stream_stage #(
-        .PIPELINE_MODE(STREAM_PIPELINE_MODE_TRANSPARENT),
-        .T(T)
+        .PIPELINE_MODE (STREAM_PIPELINE_MODE_TRANSPARENT),
+        .T             (T)
     ) stream_stage_inst0 (
-        .clk('b0),
-        .rst('b0),
+        .clk ('b0),
+        .rst ('b0),
         .stream_in,
         .stream_out
     );

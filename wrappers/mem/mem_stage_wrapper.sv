@@ -4,19 +4,14 @@ module mem_stage_wrapper (
 );
 
     mem_intf
-        mem_in (
-            .clk,
-            .rst
-        ),
-        mem_out (
-            .clk,
-            .rst
-        );
+      mem_in  (.clk, .rst),
+      mem_out (.clk, .rst);
 
     logic [0:0] mem_in_meta;
     logic [0:0] mem_out_meta;
 
-    mem_stage inst (
+    mem_stage
+      inst (
         .clk,
         .rst,
         .mem_in,

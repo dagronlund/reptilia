@@ -2,11 +2,10 @@
 
 module clk_rst_gen #(
     parameter ACTIVE_HIGH = 1,
-    parameter CYCLES = 5,
+    parameter CYCLES      = 5,
     parameter START_DELAY = 0
 ) (
-    output logic clk,
-    rst
+    output logic clk, rst
     // input logic trigger_rst = 1'b0
 );
     int i;

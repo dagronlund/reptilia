@@ -6,13 +6,13 @@ module stream_stage_tb #(
     logic clk, rst;
 
     stream_intf #(
-        .T(logic [31:0])
+        .T (logic [31:0])
     ) stream_in (
         .clk,
         .rst
     );
     stream_intf #(
-        .T(logic [31:0])
+        .T (logic [31:0])
     ) stream_out (
         .clk,
         .rst
@@ -20,8 +20,8 @@ module stream_stage_tb #(
     /* verilator public_off */
 
     stream_stage #(
-        .PIPELINE_MODE(PIPELINE_MODE),
-        .T(logic [31:0])
+        .PIPELINE_MODE (PIPELINE_MODE),
+        .T             (logic [31:0])
     ) dut (
         .clk,
         .rst,

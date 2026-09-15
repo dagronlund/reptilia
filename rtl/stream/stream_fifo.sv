@@ -68,15 +68,15 @@ module stream_fifo
     import std_pkg::*;
     import stream_pkg::*;
 #(
-    parameter std_clock_info_t CLOCK_INFO = 'b0,
-    parameter std_technology_t TECHNOLOGY = STD_TECHNOLOGY_FPGA_XILINX,
-    parameter stream_fifo_mode_t FIFO_MODE = STREAM_FIFO_MODE_COMBINATIONAL_REGISTERED,
+    parameter std_clock_info_t           CLOCK_INFO        = 'b0,
+    parameter std_technology_t           TECHNOLOGY        = STD_TECHNOLOGY_FPGA_XILINX,
+    parameter stream_fifo_mode_t         FIFO_MODE         = STREAM_FIFO_MODE_COMBINATIONAL_REGISTERED,
     parameter stream_fifo_address_mode_t FIFO_ADDRESS_MODE = STREAM_FIFO_ADDRESS_MODE_POINTERS,
-    parameter int DEPTH = 16,
-    parameter type T = logic
+    parameter int                        DEPTH             = 16,
+    parameter type                       T                 = logic
 ) (
-    input wire clk,
-    input wire rst,
+    input wire      clk,
+    input wire      rst,
 
     stream_intf.in  stream_in,
     stream_intf.out stream_out
@@ -85,37 +85,37 @@ module stream_fifo
     `STATIC_ASSERT($bits(T) == $bits(stream_in.payload))
     `STATIC_ASSERT($bits(T) == $bits(stream_out.payload))
 
-    localparam int DATA_WIDTH = $bits(T);
+    localparam int DATA_WIDTH    = $bits(T);
     localparam int POINTER_WIDTH = $clog2(DEPTH);
     typedef logic [POINTER_WIDTH-1:0] pointer_t;
-    typedef logic [DEPTH-1:0] flag_t;
+    typedef logic [DEPTH-1:0]         flag_t;
 
-    logic read_pointer_enable, write_pointer_enable;
-    pointer_t read_pointer, write_pointer;
-    logic full, empty;
+    logic     read_pointer_enable, write_pointer_enable;
+    pointer_t read_pointer,        write_pointer;
+    logic     full,                empty;
 
     std_register #(
-        .CLOCK_INFO(CLOCK_INFO),
-        .T(pointer_t),
-        .RESET_VECTOR('b0)
+        .CLOCK_INFO   (CLOCK_INFO),
+        .T            (pointer_t),
+        .RESET_VECTOR ('b0)
     ) read_pointer_register_inst (
         .clk,
         .rst,
-        .enable(read_pointer_enable),
-        .next  (read_pointer + 'b1),
-        .value (read_pointer)
+        .enable (read_pointer_enable),
+        .next   (read_pointer + 'b1),
+        .value  (read_pointer)
     );
 
     std_register #(
-        .CLOCK_INFO(CLOCK_INFO),
-        .T(pointer_t),
-        .RESET_VECTOR('b0)
+        .CLOCK_INFO   (CLOCK_INFO),
+        .T            (pointer_t),
+        .RESET_VECTOR ('b0)
     ) write_pointer_register_inst (
         .clk,
         .rst,
-        .enable(write_pointer_enable),
-        .next  (write_pointer + 'b1),
-        .value (write_pointer)
+        .enable (write_pointer_enable),
+        .next   (write_pointer + 'b1),
+        .value  (write_pointer)
     );
 
     generate
@@ -131,23 +131,23 @@ module stream_fifo
             flag_t next_flags, current_flags, enable_flags;
 
             std_register_masked #(
-                .CLOCK_INFO(CLOCK_INFO),
-                .T(flag_t),
-                .RESET_VECTOR('b0)
+                .CLOCK_INFO   (CLOCK_INFO),
+                .T            (flag_t),
+                .RESET_VECTOR ('b0)
             ) flag_register_inst (
                 .clk,
                 .rst,
-                .enable(enable_flags),
-                .next  (next_flags),
-                .value (current_flags)
+                .enable (enable_flags),
+                .next   (next_flags),
+                .value  (current_flags)
             );
 
             always_comb begin
-                next_flags = 'b0;
+                next_flags   = 'b0;
                 enable_flags = 'b0;
 
                 empty = !current_flags[read_pointer];
-                full = current_flags[write_pointer];
+                full  = current_flags[write_pointer];
 
                 if (read_pointer_enable) begin
                     next_flags[read_pointer]   = 'b0;
@@ -164,57 +164,57 @@ module stream_fifo
 
         if (FIFO_MODE == STREAM_FIFO_MODE_COMBINATIONAL || FIFO_MODE == STREAM_FIFO_MODE_COMBINATIONAL_REGISTERED) begin
 
-            localparam stream_pipeline_mode_t OUTPUT_PIPELINE_MODE = 
-                (FIFO_MODE == STREAM_FIFO_MODE_COMBINATIONAL_REGISTERED) ?
-                STREAM_PIPELINE_MODE_REGISTERED :
-                STREAM_PIPELINE_MODE_TRANSPARENT;
+            localparam stream_pipeline_mode_t OUTPUT_PIPELINE_MODE =
+                (FIFO_MODE == STREAM_FIFO_MODE_COMBINATIONAL_REGISTERED)
+                    ? STREAM_PIPELINE_MODE_REGISTERED
+                    : STREAM_PIPELINE_MODE_TRANSPARENT;
 
             logic mem_write_enable;
 
             stream_intf #(
-                .T(T)
+                .T (T)
             ) stream_next (
                 .clk,
                 .rst
             );
 
             mem_combinational #(
-                .CLOCK_INFO(CLOCK_INFO),
-                .TECHNOLOGY(TECHNOLOGY),
-                .DATA_WIDTH($bits(T)),
-                .ADDR_WIDTH($clog2(DEPTH)),
-                .READ_PORTS(1),
-                .AUTO_RESET(0)
+                .CLOCK_INFO (CLOCK_INFO),
+                .TECHNOLOGY (TECHNOLOGY),
+                .DATA_WIDTH ($bits(T)),
+                .ADDR_WIDTH ($clog2(DEPTH)),
+                .READ_PORTS (1),
+                .AUTO_RESET (0)
             ) mem_combinational_inst (
                 .clk,
                 .rst,
 
-                .write_enable(mem_write_enable),
-                .write_addr(write_pointer),
-                .write_data_in(stream_in.payload),
-                .write_data_out(),
+                .write_enable   (mem_write_enable),
+                .write_addr     (write_pointer),
+                .write_data_in  (stream_in.payload),
+                .write_data_out (),
 
-                .read_addr({read_pointer}),
-                .read_data_out({stream_next.payload}),
+                .read_addr      ({read_pointer}),
+                .read_data_out  ({stream_next.payload}),
 
-                .reset_done()
+                .reset_done     ()
             );
 
             always_comb begin
                 // Input stream logic
-                stream_in.ready = !full;
-                mem_write_enable = stream_in.valid && stream_in.ready;
+                stream_in.ready      = !full;
+                mem_write_enable     = stream_in.valid && stream_in.ready;
                 write_pointer_enable = mem_write_enable;
 
                 // Output stream logic
-                stream_next.valid = !empty;
+                stream_next.valid   = !empty;
                 read_pointer_enable = stream_next.valid && stream_next.ready;
             end
 
             stream_stage #(
-                .CLOCK_INFO(CLOCK_INFO),
-                .PIPELINE_MODE(OUTPUT_PIPELINE_MODE),
-                .T(T)
+                .CLOCK_INFO    (CLOCK_INFO),
+                .PIPELINE_MODE (OUTPUT_PIPELINE_MODE),
+                .T             (T)
             ) stream_stage_transparent_inst (
                 .clk,
                 .rst,
@@ -222,37 +222,29 @@ module stream_fifo
                 .stream_out
             );
 
-        end else if (FIFO_MODE == STREAM_FIFO_MODE_SEQUENTIAL || FIFO_MODE == STREAM_FIFO_MODE_SEQUENTIAL_REGISTERED) begin
+        end else if (FIFO_MODE == STREAM_FIFO_MODE_SEQUENTIAL
+                         || FIFO_MODE == STREAM_FIFO_MODE_SEQUENTIAL_REGISTERED) begin
 
             localparam logic ENABLE_OUTPUT_REG = (FIFO_MODE == STREAM_FIFO_MODE_SEQUENTIAL_REGISTERED);
 
             mem_intf #(
-                .DATA_WIDTH($bits(T)),
-                .ADDR_WIDTH(POINTER_WIDTH)
-            ) mem_read_in (
-                .clk,
-                .rst
-            );
+                .DATA_WIDTH ($bits(T)),
+                .ADDR_WIDTH (POINTER_WIDTH)
+            ) mem_read_in (.clk, .rst);
             mem_intf #(
-                .DATA_WIDTH($bits(T)),
-                .ADDR_WIDTH(POINTER_WIDTH)
-            ) mem_read_out (
-                .clk,
-                .rst
-            );
+                .DATA_WIDTH ($bits(T)),
+                .ADDR_WIDTH (POINTER_WIDTH)
+            ) mem_read_out (.clk, .rst);
             mem_intf #(
-                .DATA_WIDTH($bits(T)),
-                .ADDR_WIDTH(POINTER_WIDTH)
-            ) mem_write_in (
-                .clk,
-                .rst
-            );
+                .DATA_WIDTH ($bits(T)),
+                .ADDR_WIDTH (POINTER_WIDTH)
+            ) mem_write_in (.clk, .rst);
 
             mem_sequential_read_write #(
-                .CLOCK_INFO(CLOCK_INFO),
-                .TECHNOLOGY(TECHNOLOGY),
-                .MANUAL_ADDR_WIDTH(POINTER_WIDTH),
-                .ENABLE_OUTPUT_REG(ENABLE_OUTPUT_REG)
+                .CLOCK_INFO        (CLOCK_INFO),
+                .TECHNOLOGY        (TECHNOLOGY),
+                .MANUAL_ADDR_WIDTH (POINTER_WIDTH),
+                .ENABLE_OUTPUT_REG (ENABLE_OUTPUT_REG)
             ) mem_sequential_read_write_inst (
                 .clk,
                 .rst,
@@ -264,19 +256,19 @@ module stream_fifo
 
             always_comb begin
                 // Write memory interface
-                stream_in.ready = !full;
+                stream_in.ready      = !full;
                 write_pointer_enable = stream_in.valid && stream_in.ready;
-                mem_write_in.valid = write_pointer_enable;
-                mem_write_in.addr = write_pointer;
-                mem_write_in.data = stream_in.payload;
+                mem_write_in.valid   = write_pointer_enable;
+                mem_write_in.addr    = write_pointer;
+                mem_write_in.data    = stream_in.payload;
 
                 // Read in memory interface
-                mem_read_in.valid = !empty;
+                mem_read_in.valid   = !empty;
                 read_pointer_enable = mem_read_in.valid && mem_read_in.ready;
-                mem_read_in.addr = read_pointer;
+                mem_read_in.addr    = read_pointer;
 
                 // Read out memory interface
-                stream_out.valid = mem_read_out.valid;
+                stream_out.valid   = mem_read_out.valid;
                 mem_read_out.ready = stream_out.ready;
                 stream_out.payload = mem_read_out.data;
             end

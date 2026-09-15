@@ -10,21 +10,20 @@ module mem_split
     import std_pkg::*;
     import stream_pkg::*;
 #(
-    parameter std_clock_info_t CLOCK_INFO = 'b0,
-    parameter stream_pipeline_mode_t PIPELINE_MODE = STREAM_PIPELINE_MODE_REGISTERED,
-    parameter stream_select_mode_t STREAM_SELECT_MODE = STREAM_SELECT_MODE_ROUND_ROBIN,
-    parameter int PORTS = 2,
-    parameter int META_WIDTH = 1,
-    parameter bit USE_LAST = 0
+    parameter std_clock_info_t       CLOCK_INFO         = 'b0,
+    parameter stream_pipeline_mode_t PIPELINE_MODE      = STREAM_PIPELINE_MODE_REGISTERED,
+    parameter stream_select_mode_t   STREAM_SELECT_MODE = STREAM_SELECT_MODE_ROUND_ROBIN,
+    parameter int                    PORTS              = 2,
+    parameter int                    META_WIDTH         = 1,
+    parameter bit                    USE_LAST           = 0
 ) (
-    input wire clk,
-    rst,
+    input  wire                   clk, rst,
 
-          mem_intf.in                  mem_in,
-    input wire        [META_WIDTH-1:0] mem_in_meta,
+    mem_intf.in                   mem_in,
+    input  wire [META_WIDTH-1:0]  mem_in_meta,
 
-           mem_intf.out                  mem_out     [PORTS],
-    output logic        [META_WIDTH-1:0] mem_out_meta[PORTS]
+    mem_intf.out                  mem_out[PORTS],
+    output logic [META_WIDTH-1:0] mem_out_meta[PORTS]
 );
 
     typedef bit [mem_in.ADDR_WIDTH-1:0] addr_width_temp_t;
@@ -45,28 +44,29 @@ module mem_split
     // localparam OUTPUT_ID_WIDTH = $bits(mem_out[0].id);
     localparam int INTERNAL_ID_WIDTH = (PORTS > 1) ? $clog2(PORTS) : 1;
     // TODO: Actually check in and out ID widths against PORT count
-    localparam int OUTPUT_ID_WIDTH = (PORTS > 1) ? (ID_WIDTH - INTERNAL_ID_WIDTH) : ID_WIDTH; // ID_WIDTH - INTERNAL_ID_WIDTH;
+    localparam int OUTPUT_ID_WIDTH =
+        (PORTS > 1) ? (ID_WIDTH - INTERNAL_ID_WIDTH) : ID_WIDTH;  // ID_WIDTH - INTERNAL_ID_WIDTH;
     // `STATIC_ASSERT((PORTS > 1) ? (ID_WIDTH == (OUTPUT_ID_WIDTH + INTERNAL_ID_WIDTH)) : (ID_WIDTH == OUTPUT_ID_WIDTH))
 
     typedef struct packed {
-        logic read_enable;
+        logic                  read_enable;
         logic [MASK_WIDTH-1:0] write_enable;
         logic [ADDR_WIDTH-1:0] addr;
         logic [DATA_WIDTH-1:0] data;
-        logic [ID_WIDTH-1:0] id;
+        logic [ID_WIDTH-1:0]   id;
         logic [META_WIDTH-1:0] meta;
     } mem_t;
 
     logic [INTERNAL_ID_WIDTH-1:0] stream_in_id;
     stream_intf #(
-        .T(mem_t)
+        .T (mem_t)
     ) stream_in (
         .clk,
         .rst
     );
 
     stream_intf #(
-        .T(mem_t)
+        .T (mem_t)
     ) stream_out[PORTS] (
         .clk,
         .rst
@@ -85,28 +85,28 @@ module mem_split
             always_comb begin
                 automatic mem_t payload = stream_out[k].payload;
 
-                mem_out[k].valid = stream_out[k].valid;
-                mem_out[k].read_enable = payload.read_enable;
+                mem_out[k].valid        = stream_out[k].valid;
+                mem_out[k].read_enable  = payload.read_enable;
                 mem_out[k].write_enable = payload.write_enable;
-                mem_out[k].addr = payload.addr;
-                mem_out[k].data = payload.data;
-                mem_out[k].id = payload.id[OUTPUT_ID_WIDTH-1:0];
-                mem_out[k].last = stream_out_last[k];
-                mem_out_meta[k] = payload.meta;
-                stream_out[k].ready = mem_out[k].ready;
+                mem_out[k].addr         = payload.addr;
+                mem_out[k].data         = payload.data;
+                mem_out[k].id           = payload.id[OUTPUT_ID_WIDTH-1:0];
+                mem_out[k].last         = stream_out_last[k];
+                mem_out_meta[k]         = payload.meta;
+                stream_out[k].ready     = mem_out[k].ready;
             end
         end
     endgenerate
 
     always_comb begin
-        stream_in.valid = mem_in.valid;
+        stream_in.valid   = mem_in.valid;
         stream_in.payload = '{
-            read_enable: mem_in.read_enable,
+            read_enable:  mem_in.read_enable,
             write_enable: mem_in.write_enable,
-            addr: mem_in.addr,
-            data: mem_in.data,
-            id: mem_in.id,
-            meta: mem_in_meta
+            addr:         mem_in.addr,
+            data:         mem_in.data,
+            id:           mem_in.id,
+            meta:         mem_in_meta
         };
         mem_in.ready = stream_in.ready;
 
@@ -114,19 +114,19 @@ module mem_split
     end
 
     stream_split #(
-        .CLOCK_INFO(CLOCK_INFO),
-        .PIPELINE_MODE(PIPELINE_MODE),
-        .STREAM_SELECT_MODE(STREAM_SELECT_MODE),
-        .PORTS(PORTS),
-        .ID_WIDTH(OUTPUT_ID_WIDTH)
+        .CLOCK_INFO         (CLOCK_INFO),
+        .PIPELINE_MODE      (PIPELINE_MODE),
+        .STREAM_SELECT_MODE (STREAM_SELECT_MODE),
+        .PORTS              (PORTS),
+        .ID_WIDTH           (OUTPUT_ID_WIDTH)
     ) stream_split_inst (
         .clk,
         .rst,
         .stream_in,
         .stream_in_id,
-        .stream_in_last(mem_in.last),
+        .stream_in_last (mem_in.last),
         .stream_out,
-        .stream_out_id (),
+        .stream_out_id  (),
         .stream_out_last
     );
 

@@ -8,33 +8,24 @@ module mem_sequential_single_tb ();
     logic clk, rst;
 
     mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(10),
-        .ID_WIDTH  (4)
-    ) mem_in (
-        .clk,
-        .rst
-    );
+        .DATA_WIDTH (32),
+        .ADDR_WIDTH (10),
+        .ID_WIDTH   (4)
+    ) mem_in (.clk, .rst);
     mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(10),
-        .ID_WIDTH  (4)
-    ) mem_mid (
-        .clk,
-        .rst
-    );
+        .DATA_WIDTH (32),
+        .ADDR_WIDTH (10),
+        .ID_WIDTH   (4)
+    ) mem_mid (.clk, .rst);
     mem_intf #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(10),
-        .ID_WIDTH  (4)
-    ) mem_out (
-        .clk,
-        .rst
-    );
+        .DATA_WIDTH (32),
+        .ADDR_WIDTH (10),
+        .ID_WIDTH   (4)
+    ) mem_out (.clk, .rst);
     /* verilator public_off */
 
     mem_sequential_single #(
-        .ENABLE_OUTPUT_REG(1)
+        .ENABLE_OUTPUT_REG (1)
     ) dut (
         .clk,
         .rst,
@@ -43,13 +34,13 @@ module mem_sequential_single_tb ();
     );
 
     mem_stage #(
-        .PIPELINE_MODE(STREAM_PIPELINE_MODE_REGISTERED)
+        .PIPELINE_MODE (STREAM_PIPELINE_MODE_REGISTERED)
     ) output_stage (
         .clk,
         .rst,
-        .mem_in(mem_mid),
-        .mem_in_meta('0),
+        .mem_in       (mem_mid),
+        .mem_in_meta  ('0),
         .mem_out,
-        .mem_out_meta()
+        .mem_out_meta ()
     );
 endmodule
