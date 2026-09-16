@@ -59,3 +59,11 @@ RustdvTest(
     files=("rtl/stream/stream_merge.sv",),
     wrapper="rtl/stream/test/rtl/stream_merge_tb.sv",
 )
+
+RustdvTest(
+    name="stream-stage-fv",
+    family="stream",
+    top="stream_stage_formal",
+    files=("rtl/stream/stream_stage.sv",),
+    wrapper="rtl/stream/test/rtl/stream_stage_fv.sv",
+)

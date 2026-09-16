@@ -33,26 +33,26 @@ WaveFormat = Literal["vcd", "fst"]
 class RustdvTarget:
     name: str
     family: Literal["gecko", "mem", "stream"]
-    crate: str
-    testcase: str
     top: str
     files: tuple[str, ...]
     wrapper: str
+    crate: str | None = None
+    testcase: str | None = None
     parameters: tuple[tuple[str, str | int], ...] = ()
     arguments: tuple[str, ...] = ()
     program: RiscvProgram | None = None
 
 
 class RustdvTest:
-    """Declare and register a rustdv target in the calling manifest."""
+    """Register a target; omit crate and testcase for a compile-only target."""
 
     def __init__(
         self,
         *,
         name: str,
         family: Literal["gecko", "mem", "stream"],
-        crate: str,
-        testcase: str,
+        crate: str | None = None,
+        testcase: str | None = None,
         top: str,
         files: tuple[str, ...],
         wrapper: str,
@@ -60,6 +60,10 @@ class RustdvTest:
         arguments: tuple[str, ...] = (),
         program: RiscvProgram | None = None,
     ) -> None:
+        if (crate is None) != (testcase is None):
+            raise ValueError(
+                "crate and testcase must either both be set or both be omitted"
+            )
         self.target = RustdvTarget(
             name=name,
             family=family,
@@ -207,6 +211,8 @@ def _build_model(
         "--top-module",
         target.top,
     ]
+    if target.testcase is None:
+        verilator_args.extend(("--assert", "--coverage-user"))
     compile_flags: tuple[str, ...] = ()
     link_flags: tuple[str, ...] = ()
     if wave == "vcd":
@@ -287,6 +293,7 @@ def _write_test_ninja(
     waveforms: list[Path] = []
     for target in targets:
         simulator = simulators[target.name].resolve()
+        assert target.crate is not None
         library = _library_path(target.crate).resolve()
         arguments = target.arguments
         binaries = []
@@ -356,7 +363,7 @@ def build_rustdv_targets(
                 program.write_ninja_build(cast(str, ninja_file))
         subprocess.run(["ninja", "--quiet", "-f", str(program_ninja)], check=True)
 
-    crates = sorted({target.crate for target in targets})
+    crates = sorted({target.crate for target in targets if target.crate is not None})
     for crate in crates:
         subprocess.run(["cargo", "build", "--release", "-p", crate], check=True)
 
@@ -366,7 +373,13 @@ def build_rustdv_targets(
         dotfile_path = Path("build/rustdv") / target.name / "sources.f"
         _write_dotfile(dotfile_path, target, source_files)
         # Test variants sharing identical RTL need only one Verilator build.
-        key = (target.top, target.files, target.wrapper, target.parameters)
+        key = (
+            target.top,
+            target.files,
+            target.wrapper,
+            target.parameters,
+            target.testcase is None,
+        )
         if key not in models:
             models[key] = _build_model(target, dotfile_path, wave)
         simulators[target.name] = models[key]
@@ -383,6 +396,10 @@ def run_rustdv_tests(
     output: bool = False,
 ) -> None:
     """Run previously built targets and verify requested waveforms."""
+    targets = tuple(target for target in targets if target.testcase is not None)
+    if not targets:
+        return
+
     requested_seed = os.environ.get("RUSTDV_RANDOM_SEED")
     seeds = (requested_seed,) if requested_seed is not None else ("1", "24301")
     log_dir = Path("build/rustdv/logs")

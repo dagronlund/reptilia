@@ -186,7 +186,7 @@ def build(
 
     info("Building RustDV targets...")
     simulators = build_rustdv_targets(source_files, targets=targets, wave=wave)
-    if run_tests:
+    if run_tests and any(target.testcase is not None for target in targets):
         info("Running RustDV regressions...")
         run_rustdv_tests(
             targets=targets,
